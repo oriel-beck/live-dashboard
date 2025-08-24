@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Default command definitions (registered from bot deployment)
+model DefaultCommand {
+  id          Int   @id @default(autoincrement()) @db.Integer // Auto-generated for subcommands, Discord ID for main commands
+  discordId   BigInt?  @unique @map("discord_id") @db.BigInt // Discord slash command ID (only for main commands)
+  name        String   @db.VarChar(100)
+  description String   @db.Text
+  cooldown    Int      @default(0) // Cooldown in seconds
+  permissions BigInt   @default(0) @db.BigInt // Discord permission bitfield
+  enabled     Boolean  @default(true)
+  parentId    Int?  @map("parent_id") @db.Integer
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Related command category
+  category CommandCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId Int? @map("category_id") @db.Integer
+  
+  // Self-referential relation for parent/child commands
+  parent      DefaultCommand?  @relation("DefaultCommandHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subcommands DefaultCommand[] @relation("DefaultCommandHierarchy")
+  
+  // Related guild configs
+  guildConfigs GuildCommandConfig[]
+  
+  @@index([name])
+  @@index([parentId])
+  @@index([discordId])
+  @@map("default_commands")
+}
+
+model CommandCategory {
+  id          Int   @id @default(autoincrement()) @db.Integer
+  name        String   @db.VarChar(100)
+  description String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // Related commands
+  commands    DefaultCommand[]
+  
+  @@index([name])
+  @@map("command_categories")
+}
+
+// Guild-specific command configurations
+model GuildCommandConfig {
+  guildId             String   @map("guild_id") @db.VarChar(20)
+  commandId           Int   @map("command_id") @db.Integer // References DefaultCommand.id
+  enabled             Boolean  @default(true)
+  // For main commands only (subcommands inherit from parent)
+  whitelistedRoles    String[] @map("whitelisted_roles") @default([])
+  blacklistedRoles    String[] @map("blacklisted_roles") @default([])
+  whitelistedChannels String[] @map("whitelisted_channels") @default([])
+  blacklistedChannels String[] @map("blacklisted_channels") @default([])
+  bypassRoles         String[] @map("bypass_roles") @default([])
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // Relation to default command
+  defaultCommand DefaultCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  
+  @@id([guildId, commandId])
+  @@index([guildId])
+  @@index([commandId])
+  @@map("guild_command_configs")
+}
