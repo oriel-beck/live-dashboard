@@ -4,7 +4,7 @@ import { redis } from './redis';
 import { DiscordService } from './discord';
 
 export class SessionService {
-  // Store user session data
+  // Store user session data with partial data only
   static async storeUserSession(sessionId: string, userData: {
     user: User;
     guilds: UserGuild[];
@@ -12,9 +12,29 @@ export class SessionService {
     refreshToken: string;
     expiresIn: number;
   }): Promise<void> {
+    // Save only essential user data (remove sensitive/unnecessary fields)
+    const partialUser = {
+      id: userData.user.id,
+      username: userData.user.username,
+      discriminator: userData.user.discriminator,
+      avatar: userData.user.avatar,
+      // email is intentionally excluded for privacy
+    };
+
+    // Save only essential guild data (remove features)
+    const partialGuilds = userData.guilds.map(guild => ({
+      id: guild.id,
+      name: guild.name,
+      icon: guild.icon,
+      owner: guild.owner,
+      permissions: guild.permissions,
+      botHasAccess: guild.botHasAccess,
+      // features field is intentionally excluded
+    }));
+
     const sessionData = {
-      user: userData.user,
-      guilds: userData.guilds,
+      user: partialUser,
+      guilds: partialGuilds,
       accessToken: userData.accessToken,
       refreshToken: userData.refreshToken,
       expiresAt: Date.now() + (userData.expiresIn * 1000), // Convert seconds to milliseconds
@@ -38,16 +58,15 @@ export class SessionService {
     expiresAt: number;
     createdAt: string;
   } | null> {
-    const sessionData = await redis.get(`session:${sessionId}`);
-    
-    if (!sessionData) {
-      return null;
-    }
-
     try {
+      const sessionData = await redis.get(`session:${sessionId}`);
+      if (!sessionData) {
+        return null;
+      }
+
       return JSON.parse(sessionData);
     } catch (error) {
-      console.error('Failed to parse session data:', error);
+      console.error('Error retrieving session data:', error);
       return null;
     }
   }
@@ -82,13 +101,13 @@ export class SessionService {
       // Refresh the access token
       const newTokenData = await DiscordService.refreshAccessToken(sessionData.refreshToken);
       
-      // Get fresh guilds with new token
+      // Get fresh guilds with new token (will be partial data)
       const freshGuilds = await DiscordService.getUserGuilds(newTokenData.access_token, sessionData.user.id);
       
-      // Update session with new token data
+      // Update session with new token data (keeping partial data approach)
       const updatedSessionData = {
-        user: sessionData.user,
-        guilds: freshGuilds,
+        user: sessionData.user, // Keep existing partial user data
+        guilds: freshGuilds, // Fresh partial guild data
         accessToken: newTokenData.access_token,
         refreshToken: newTokenData.refresh_token,
         expiresAt: Date.now() + (newTokenData.expires_in * 1000),
@@ -116,13 +135,13 @@ export class SessionService {
     await redis.del(`session:${sessionId}`);
   }
 
-  // Generate session ID
+  // Generate a unique session ID
   static generateSessionId(): string {
-    return Math.random().toString(36).substring(2) + Date.now().toString(36);
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Middleware to attach user data to request
-  static async attachUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  // Attach user to request from session
+  static async attachUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const sessionId = req.cookies?.sessionId;
     
     if (!sessionId) {
@@ -130,45 +149,34 @@ export class SessionService {
     }
 
     try {
-      // Check if token needs refresh and refresh if needed
-      const sessionData = await SessionService.refreshTokenIfNeeded(sessionId);
+      // Try to get session data, refreshing token if needed
+      const sessionData = await this.refreshTokenIfNeeded(sessionId);
       
       if (sessionData) {
-        // Filter guilds to only include those the user can manage
-        const manageableGuilds = sessionData.guilds.filter(guild => {
-          // Check if user is owner (always has access)
-          if (guild.owner) {
-            return true;
-          }
-
-          // Check for required permissions (Administrator or Manage Server)
-          const permissions = BigInt(guild.permissions);
-          const ADMINISTRATOR = BigInt(1 << 3);
-          const MANAGE_GUILD = BigInt(1 << 5);
-
-          return (permissions & ADMINISTRATOR) === ADMINISTRATOR ||
-                 (permissions & MANAGE_GUILD) === MANAGE_GUILD;
-        });
-
+        // Attach user data with guilds to the request
         req.user = {
           ...sessionData.user,
-          guilds: manageableGuilds
+          guilds: sessionData.guilds
         };
         req.sessionId = sessionId;
         req.sessionData = {
           userId: sessionData.user.id,
-          accessToken: sessionData.accessToken
+          accessToken: sessionData.accessToken,
+          refreshToken: sessionData.refreshToken,
+          expiresAt: sessionData.expiresAt,
         };
       }
     } catch (error) {
-      console.error('Error attaching user:', error);
+      console.error('Error attaching user to request:', error);
+      // Clear invalid session
+      await this.clearUserSession(sessionId);
     }
 
     next();
   }
 
   // Check if user has access to a guild
-  static async hasGuildAccess(userId: string, guildId: string, sessionId: string): Promise<boolean> {
+  static async hasGuildAccess(guildId: string, sessionId: string): Promise<boolean> {
     const sessionData = await SessionService.refreshTokenIfNeeded(sessionId);
     
     if (!sessionData) {

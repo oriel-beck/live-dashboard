@@ -1,5 +1,47 @@
 // API client for bot to communicate with the API service
 export class ApiClient {
+  private static readonly API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
+
+  static async fetchGuildData(guildId: string): Promise<{
+    guildInfo: any;
+    roles: any[];
+    channels: any[];
+  }> {
+    const response = await fetch(`${this.API_BASE}/bot/guilds/${guildId}/data`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.BOT_TOKEN}`, // Bot token for internal API calls
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch guild data: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data as {
+      guildInfo: any;
+      roles: any[];
+      channels: any[];
+    };
+  }
+
+  static async sendCommandResponse(commandId: string, response: any) {
+    const apiResponse = await fetch(`${this.API_BASE}/commands/${commandId}/response`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.BOT_TOKEN}`,
+      },
+      body: JSON.stringify(response),
+    });
+
+    if (!apiResponse.ok) {
+      console.error('Failed to send command response to API');
+    }
+  }
+
   private baseUrl: string;
 
   constructor(baseUrl?: string) {

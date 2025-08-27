@@ -1,75 +1,52 @@
-import { Router, Response, Request } from "express";
-import { AuthenticatedRequest } from "../types";
+import { Request, Response, Router } from "express";
+import { CommandConfigService, DefaultCommandService } from "../database";
 import { requireAuth, requireGuildAccess } from "../middleware/auth";
 import { RedisService } from "../services/redis";
-import { CommandConfigService, DefaultCommandService } from "../database";
 
 const router = Router();
 
 // Apply authentication middleware to all guild routes
 router.use(requireAuth);
 
-// Get guild information
+// Get guild information with lazy loading
 router.get(
   "/:guildId",
   requireGuildAccess,
   async (req: Request, res: Response) => {
     try {
-      const guildInfo = await RedisService.getGuildInfo(req.params.guildId);
+      const guildId = req.params.guildId;
+
+      // Use the new lazy loading method
+      const guildData = await RedisService.getGuildDataWithLazyLoad(guildId);
 
       res.json({
         success: true,
-        data: guildInfo,
+        data: {
+          ...guildData.guildInfo,
+          roles: guildData.roles,
+          channels: guildData.channels,
+          lastUpdate: guildData.guildInfo.lastUpdated,
+          isStale: false, // Data was just fetched or is fresh
+        },
       });
-    } catch (error) {
-      console.error("Error fetching guild info:", error);
+    } catch (error: any) {
+      console.error("Error fetching guild data:", error);
+
+      // Handle specific error cases for dashboard redirect
+      if (
+        error.message === "GUILD_NOT_ACCESSIBLE" ||
+        error.message === "GUILD_FETCH_FAILED"
+      ) {
+        return res.status(404).json({
+          success: false,
+          error: "Guild not found or bot no longer has access",
+          redirectToGuilds: true, // Signal to dashboard to redirect to guilds page
+        });
+      }
+
       res.status(500).json({
         success: false,
         error: "Failed to fetch guild information",
-      });
-    }
-  }
-);
-
-// Get guild roles
-router.get(
-  "/:guildId/roles",
-  requireGuildAccess,
-  async (req: Request, res: Response) => {
-    try {
-      const roles = await RedisService.getGuildRoles(req.params.guildId);
-
-      res.json({
-        success: true,
-        data: { roles },
-      });
-    } catch (error) {
-      console.error("Error fetching guild roles:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to fetch guild roles",
-      });
-    }
-  }
-);
-
-// Get guild channels
-router.get(
-  "/:guildId/channels",
-  requireGuildAccess,
-  async (req: Request, res: Response) => {
-    try {
-      const channels = await RedisService.getGuildChannels(req.params.guildId);
-
-      res.json({
-        success: true,
-        data: { channels },
-      });
-    } catch (error) {
-      console.error("Error fetching guild channels:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to fetch guild channels",
       });
     }
   }
@@ -244,17 +221,39 @@ router.get(
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
-    // Send initial data
-    res.write(
-      `event: update\ndata: ${JSON.stringify({
-        type: "initial",
-        guildId,
-        guildInfo: await RedisService.getGuildInfo(guildId),
-        roles: await RedisService.getGuildRoles(guildId),
-        channels: await RedisService.getGuildChannels(guildId),
-        commands: await CommandConfigService.getGuildCommands(guildId, true),
-      })}\n\n`
-    );
+    // Send initial data with lazy loading
+    try {
+      const guildData = await RedisService.getGuildDataWithLazyLoad(guildId);
+
+      res.write(
+        `event: update\ndata: ${JSON.stringify({
+          type: "initial",
+          guildId,
+          guildInfo: guildData.guildInfo,
+          roles: guildData.roles,
+          channels: guildData.channels,
+          commands: await CommandConfigService.getGuildCommands(guildId, true),
+        })}\n\n`
+      );
+    } catch (error: any) {
+      console.error(`[SSE] Failed to load guild data for ${guildId}:`, error);
+
+      // If guild fetch failed, send error event and close connection
+      res.write(
+        `event: update\ndata: ${JSON.stringify({
+          type: "guild_fetch_failed",
+          guildId,
+          error: error.message || "Failed to fetch guild data",
+        })}\n\n`
+      );
+
+      // Close the connection after sending error
+      setTimeout(() => {
+        res.end();
+      }, 1000);
+
+      return;
+    }
 
     // Subscribe to guild events
     await RedisService.subscribeToGuildEvents(guildId, (message) => {

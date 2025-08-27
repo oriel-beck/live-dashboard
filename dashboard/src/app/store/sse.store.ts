@@ -21,6 +21,7 @@ import {
   GuildService,
 } from '../core/services/guild.service';
 import { pipe, switchMap } from 'rxjs';
+import { Router } from '@angular/router';
 
 interface CacheStore {
   source: EventSource | null;
@@ -51,6 +52,7 @@ const initialState: CacheStore = {
 export const CacheStore = signalStore(
   withState(initialState),
   withMethods((store) => {
+    const router = inject(Router);
     const obj = {
       retryConnection: () => {
         if (store.retryCount() === 5) {
@@ -130,6 +132,16 @@ export const CacheStore = signalStore(
                     new Map<number, CommandConfig>()
                   ),
                 });
+                break;
+              case 'guild_fetch_failed':
+                console.error(`[Dashboard] Guild fetch failed for ${event.guildId}:`, event.error);
+                patchState(store, {
+                  error: `Failed to load guild data: ${event.error}`,
+                });
+                // Close the SSE connection
+                store.source()?.close();
+                // Redirect to guilds page using router
+                router.navigate(['/servers']);
                 break;
             }
           } catch {

@@ -5,7 +5,7 @@ export interface User {
   username: string;
   discriminator: string;
   avatar: string | null;
-  email?: string;
+  email?: string; // Made optional since we exclude it from session data for privacy
   guilds?: UserGuild[];
 }
 
@@ -15,7 +15,7 @@ export interface UserGuild {
   icon: string | null;
   owner: boolean;
   permissions: string;
-  features: string[];
+  features?: string[]; // Made optional since we're removing it from session data
   botHasAccess?: boolean; // Whether the bot has access to this guild
 }
 
