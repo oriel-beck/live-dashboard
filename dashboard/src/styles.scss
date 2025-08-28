@@ -161,6 +161,21 @@ body {
     padding: var(--space-lg) var(--space-2xl);
     font-size: 1.1rem;
   }
+
+  // SVG icon styling for buttons
+  svg {
+    width: 16px;
+    height: 16px;
+    margin-right: var(--space-sm);
+    flex-shrink: 0;
+  }
+
+  // For buttons with only icons (no text), center the icon
+  &:has(svg):not(:has(span)) {
+    svg {
+      margin-right: 0;
+    }
+  }
 }
 
 // Modern Card Component

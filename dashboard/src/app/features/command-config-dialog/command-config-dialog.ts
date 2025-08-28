@@ -7,7 +7,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { DividerModule } from 'primeng/divider';
 import { DynamicDialogRef, DynamicDialogConfig } from 'primeng/dynamicdialog';
-import { CommandConfig, GuildRole, GuildChannel } from '../../core/services/guild.service';
+import { CommandConfigData as CommandConfig, GuildRole, GuildChannel } from '@discord-bot/shared-types';
 
 @Component({
   selector: 'app-command-config-dialog',

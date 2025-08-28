@@ -1,60 +1,10 @@
 import { inject, Injectable } from '@angular/core';
-import { Observable, map, catchError, of } from 'rxjs';
+import {
+  CommandConfigData as CommandConfig,
+  GuildInfo
+} from '@discord-bot/shared-types';
+import { catchError, map, Observable, of } from 'rxjs';
 import { ApiService } from './api.service';
-
-export interface GuildInfo {
-  id: string;
-  name: string;
-  icon: string | null;
-  owner_id: string;
-}
-
-export interface GuildRole {
-  id: string;
-  name: string;
-  color: number;
-  hoist: boolean;
-  position: number;
-  permissions: string;
-  managed: boolean;
-  mentionable: boolean;
-}
-
-export interface GuildChannel {
-  id: string;
-  name: string;
-  type: number;
-  position: number;
-  parent_id: string | null;
-  permission_overwrites: unknown[];
-}
-
-export interface CommandConfig {
-  id: number;
-  discordId?: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  permissions: string;
-  cooldown: number;
-  whitelistedRoles: string[];
-  blacklistedRoles: string[];
-  whitelistedChannels: string[];
-  blacklistedChannels: string[];
-  bypassRoles: string[];
-  subcommands?: Record<string, unknown>;
-  category?: CommandCategory;
-  categoryId?: number;
-}
-
-export interface CommandCategory {
-  id: number;
-  name: string;
-  description: string;
-  updatedAt: Date;
-  createdAt: Date;
-  commands: CommandConfig[];
-}
 
 @Injectable({
   providedIn: 'root'

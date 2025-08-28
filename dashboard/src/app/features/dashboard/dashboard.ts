@@ -4,10 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DialogService } from 'primeng/dynamicdialog';
 import { AuthService } from '../../core/services/auth.service';
-import {
-  CommandCategory,
-  CommandConfig
-} from '../../core/services/guild.service';
 import { CacheStore } from '../../store/sse.store';
 
 // PrimeNG Components
@@ -18,6 +14,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 
 // Import the command config dialog component
 import { CommandConfigDialog } from '../command-config-dialog/command-config-dialog';
+import { CommandCategory, CommandConfigData as CommandConfig } from '@discord-bot/shared-types';
 
 @Component({
   selector: 'app-dashboard',
@@ -43,9 +40,9 @@ export class Dashboard {
   selectedCategory = signal<CommandCategory | null>(null);
   
   constructor() {
-    // Select first category when available
+    // Select first category when available, but only if no category is currently selected
     effect(() => {
-      if (this.store.commandsCategories()) {
+      if (this.store.commandsCategories() && !this.selectedCategory()) {  
         this.selectedCategory.set(
           this.store.commandsCategories().values().next().value!
         );

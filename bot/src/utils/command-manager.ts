@@ -85,7 +85,7 @@ export class CommandManager {
         // Transform API response to internal format
         return {
           id: config.id,
-          commandName: config.name,
+          commandName: config.commandName,
           guildId: guildId,
           enabled: config.enabled,
           cooldown: config.cooldown,
@@ -124,30 +124,32 @@ export class CommandManager {
         false, // Don't need all subcommands, just the specific one
         subcommandName
       );
-      if (config && config.command && config.subcommand) {
-        // Transform API response to internal format
+      
+      // The API returns a CommandConfigWithSubcommandResult when subcommandName is provided
+      if (config && 'subcommand' in config) {
+        const result = config as any; // Type assertion for now
         return {
           command: {
-            id: config.command.id,
-            commandName: config.command.name,
+            id: result.id,
+            commandName: result.name,
             guildId: guildId,
-            enabled: config.command.enabled,
-            cooldown: config.command.cooldown,
-            permissions: config.command.permissions,
-            subcommands: config.command.subcommands || {},
-            createdAt: config.command.createdAt,
-            updatedAt: config.command.updatedAt,
+            enabled: result.enabled,
+            cooldown: result.cooldown,
+            permissions: result.permissions,
+            subcommands: result.subcommands || {},
+            createdAt: result.createdAt,
+            updatedAt: result.updatedAt,
           },
           subcommand: {
-            id: config.subcommand.id,
-            commandName: config.subcommand.name,
+            id: result.subcommand.id,
+            commandName: result.subcommand.name,
             guildId: guildId,
-            enabled: config.subcommand.enabled,
-            cooldown: config.subcommand.cooldown,
-            permissions: config.subcommand.permissions,
+            enabled: result.subcommand.enabled,
+            cooldown: result.subcommand.cooldown,
+            permissions: result.subcommand.permissions,
             subcommands: {},
-            createdAt: config.subcommand.createdAt,
-            updatedAt: config.subcommand.updatedAt,
+            createdAt: result.subcommand.createdAt,
+            updatedAt: result.subcommand.updatedAt,
           }
         };
       }
@@ -383,7 +385,7 @@ export class CommandManager {
       for (const [commandName, config] of Object.entries(configs)) {
         const guildConfig: GuildCommandConfig = {
           id: config.id,
-          commandName: config.name,
+          commandName: config.commandName,
           guildId: guildId,
           enabled: config.enabled,
           cooldown: config.cooldown,

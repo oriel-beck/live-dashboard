@@ -11,16 +11,16 @@ import { tapResponse } from '@ngrx/operators';
 import { injectParams } from 'ngxtension/inject-params';
 import { environment } from '../../environments/environment';
 import { computed, inject } from '@angular/core';
-import {
-  CommandCategory,
-  CommandConfig,
-  GuildChannel,
-  GuildInfo,
-  GuildRole,
-  GuildService,
-} from '../core/services/guild.service';
+import { GuildService } from '../core/services/guild.service';
 import { pipe, switchMap } from 'rxjs';
 import { Router } from '@angular/router';
+import {
+  CommandConfigData as CommandConfig,
+  GuildRole,
+  GuildChannel,
+  GuildInfo,
+  CommandCategory,
+} from '@discord-bot/shared-types';
 
 interface CacheStore {
   source: EventSource | null;
@@ -102,10 +102,15 @@ export const CacheStore = signalStore(
                   break;
                 }
 
+                const { command: evCommand, subcommand } = event;
                 const newCommand = {
                   ...command,
-                  ...event.command,
+                  ...evCommand,
                 };
+
+                if (subcommand) {
+                  newCommand.subcommands[subcommand.name] = subcommand;
+                }
 
                 copy.set(event.command.id, newCommand);
 
@@ -128,7 +133,10 @@ export const CacheStore = signalStore(
                 });
                 break;
               case 'guild_fetch_failed':
-                console.error(`[Dashboard] Guild fetch failed for ${event.guildId}:`, event.error);
+                console.error(
+                  `[Dashboard] Guild fetch failed for ${event.guildId}:`,
+                  event.error
+                );
                 patchState(store, {
                   error: `Failed to load guild data: ${event.error}`,
                 });
@@ -246,25 +254,28 @@ export const CacheStore = signalStore(
   withComputed((store) => {
     return {
       commandsCategories: computed(() => {
-        return Array.from(store.commands().values()).reduce((acc, command) => {
-          // Check if command has category information
-          if (command.category && command.categoryId) {
-            let data = acc.get(command.categoryId) ?? command.category;
-            data.commands ??= [];
-            const existingCommand = data.commands.find(
-              (c) => c.id === command.id
-            );
-            if (!existingCommand) {
-              data.commands.push(command);
-            } else {
-              data.commands = data.commands.map((c) =>
-                c.id === command.id ? command : c
+        return Array.from(store.commands().values()).reduce(
+          (acc, command: CommandConfig) => {
+            // Check if command has category information
+            if (command.category && command.categoryId) {
+              let data = acc.get(command.categoryId) ?? command.category;
+              data.commands ??= [];
+              const existingCommand = data.commands.find(
+                (c: CommandConfig) => c.id === command.id
               );
+              if (!existingCommand) {
+                data.commands.push(command);
+              } else {
+                data.commands = data.commands.map((c: CommandConfig) =>
+                  c.id === command.id ? command : c
+                );
+              }
+              acc.set(command.categoryId, data);
             }
-            acc.set(command.categoryId, data);
-          }
-          return acc;
-        }, new Map<number, CommandCategory>());
+            return acc;
+          },
+          new Map<number, CommandCategory>()
+        );
       }),
     };
   }),

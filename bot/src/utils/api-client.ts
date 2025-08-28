@@ -1,15 +1,18 @@
 import { APIChannel, APIGuild, APIRole } from 'discord.js';
 import logger from './logger';
+import { GuildCommandConfig } from '../types/command';
+import { 
+  GuildDataResponseSchema,
+  DefaultCommandRegistrationSchema,
+  GuildDataResponse,
+  DefaultCommandRegistration
+} from '@discord-bot/shared-types';
 
 // API client for bot to communicate with the API service
 export class ApiClient {
   private static readonly API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
 
-  static async fetchGuildData(guildId: string): Promise<{
-    guildInfo: APIGuild;
-    roles: APIRole[];
-    channels: APIChannel[];
-  }> {
+  static async fetchGuildData(guildId: string): Promise<GuildDataResponse> {
     const response = await fetch(`${this.API_BASE}/bot/guilds/${guildId}/data`, {
       method: 'GET',
       headers: {
@@ -23,11 +26,10 @@ export class ApiClient {
     }
 
     const data = await response.json();
-    return data as {
-      guildInfo: APIGuild;
-      roles: APIRole[];
-      channels: APIChannel[];
-    };
+    
+    // Validate response data
+    const validatedData = GuildDataResponseSchema.parse(data);
+    return validatedData;
   }
 
   static async sendCommandResponse(commandId: string, response: unknown) {
@@ -57,17 +59,17 @@ export class ApiClient {
     return url;
   }
 
-  async get(endpoint: string): Promise<unknown> {
+  async get<T>(endpoint: string): Promise<T> {
     const response = await fetch(`${this.baseUrl}${endpoint}`);
     if (!response.ok) {
       throw new Error(
         `API request failed: ${response.status} ${response.statusText}`
       );
     }
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
-  async post(endpoint: string, data: unknown): Promise<unknown> {
+  async post<T>(endpoint: string, data: unknown): Promise<T> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: "POST",
       headers: {
@@ -80,10 +82,10 @@ export class ApiClient {
         `API request failed: ${response.status} ${response.statusText}`
       );
     }
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
-  async put(endpoint: string, data: unknown): Promise<unknown> {
+  async put<T>(endpoint: string, data: unknown): Promise<T> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: "PUT",
       headers: {
@@ -96,15 +98,15 @@ export class ApiClient {
         `API request failed: ${response.status} ${response.statusText}`
       );
     }
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
   async getGuildCommandConfigs(
     guildId: string,
     withSubcommands: boolean = false
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Record<string, GuildCommandConfig>> {
     const params = withSubcommands ? "?withSubcommands=true" : "";
-    return this.get(`/guilds/${guildId}/commands${params}`) as Promise<Record<string, unknown>>;
+    return this.get(`/guilds/${guildId}/commands${params}`) as Promise<Record<string, GuildCommandConfig>>;
   }
 
   // Get command config by ID
@@ -113,13 +115,13 @@ export class ApiClient {
     commandId: string,
     withSubcommands: boolean = false,
     subcommandName?: string
-  ): Promise<unknown> {
+  ) {
     const params = new URLSearchParams();
     if (withSubcommands) params.append("withSubcommands", "true");
     if (subcommandName) params.append("subcommandName", subcommandName);
     
     const queryString = params.toString();
-    return this.get(`/guilds/${guildId}/commands/${commandId}${queryString ? `?${queryString}` : ""}`);
+    return this.get<GuildCommandConfig>(`/guilds/${guildId}/commands/${commandId}${queryString ? `?${queryString}` : ""}`);
   }
 
   // Update command config by ID
@@ -145,15 +147,9 @@ export class ApiClient {
   }
 
   // Register a default command in the database (upsert operation - creates or updates)
-  async registerDefaultCommand(command: {
-    discordId?: string | null; // Only for main commands
-    name: string;
-    description: string;
-    permissions: string;
-    enabled: boolean;
-    parentId?: string | null;
-    cooldown: number;
-  }): Promise<unknown> {
-    return this.post("/commands/register", command);
+  async registerDefaultCommand(command: DefaultCommandRegistration): Promise<unknown> {
+    // Validate command data
+    const validatedCommand = DefaultCommandRegistrationSchema.parse(command);
+    return this.post("/commands/register", validatedCommand);
   }
 }

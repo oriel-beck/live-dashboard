@@ -1,5 +1,13 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, SlashCommandSubcommandsOnlyBuilder } from 'discord.js';
 import logger from '../utils/logger';
+import {
+  GuildCommandConfig,
+  SubcommandConfig,
+  CommandExecutionContext,
+  PermissionCheckResult,
+  CommandInfo,
+  CommandPermissions,
+} from '@discord-bot/shared-types';
 
 // ===== BASE COMMAND CLASS =====
 // Abstract base class that all commands must extend
@@ -58,55 +66,12 @@ export interface CommandDefinition {
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }
 
-// ===== GUILD-SPECIFIC CONFIGURATION =====
-// These values can be configured per guild through the dashboard
-
-export interface GuildCommandPermissions {
-  whitelistedRoles: string[]; // Role IDs that can use the command
-  blacklistedRoles: string[]; // Role IDs that cannot use the command
-  whitelistedChannels: string[]; // Channel IDs where command can be used
-  blacklistedChannels: string[]; // Channel IDs where command cannot be used
-  bypassRoles: string[]; // Role IDs that bypass all restrictions
-}
-
-export interface GuildCommandConfig {
-  id: string;
-  commandName: string;
-  guildId: string;
-  enabled: boolean;
-  cooldown: number;
-  permissions: GuildCommandPermissions;
-  subcommands?: Record<string, GuildSubcommandConfig>;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface GuildSubcommandConfig {
-  enabled: boolean;
-  cooldown: number;
-  permissions: GuildCommandPermissions;
-}
-
-// ===== RUNTIME TYPES =====
-// These are used during command execution
-
-export interface CommandExecutionContext {
-  interaction: ChatInputCommandInteraction;
-  definition: CommandDefinition;
-  guildConfig: GuildCommandConfig;
-  subcommandConfig?: GuildSubcommandConfig;
-}
-
-export interface PermissionCheckResult {
-  allowed: boolean;
-  reason?: string;
-  bypassUsed?: boolean;
-}
-
-export interface CommandInfo {
-  name: string;
-  description: string;
-}
-
-// Legacy alias for backward compatibility during refactor
-export type Command = CommandDefinition;
+// Re-export shared types for convenience
+export {
+  GuildCommandConfig,
+  SubcommandConfig as GuildSubcommandConfig,
+  CommandExecutionContext,
+  PermissionCheckResult,
+  CommandInfo,
+  CommandPermissions as GuildCommandPermissions,
+};
