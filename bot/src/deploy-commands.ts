@@ -15,8 +15,9 @@ import { REST, Routes, ApplicationCommand } from "discord.js";
 import { CommandLoader } from "./utils/command-loader";
 import { ApiClient } from "./utils/api-client";
 import logger from "./utils/logger";
+import { BaseCommand } from './types/command';
 
-async function deployGlobalCommands(commands: any[]): Promise<ApplicationCommand[]> {
+async function deployGlobalCommands(commands: BaseCommand[]): Promise<ApplicationCommand[]> {
   const BOT_TOKEN = process.env.BOT_TOKEN!;
   
   // Extract application ID from bot token
@@ -43,7 +44,7 @@ async function deployGlobalCommands(commands: any[]): Promise<ApplicationCommand
 }
 
 async function registerCommandsInDatabase(
-  localCommands: any[],
+  localCommands: BaseCommand[],
   deployedCommands: ApplicationCommand[]
 ) {
   const apiClient = new ApiClient();
@@ -64,14 +65,14 @@ async function registerCommandsInDatabase(
       name: deployedCmd.name,
       description: deployedCmd.description,
       cooldown: 0, // Default cooldown in seconds
-      permissions: (localCommand.requiredPermissions || [])
-        .reduce((acc: bigint, perm: any) => acc | BigInt(perm), 0n)
+      permissions: ((localCommand as any).requiredPermissions || [])
+        .reduce((acc: bigint, perm: unknown) => acc | BigInt(perm as string), 0n)
         .toString(),
       enabled: true,
       parentId: null,
     });
 
-    const mainCommandId = mainCommandResponse.command.id;
+    const mainCommandId = (mainCommandResponse as any).command.id;
     logger.info(
       `[Deploy] Registered command: ${deployedCmd.name} (${deployedCmd.id} -> ${mainCommandId})`
     );
@@ -91,7 +92,7 @@ async function registerCommandsInDatabase(
 async function registerSubcommands(
   apiClient: ApiClient,
   deployedCmd: ApplicationCommand,
-  localCommand: any,
+  localCommand: unknown,
   parentId: string
 ) {
   if (!deployedCmd.options) return;
@@ -110,7 +111,7 @@ async function registerSubcommands(
         parentId,
       });
 
-      const groupId = groupResponse.command.id;
+      const groupId = (groupResponse as any).command.id;
       logger.info(
         `[Deploy] Registered subcommand group: ${option.name} (${groupId})`
       );

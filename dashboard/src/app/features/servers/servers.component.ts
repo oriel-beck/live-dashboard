@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
-import { UserGuild } from '../../core/models/user.model';
 
 @Component({
   selector: 'app-servers',
@@ -48,12 +47,8 @@ export class ServersComponent implements OnInit {
 
   loadServers() {
     this.authService.getUserGuilds().subscribe({
-      next: () => {
-        // Success handled by auth service
-      },
-      error: (error) => {
+      error: () => {
         this.error.set('Failed to load your servers. Please try again.');
-        console.error('Failed to load guilds:', error);
       }
     });
   }
@@ -69,7 +64,6 @@ export class ServersComponent implements OnInit {
   logout() {
     this.authService.logout().subscribe();
   }
-
 
   clearSearch() {
     this.searchQuery.set('');

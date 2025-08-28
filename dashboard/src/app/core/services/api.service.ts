@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -32,7 +32,7 @@ export class ApiService {
   }
 
   // Generic POST request
-  post<T>(endpoint: string, data: any): Observable<ApiResponse<T>> {
+  post<T>(endpoint: string, data: unknown): Observable<ApiResponse<T>> {
     return this.http.post<ApiResponse<T>>(`${this.baseUrl}${endpoint}`, data, {
       headers: this.getHeaders(),
       withCredentials: true
@@ -40,7 +40,7 @@ export class ApiService {
   }
 
   // Generic PUT request
-  put<T>(endpoint: string, data: any): Observable<ApiResponse<T>> {
+  put<T>(endpoint: string, data: unknown): Observable<ApiResponse<T>> {
     return this.http.put<ApiResponse<T>>(`${this.baseUrl}${endpoint}`, data, {
       headers: this.getHeaders(),
       withCredentials: true

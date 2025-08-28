@@ -1,16 +1,34 @@
 import { CommonModule } from '@angular/common';
 import { Component, effect, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { DialogService } from 'primeng/dynamicdialog';
 import { AuthService } from '../../core/services/auth.service';
 import {
   CommandCategory,
-  CommandConfig,
+  CommandConfig
 } from '../../core/services/guild.service';
 import { CacheStore } from '../../store/sse.store';
 
+// PrimeNG Components
+import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
+import { DividerModule } from 'primeng/divider';
+import { MultiSelectModule } from 'primeng/multiselect';
+
+// Import the command config dialog component
+import { CommandConfigDialog } from '../command-config-dialog/command-config-dialog';
+
 @Component({
   selector: 'app-dashboard',
-  imports: [CommonModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MultiSelectModule,
+    CheckboxModule,
+    ButtonModule,
+    DividerModule,
+  ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
   providers: [CacheStore],
@@ -18,21 +36,22 @@ import { CacheStore } from '../../store/sse.store';
 export class Dashboard {
   private authService = inject(AuthService);
   private router = inject(Router);
+  private dialogService = inject(DialogService);
   store = inject(CacheStore);
 
   // Selected category
   selectedCategory = signal<CommandCategory | null>(null);
-  selectFirstCategory = effect(() => {
-    if (this.store.commandsCategories()) {
-      this.selectedCategory.set(
-        this.store.commandsCategories().values().next().value!
+  
+  constructor() {
+    // Select first category when available
+    effect(() => {
+      if (this.store.commandsCategories()) {
+        this.selectedCategory.set(
+          this.store.commandsCategories().values().next().value!
         );
-    }
-  });
-
-  // Command configuration modal
-  isConfigModalOpen = signal(false);
-  configModalCommand = signal<CommandConfig | null>(null);
+      }
+    });
+  }
 
   // Navigation and UI methods
   navigateBack() {
@@ -60,13 +79,25 @@ export class Dashboard {
   }
 
   openCommandConfig(command: CommandConfig) {
-    this.configModalCommand.set(command);
-    this.isConfigModalOpen.set(true);
-  }
+    const ref = this.dialogService.open(CommandConfigDialog, {
+      header: `Configure Command: ${command.name}`,
+      width: '700px',
+      data: {
+        command,
+        roles: this.store.roles(),
+        channels: this.store.channels(),
+      },
+      styleClass: 'command-config-dialog',
+    });
 
-  closeConfigModal() {
-    this.isConfigModalOpen.set(false);
-    this.configModalCommand.set(null);
+    ref.onClose.subscribe((result: Partial<CommandConfig> | undefined) => {
+      if (result) {
+        this.store.saveCommandConfig({
+          commandId: command.id,
+          updates: result,
+        });
+      }
+    });
   }
 
   getSubcommands(command: CommandConfig) {

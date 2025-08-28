@@ -17,7 +17,7 @@ export const routes: Routes = [
   {
     path: 'servers/:serverId',
     loadComponent: () =>
-      import('./features/dashboard/dashboard').then((feature) => feature.Dashboard),
+      import('./features/dashboard/dashboard').then((m) => m.Dashboard),
     canActivate: [authGuard, guildAccessGuard],
   },
   // Legacy redirect for backward compatibility

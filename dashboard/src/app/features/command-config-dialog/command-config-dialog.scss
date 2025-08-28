@@ -1,0 +1,161 @@
+// Command Configuration Dialog Styles
+:host {
+  display: block;
+}
+
+// Dialog Content
+.config-dialog-content {
+  padding: var(--space-xl);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--color-bg-secondary);
+
+  .config-section {
+    margin-bottom: var(--space-2xl);
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin: 0 0 var(--space-lg) 0;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+
+      &::before {
+        content: '';
+        width: 3px;
+        height: 20px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        border-radius: 2px;
+      }
+    }
+
+    .config-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-lg);
+      gap: var(--space-lg);
+      padding: var(--space-lg);
+      background: var(--color-bg-tertiary);
+      border: 1px solid var(--color-border-primary);
+      border-radius: var(--radius-lg);
+      transition: all var(--transition-fast);
+
+      &:hover {
+        border-color: #6366f1;
+        background: rgba(99, 102, 241, 0.05);
+      }
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      label {
+        font-weight: 500;
+        color: var(--color-text-primary);
+        font-size: 0.95rem;
+        min-width: 150px;
+        flex-shrink: 0;
+      }
+
+      // Custom MultiSelect Styles
+      ::ng-deep .custom-multiselect {
+        flex: 1;
+        min-width: 200px;
+      }
+    }
+  }
+}
+
+// Dialog Footer
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  background: var(--color-bg-tertiary);
+  border-top: 1px solid var(--color-border-primary);
+}
+
+// Button Styles
+::ng-deep .p-button {
+  &.p-button-text {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--color-text-secondary);
+    transition: all var(--transition-fast);
+
+    &:hover {
+      background: var(--color-bg-secondary);
+      border-color: var(--color-border-primary);
+      color: var(--color-text-primary);
+    }
+  }
+
+  &.p-button-success {
+    background: #10b981;
+    border: 1px solid #10b981;
+    color: white;
+    transition: all var(--transition-fast);
+
+    &:hover {
+      background: #059669;
+      border-color: #059669;
+    }
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .config-dialog-content {
+    padding: var(--space-lg);
+
+    .config-section {
+      .config-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-md);
+
+        label {
+          min-width: auto;
+        }
+
+        ::ng-deep .custom-multiselect {
+          width: 100%;
+          min-width: auto;
+        }
+      }
+    }
+  }
+
+  .dialog-footer {
+    padding: var(--space-lg);
+  }
+}
+
+// Scrollbar Styles
+.config-dialog-content {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--color-bg-tertiary);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-border-primary);
+    border-radius: 3px;
+
+    &:hover {
+      background: #6366f1;
+    }
+  }
+}

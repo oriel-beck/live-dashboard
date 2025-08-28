@@ -1,0 +1,104 @@
+<div class="config-dialog-content">
+
+  <!-- Channel Permissions -->
+  <div class="config-section">
+    <h3>Channel Permissions</h3>
+    <div class="config-row">
+      <label>Whitelisted Channels</label>
+      <p-multiSelect
+        [(ngModel)]="configForm().whitelistedChannels"
+        [options]="channelOptions()"
+        [filter]="true"
+        appendTo="body"
+        filterPlaceholder="Search channels..."
+        placeholder="Select channels to whitelist"
+        class="custom-multiselect"
+        optionLabel="label"
+        optionValue="value"
+        [dt]="multiselectTokens"
+      ></p-multiSelect>
+    </div>
+    <div class="config-row">
+      <label>Blacklisted Channels</label>
+      <p-multiSelect
+        [(ngModel)]="configForm().blacklistedChannels"
+        [options]="channelOptions()"
+        [filter]="true"
+        appendTo="body"
+        filterPlaceholder="Search channels..."
+        placeholder="Select channels to blacklist"
+        class="custom-multiselect"
+        optionLabel="label"
+        optionValue="value"
+        [dt]="multiselectTokens"
+      ></p-multiSelect>
+    </div>
+  </div>
+
+  <p-divider></p-divider>
+
+  <!-- Role Permissions -->
+  <div class="config-section">
+    <h3>Role Permissions</h3>
+    <div class="config-row">
+      <label>Whitelisted Roles</label>
+      <p-multiSelect
+        [(ngModel)]="configForm().whitelistedRoles"
+        [options]="roleOptions()"
+        [filter]="true"
+        appendTo="body"
+        filterPlaceholder="Search roles..."
+        placeholder="Select roles to whitelist"
+        class="custom-multiselect"
+        optionLabel="label"
+        optionValue="value"
+        [dt]="multiselectTokens"
+      ></p-multiSelect>
+    </div>
+    <div class="config-row">
+      <label>Blacklisted Roles</label>
+      <p-multiSelect
+        [(ngModel)]="configForm().blacklistedRoles"
+        [options]="roleOptions()"
+        [filter]="true"
+        appendTo="body"
+        filterPlaceholder="Search roles..."
+        placeholder="Select roles to blacklist"
+        class="custom-multiselect"
+        optionLabel="label"
+        optionValue="value"
+        [dt]="multiselectTokens"
+      ></p-multiSelect>
+    </div>
+    <div class="config-row">
+      <label>Bypass Roles</label>
+      <p-multiSelect
+        [(ngModel)]="configForm().bypassRoles"
+        [options]="roleOptions()"
+        [filter]="true"
+        appendTo="body"
+        filterPlaceholder="Search roles..."
+        placeholder="Select roles that can bypass restrictions"
+        class="custom-multiselect"
+        optionLabel="label"
+        optionValue="value"
+        [dt]="multiselectTokens"
+      ></p-multiSelect>
+    </div>
+  </div>
+</div>
+
+<div class="dialog-footer">
+  <p-button
+    label="Cancel"
+    icon="pi pi-times"
+    (onClick)="onCancel()"
+    [styleClass]="'p-button-text'"
+  ></p-button>
+  <p-button
+    label="Save Changes"
+    icon="pi pi-check"
+    (onClick)="onSave()"
+    [styleClass]="'p-button-success'"
+  ></p-button>
+</div>

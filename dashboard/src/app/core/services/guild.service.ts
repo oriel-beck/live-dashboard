@@ -26,7 +26,7 @@ export interface GuildChannel {
   type: number;
   position: number;
   parent_id: string | null;
-  permission_overwrites: any[];
+  permission_overwrites: unknown[];
 }
 
 export interface CommandConfig {
@@ -42,7 +42,7 @@ export interface CommandConfig {
   whitelistedChannels: string[];
   blacklistedChannels: string[];
   bypassRoles: string[];
-  subcommands?: Record<string, any>;
+  subcommands?: Record<string, unknown>;
   category?: CommandCategory;
   categoryId?: number;
 }
@@ -72,26 +72,6 @@ export class GuildService {
     );
   }
 
-  getGuildRoles(guildId: string): Observable<GuildRole[]> {
-    return this.apiService.get<{ roles: GuildRole[] }>(`/guilds/${guildId}/roles`).pipe(
-      map(response => response.success ? response.data?.roles || [] : []),
-      catchError(error => {
-        console.error('Failed to fetch guild roles:', error);
-        return of([]);
-      })
-    );
-  }
-
-  getGuildChannels(guildId: string): Observable<GuildChannel[]> {
-    return this.apiService.get<{ channels: GuildChannel[] }>(`/guilds/${guildId}/channels`).pipe(
-      map(response => response.success ? response.data?.channels || [] : []),
-      catchError(error => {
-        console.error('Failed to fetch guild channels:', error);
-        return of([]);
-      })
-    );
-  }
-
   getGuildCommands(guildId: string, withSubcommands = false): Observable<Record<string, CommandConfig>> {
     const params = withSubcommands ? '?withSubcommands=true' : '';
     return this.apiService.get<Record<string, CommandConfig>>(`/guilds/${guildId}/commands${params}`).pipe(
@@ -113,7 +93,7 @@ export class GuildService {
     );
   }
 
-  updateSubcommandConfig(guildId: string, commandId: number, subcommandName: string, updates: any): Observable<any> {
+  updateSubcommandConfig(guildId: string, commandId: number, subcommandName: string, updates: unknown): Observable<unknown> {
     return this.apiService.put(`/guilds/${guildId}/commands/${commandId}/${subcommandName}`, updates).pipe(
       map(response => response.success ? response.data || null : null),
       catchError(error => {

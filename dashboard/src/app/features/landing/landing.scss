@@ -256,6 +256,7 @@
     &:hover {
       .feature-icon {
         transform: translateY(-4px);
+        transition: transform var(--transition-normal);
       }
     }
   }

@@ -30,13 +30,15 @@ router.get(
           isStale: false, // Data was just fetched or is fresh
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching guild data:", error);
 
       // Handle specific error cases for dashboard redirect
       if (
-        error.message === "GUILD_NOT_ACCESSIBLE" ||
-        error.message === "GUILD_FETCH_FAILED"
+        error instanceof Error && (
+          error.message === "GUILD_NOT_ACCESSIBLE" ||
+          error.message === "GUILD_FETCH_FAILED"
+        )
       ) {
         return res.status(404).json({
           success: false,
@@ -235,7 +237,7 @@ router.get(
           commands: await CommandConfigService.getGuildCommands(guildId, true),
         })}\n\n`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(`[SSE] Failed to load guild data for ${guildId}:`, error);
 
       // If guild fetch failed, send error event and close connection
@@ -243,7 +245,7 @@ router.get(
         `event: update\ndata: ${JSON.stringify({
           type: "guild_fetch_failed",
           guildId,
-          error: error.message || "Failed to fetch guild data",
+          error: error instanceof Error ? error.message : "Failed to fetch guild data",
         })}\n\n`
       );
 

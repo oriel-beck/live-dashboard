@@ -31,7 +31,6 @@ export class Landing implements OnInit {
     this.route.queryParams.subscribe(params => {
       if (params['auth'] === 'success') {
         this.authSuccess = 'Successfully logged in! Redirecting...';
-        // Check auth status to update user data
         this.authService.checkAuthStatus().subscribe();
       } else if (params['auth'] === 'error') {
         this.authError = 'Failed to login with Discord. Please try again.';
@@ -58,7 +57,7 @@ export class Landing implements OnInit {
         this.authSuccess = 'Successfully logged out';
         setTimeout(() => this.clearMessages(), 3000);
       },
-      error: (error) => {
+      error: () => {
         this.authError = 'Failed to logout';
         setTimeout(() => this.clearMessages(), 5000);
       }

@@ -9,11 +9,11 @@ export async function hdel(key: string, field: string) {
   await redis.hdel(key, field);
 }
 
-export async function publishGuildEvent(guildId: string, evt: any) {
+export async function publishGuildEvent(guildId: string, evt: unknown) {
   await redis.publish(REDIS_KEYS.GUILD_EVENTS(guildId), JSON.stringify(evt));
 }
 
-export async function publishUserEvent(userId: string, evt: any) {
+export async function publishUserEvent(userId: string, evt: unknown) {
   await redis.publish(REDIS_KEYS.USER_EVENTS(userId), JSON.stringify(evt));
 }
 
@@ -37,7 +37,7 @@ export async function getAllGuildIds(): Promise<string[]> {
 
 export async function setGuildDataWithTTL(
   guildId: string, 
-  data: Record<string, any>, 
+  data: Record<string, unknown>, 
   ttlSeconds: number
 ) {
   const key = REDIS_KEYS.GUILD_INFO(guildId);
@@ -47,7 +47,7 @@ export async function setGuildDataWithTTL(
 
 export async function setGuildRolesWithTTL(
   guildId: string, 
-  roles: Record<string, any>, 
+  roles: Record<string, unknown>, 
   ttlSeconds: number
 ) {
   const key = REDIS_KEYS.GUILD_ROLES(guildId);
@@ -63,7 +63,7 @@ export async function setGuildRolesWithTTL(
 
 export async function setGuildChannelsWithTTL(
   guildId: string, 
-  channels: Record<string, any>, 
+  channels: Record<string, unknown>, 
   ttlSeconds: number
 ) {
   const key = REDIS_KEYS.GUILD_CHANNELS(guildId);

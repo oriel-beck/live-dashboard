@@ -5,7 +5,6 @@ import {
   withHooks,
   withMethods,
   withState,
-  WritableStateSource,
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { tapResponse } from '@ngrx/operators';
@@ -83,7 +82,6 @@ export const CacheStore = signalStore(
             lastEvent: 'Connected',
             retryCount: 0,
           });
-          // SSE Connected - removed verbose logging
         });
 
         source.addEventListener('update', (evt: MessageEvent) => {
@@ -92,7 +90,6 @@ export const CacheStore = signalStore(
               lastEvent: evt.data,
             });
             const event = JSON.parse(evt.data);
-            // Real-time event received - removed verbose logging
 
             switch (event.type) {
               case 'command.config.update':
@@ -135,9 +132,7 @@ export const CacheStore = signalStore(
                 patchState(store, {
                   error: `Failed to load guild data: ${event.error}`,
                 });
-                // Close the SSE connection
                 store.source()?.close();
-                // Redirect to guilds page using router
                 router.navigate(['/servers']);
                 break;
             }
@@ -146,11 +141,10 @@ export const CacheStore = signalStore(
           }
         });
 
-        source.addEventListener('error', (ev) => {
+        source.addEventListener('error', () => {
           patchState(store, {
             lastEvent: 'Error',
           });
-          // SSE Error - removed verbose logging
           obj.retryConnection();
         });
 
@@ -183,8 +177,8 @@ export const CacheStore = signalStore(
             )
           ),
           tapResponse({
-            next: (subcommand) => {
-              // Subcommand updated - removed verbose logging
+            next: () => {
+              // Subcommand updated successfully
             },
             error: (error) => {
               console.error('Error toggling subcommand', error);
@@ -202,8 +196,8 @@ export const CacheStore = signalStore(
             })
           ),
           tapResponse({
-            next: (command) => {
-              console.log('command', command);
+            next: () => {
+              // Command updated successfully
             },
             error: (error) => {
               console.error('Error toggling command', error);
@@ -224,37 +218,11 @@ export const CacheStore = signalStore(
             )
           ),
           tapResponse({
-            next: (command) => {
-              console.log('command', command);
+            next: () => {
+              // Command config saved successfully
             },
             error: (error) => {
               console.error('Error saving command config', error);
-            },
-          })
-        )
-      ),
-      refreshRoles: rxMethod<void>(
-        pipe(
-          switchMap(() => guildService.getGuildRoles(store.guildId()!)),
-          tapResponse({
-            next: (roles) => {
-              patchState(store, { roles });
-            },
-            error: (error) => {
-              console.error('Error refreshing roles', error);
-            },
-          })
-        )
-      ),
-      refreshChannels: rxMethod<void>(
-        pipe(
-          switchMap(() => guildService.getGuildChannels(store.guildId()!)),
-          tapResponse({
-            next: (channels) => {
-              patchState(store, { channels });
-            },
-            error: (error) => {
-              console.error('Error refreshing channels', error);
             },
           })
         )
@@ -264,7 +232,7 @@ export const CacheStore = signalStore(
           switchMap(() => guildService.getGuildInfo(store.guildId()!)),
           tapResponse({
             next: (guildInfo) => {
-              patchState(store, { guildInfo: guildInfo });
+              patchState(store, { guildInfo: guildInfo || null });
             },
             error: (error) => {
               console.error('Error refreshing guild info', error);

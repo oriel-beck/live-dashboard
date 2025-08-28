@@ -51,7 +51,7 @@ export interface GuildChannel {
   type: number;
   position: number;
   parent_id: string | null;
-  permission_overwrites: any[];
+  permission_overwrites: unknown[];
 }
 
 export interface CommandPermissions {
@@ -72,9 +72,75 @@ export interface CommandConfig {
   updatedAt: Date;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
   message?: string;
+}
+
+// Transformed types for cached data
+export interface CachedGuildRole {
+  id: string;
+  name: string;
+  position: number;
+  color: number;
+  permissions: string;
+  managed: boolean;
+  lastUpdated: number;
+  // Note: hoist and mentionable are not cached
+}
+
+export interface CachedGuildChannel {
+  id: string;
+  name: string;
+  type: number;
+  parentId: string | null; // Note: transformed from parent_id
+  position: number;
+  lastUpdated: number;
+  // Note: permission_overwrites are not cached
+}
+
+export interface CachedGuildInfo {
+  id: string;
+  name: string;
+  icon: string | null;
+  owner: boolean;
+  lastUpdated: number;
+  // Note: permissions and features are not cached
+}
+
+// Command configuration types
+export interface CommandConfigData {
+  id: string;
+  name: string;
+  description: string;
+  cooldown: number;
+  permissions: string;
+  enabled: boolean;
+  whitelistedRoles: string[];
+  blacklistedRoles: string[];
+  whitelistedChannels: string[];
+  blacklistedChannels: string[];
+  bypassRoles: string[];
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  categoryId: number | null;
+  category: { name: string; id: number; description: string; createdAt: Date; updatedAt: Date; } | null;
+  subcommands?: Record<string, CommandConfigData>;
+}
+
+export interface CommandConfigUpdate {
+  enabled?: boolean;
+  whitelistedRoles?: string[];
+  blacklistedRoles?: string[];
+  whitelistedChannels?: string[];
+  blacklistedChannels?: string[];
+  bypassRoles?: string[];
+  [key: string]: unknown;
+}
+
+export interface CacheEntry<T> {
+  data: T;
+  expires: number;
 }

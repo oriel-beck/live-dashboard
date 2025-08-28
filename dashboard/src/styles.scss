@@ -1,6 +1,8 @@
 /* Modern Design System - Global Styles */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+@import "primeicons/primeicons.css";
 
 :root {
   // Modern Color Palette
@@ -9,34 +11,34 @@
   --color-bg-tertiary: #1e1f23;
   --color-bg-glass: rgba(255, 255, 255, 0.02);
   --color-bg-glass-hover: rgba(255, 255, 255, 0.05);
-  
+
   --color-border-primary: rgba(255, 255, 255, 0.08);
   --color-border-secondary: rgba(255, 255, 255, 0.05);
-  
+
   --color-text-primary: #ffffff;
   --color-text-secondary: #b4b8c0;
   --color-text-tertiary: #8b8f98;
   --color-text-muted: #6b7280;
-  
+
   --color-accent-primary: #6366f1;
   --color-accent-secondary: #8b5cf6;
   --color-accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  
+
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
-  
+
   // Shadows
   --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
-  
+
   // Glass effects
   --glass-bg: rgba(255, 255, 255, 0.02);
   --glass-border: rgba(255, 255, 255, 0.1);
   --glass-blur: blur(20px);
-  
+
   // Spacing
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
@@ -44,14 +46,14 @@
   --space-lg: 1.5rem;
   --space-xl: 2rem;
   --space-2xl: 3rem;
-  
+
   // Border radius
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-2xl: 24px;
-  
+
   // Transitions
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -69,7 +71,8 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   line-height: 1.6;
@@ -94,61 +97,66 @@ body {
   text-decoration: none;
   position: relative;
   overflow: hidden;
-  
+
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
     transition: left var(--transition-slow);
   }
-  
+
   &:hover::before {
     left: 100%;
   }
-  
+
   &.btn-primary {
     background: var(--color-accent-gradient);
     color: white;
     box-shadow: var(--shadow-md);
-    
+
     &:hover {
       transform: translateY(-2px);
       box-shadow: var(--shadow-lg);
     }
   }
-  
+
   &.btn-secondary {
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
     border-color: var(--glass-border);
     color: var(--color-text-primary);
-    
+
     &:hover {
       background: var(--color-bg-glass-hover);
       border-color: rgba(255, 255, 255, 0.15);
       transform: translateY(-1px);
     }
   }
-  
+
   &.btn-ghost {
     background: transparent;
     color: var(--color-text-secondary);
-    
+
     &:hover {
       background: var(--color-bg-glass-hover);
       color: var(--color-text-primary);
     }
   }
-  
+
   &.btn-sm {
     padding: var(--space-sm) var(--space-md);
     font-size: 0.875rem;
   }
-  
+
   &.btn-lg {
     padding: var(--space-lg) var(--space-2xl);
     font-size: 1.1rem;
@@ -164,7 +172,7 @@ body {
   padding: var(--space-xl);
   box-shadow: var(--shadow-md);
   transition: all var(--transition-normal);
-  
+
   &:hover {
     border-color: rgba(255, 255, 255, 0.15);
     box-shadow: var(--shadow-lg);
@@ -182,13 +190,13 @@ body {
   color: var(--color-text-primary);
   font-size: 0.95rem;
   transition: all var(--transition-fast);
-  
+
   &:focus {
     outline: none;
     border-color: var(--color-accent-primary);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
   }
-  
+
   &::placeholder {
     color: var(--color-text-muted);
   }
@@ -200,13 +208,13 @@ body {
   display: inline-block;
   width: 50px;
   height: 24px;
-  
+
   input {
     opacity: 0;
     width: 0;
     height: 0;
   }
-  
+
   .toggle-slider {
     position: absolute;
     cursor: pointer;
@@ -218,7 +226,7 @@ body {
     border: 1px solid var(--color-border-primary);
     transition: var(--transition-fast);
     border-radius: 24px;
-    
+
     &::before {
       position: absolute;
       content: "";
@@ -231,28 +239,28 @@ body {
       border-radius: 50%;
     }
   }
-  
+
   input:checked + .toggle-slider {
     background: var(--color-accent-primary);
     border-color: var(--color-accent-primary);
-    
+
     &::before {
       background: white;
       transform: translateX(26px);
     }
   }
-  
+
   &.toggle-switch-sm {
     width: 40px;
     height: 20px;
-    
+
     .toggle-slider::before {
       height: 14px;
       width: 14px;
       left: 2px;
       bottom: 2px;
     }
-    
+
     input:checked + .toggle-slider::before {
       transform: translateX(20px);
     }
@@ -270,8 +278,12 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 // Utility Classes
@@ -310,7 +322,7 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--color-border-primary);
   border-radius: 4px;
-  
+
   &:hover {
     background: var(--color-border-secondary);
   }
@@ -326,17 +338,252 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { 
+  from {
     opacity: 0;
     transform: translateY(20px);
   }
-  to { 
+  to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+// DynamicDialog Global Styles
+.p-dialog {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+
+  .p-dialog-header {
+    background: var(--color-bg-secondary) !important;
+    border-bottom: 1px solid var(--color-border-primary);
+    padding: var(--space-xl);
+
+    .p-dialog-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin: 0;
+    }
+
+    .p-dialog-header-icon {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--color-text-secondary);
+      border-radius: var(--radius-md);
+      transition: all var(--transition-fast);
+
+      &:hover {
+        background: var(--color-bg-tertiary);
+        border-color: var(--color-border-primary);
+        color: var(--color-text-primary);
+      }
+    }
+  }
+
+  .p-dialog-content {
+    padding: 0;
+    background: var(--color-bg-secondary) !important;
+  }
+
+  .p-dialog-footer {
+    background: var(--color-bg-secondary) !important;
+    border-top: 1px solid var(--color-border-primary);
+    padding: var(--space-xl);
+  }
+}
+
+// Global PrimeNG Multiselect Styles (for body-appended overlays)
+::ng-deep .p-multiselect {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: #6366f1;
+  }
+
+  &.p-focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  }
+
+  .p-multiselect-label-container {
+    .p-multiselect-label {
+      color: var(--color-text-primary) !important;
+      padding: var(--space-sm) var(--space-md);
+      font-weight: 400;
+      font-size: 0.875rem;
+      line-height: 1.4;
+      background: transparent;
+      display: block;
+      width: 100%;
+      
+      &.p-placeholder {
+        color: var(--color-text-muted) !important;
+      }
+    }
+  }
+
+  .p-multiselect-trigger {
+    color: var(--color-text-secondary);
+  }
+}
+
+// Multiselect overlay styling - targeting the actual DOM structure
+::ng-deep .p-overlay .p-overlay-content .p-multiselect-overlay {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+
+  // Header with filter
+  .p-multiselect-header {
+    background: var(--color-bg-tertiary) !important;
+    border-bottom: 1px solid var(--color-border-primary);
+    padding: var(--space-sm) var(--space-md);
+
+    .p-multiselect-filter-container {
+      .p-multiselect-filter {
+        background: var(--color-bg-secondary) !important;
+        border: 1px solid var(--color-border-primary);
+        color: var(--color-text-primary) !important;
+        border-radius: var(--radius-sm);
+        padding: var(--space-xs) var(--space-sm);
+        font-size: 0.875rem;
+
+        &:focus {
+          border-color: #6366f1;
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        &::placeholder {
+          color: var(--color-text-muted) !important;
+        }
+      }
+    }
+  }
+
+  // List container
+  .p-multiselect-list-container {
+    .p-multiselect-list {
+      .p-multiselect-option {
+        color: var(--color-text-primary) !important;
+        padding: var(--space-xs) var(--space-sm);
+        transition: all var(--transition-fast);
+        font-size: 0.875rem;
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+
+        &:hover {
+          background: rgba(99, 102, 241, 0.15) !important;
+          color: var(--color-text-primary) !important;
+        }
+
+        &.p-highlight {
+          background: #6366f1 !important;
+          color: white !important;
+        }
+
+        &.p-focus {
+          background: rgba(99, 102, 241, 0.2) !important;
+          color: var(--color-text-primary) !important;
+        }
+
+        &.p-disabled {
+          color: var(--color-text-muted) !important;
+          background: transparent !important;
+        }
+
+        // Checkbox styling
+        .p-checkbox {
+          .p-checkbox-box {
+            background: var(--color-bg-secondary) !important;
+            border: 1px solid var(--color-border-primary);
+            border-radius: var(--radius-sm);
+            width: 16px;
+            height: 16px;
+
+            &.p-highlight {
+              background: #6366f1 !important;
+              border-color: #6366f1;
+            }
+
+            .p-checkbox-icon {
+              color: white !important;
+              font-size: 0.75rem;
+            }
+          }
+        }
+
+        // Text span
+        span {
+          color: inherit !important;
+          margin-left: var(--space-sm);
+          font-weight: 400;
+        }
+      }
+
+      // No results found message
+      .p-multiselect-empty-message {
+        color: var(--color-text-primary) !important;
+        padding: var(--space-sm) var(--space-md);
+        text-align: center;
+        font-size: 0.875rem;
+        background: var(--color-bg-secondary) !important;
+      }
+    }
+  }
+}
+
+// Selected items styling (tokens)
+::ng-deep .p-multiselect-token {
+  background: #6366f1 !important;
+  color: white !important;
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  margin: var(--space-xs);
+  font-size: 0.75rem;
+  font-weight: 500;
+
+  .p-multiselect-token-label {
+    color: white !important;
+  }
+
+  .p-multiselect-token-icon {
+    color: white !important;
+    margin-left: var(--space-xs);
+
+    &:hover {
+      color: rgba(255, 255, 255, 0.8) !important;
+    }
+  }
+}
+
+// Global multiselect label overrides
+::ng-deep .p-multiselect-label {
+  color: var(--color-text-primary) !important;
+  background: transparent !important;
+  &.p-placeholder {
+    color: var(--color-text-muted) !important;
+  }
+}
+
+// Simplified multiselect option text overrides
+::ng-deep .p-multiselect-option,
+::ng-deep .p-multiselect-option span {
+  color: var(--color-text-primary) !important;
 }

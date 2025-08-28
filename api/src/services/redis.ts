@@ -2,7 +2,7 @@ import Redis from 'ioredis';
 import { config } from '../config';
 import { CACHE_TTL, REDIS_KEYS } from '../constants';
 import { DiscordService } from './discord';
-import { UserGuild, GuildRole, GuildChannel } from '../types';
+import { UserGuild, GuildRole, GuildChannel, CachedGuildRole, CachedGuildChannel, CachedGuildInfo } from '../types';
 import { makeRequestWithRetry } from '../utils/request-utils';
 import logger from '../utils/logger';
 
@@ -25,7 +25,7 @@ export const redisSubscriber = new Redis({
 });
 
 export class RedisService {
-  static async getGuildRoles(guildId: string) {
+  static async getGuildRoles(guildId: string): Promise<CachedGuildRole[]> {
     const key = REDIS_KEYS.GUILD_ROLES(guildId);
     
     // Check if data exists and is not expired
@@ -45,22 +45,24 @@ export class RedisService {
           `guild roles (guild ${guildId})`
         );
 
-        // Transform and cache the roles
+        // Transform and cache the roles (excluding managed roles)
         const now = Date.now();
-        const roles = rolesData.map((role: any) => ({
-          id: role.id,
-          name: role.name,
-          position: role.position,
-          color: role.color,
-          permissions: role.permissions,
-          managed: role.managed,
-          lastUpdated: now,
-        }));
+        const roles = rolesData
+          .filter((role) => !role.managed) // Filter out managed roles
+          .map((role) => ({
+            id: role.id,
+            name: role.name,
+            position: role.position,
+            color: role.color,
+            permissions: role.permissions,
+            managed: role.managed,
+            lastUpdated: now,
+          }));
 
         // Cache roles with TTL
         if (roles.length > 0) {
           const pipeline = redis.pipeline().del(key);
-          roles.forEach((role: any) => {
+          roles.forEach((role) => {
             pipeline.hset(key, role.id, JSON.stringify(role));
           });
           await pipeline.exec();
@@ -84,7 +86,7 @@ export class RedisService {
     return roles;
   }
 
-  static async getGuildChannels(guildId: string) {
+  static async getGuildChannels(guildId: string): Promise<CachedGuildChannel[]> {
     const key = REDIS_KEYS.GUILD_CHANNELS(guildId);
     
     // Check if data exists and is not expired
@@ -104,11 +106,12 @@ export class RedisService {
           `guild channels (guild ${guildId})`
         );
 
-        // Transform and cache the channels
+        // Transform and cache the channels (text, announcement, and voice channels)
         const now = Date.now();
         const channels = channelsData
-          .filter((channel: any) => channel.type !== 1) // Filter out DM channels
-          .map((channel: any) => ({
+          .filter((channel) => channel.type !== 1) // Filter out DM channels
+          .filter((channel) => [0, 2, 5].includes(channel.type)) // Filter to text, voice, and announcement channels
+          .map((channel) => ({
             id: channel.id,
             name: channel.name,
             type: channel.type,
@@ -120,7 +123,7 @@ export class RedisService {
         // Cache channels with TTL
         if (channels.length > 0) {
           const pipeline = redis.pipeline().del(key);
-          channels.forEach((channel: any) => {
+          channels.forEach((channel) => {
             pipeline.hset(key, channel.id, JSON.stringify(channel));
           });
           await pipeline.exec();
@@ -144,7 +147,7 @@ export class RedisService {
     return channels;
   }
 
-  static async getGuildInfo(guildId: string) {
+  static async getGuildInfo(guildId: string): Promise<CachedGuildInfo> {
     const key = REDIS_KEYS.GUILD_INFO(guildId);
     
     // Check if data exists and is not expired
@@ -191,7 +194,13 @@ export class RedisService {
 
     const guildInfo = await redis.hgetall(key);
     
-    return guildInfo;
+    return {
+      id: guildInfo.id || '',
+      name: guildInfo.name || '',
+      icon: guildInfo.icon || null,
+      owner: guildInfo.owner === 'true',
+      lastUpdated: parseInt(guildInfo.lastUpdated || '0'),
+    };
   }
 
   // New method for lazy loading guild data with proper error handling
@@ -240,9 +249,9 @@ export class RedisService {
 
   // Helper method to fetch guild data from bot
   private static async fetchGuildDataFromBot(guildId: string): Promise<{
-    guildInfo: any;
-    roles: any[];
-    channels: any[];
+    guildInfo: CachedGuildInfo;
+    roles: CachedGuildRole[];
+    channels: CachedGuildChannel[];
   }> {
     try {
       // Make all requests concurrently, but each has its own retry logic
@@ -285,22 +294,26 @@ export class RedisService {
         name: guildData.name,
         icon: guildData.icon,
         owner: guildData.owner,
+        permissions: guildData.permissions,
         lastUpdated: Date.now(),
       };
 
-      const roles = rolesData.map((role: any) => ({
-        id: role.id,
-        name: role.name,
-        position: role.position,
-        color: role.color,
-        permissions: role.permissions,
-        managed: role.managed,
-        lastUpdated: Date.now(),
-      }));
+      const roles = rolesData
+        .filter((role) => !role.managed) // Filter out managed roles
+        .map((role) => ({
+          id: role.id,
+          name: role.name,
+          position: role.position,
+          color: role.color,
+          permissions: role.permissions,
+          managed: role.managed,
+          lastUpdated: Date.now(),
+        }));
 
       const channels = channelsData
-        .filter((channel: any) => channel.type !== 1) // Filter out DM channels
-        .map((channel: any) => ({
+        .filter((channel) => channel.type !== 1) // Filter out DM channels
+        .filter((channel) => [0, 2, 5].includes(channel.type)) // Filter to text, voice, and announcement channels
+        .map((channel) => ({
           id: channel.id,
           name: channel.name,
           type: channel.type,
@@ -314,14 +327,18 @@ export class RedisService {
         roles,
         channels,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(`[RedisService] Error fetching guild data for ${guildId}:`, error);
-      throw new Error(`Failed to fetch guild data from Discord API: ${error.message || 'Unknown error'}`);
+      throw new Error(`Failed to fetch guild data from Discord API: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   // Helper method to cache guild data with TTL
-  private static async cacheGuildData(guildId: string, data: any) {
+  private static async cacheGuildData(guildId: string, data: {
+    guildInfo: CachedGuildInfo;
+    roles: CachedGuildRole[];
+    channels: CachedGuildChannel[];
+  }) {
     const now = Date.now();
     
     // Cache guild basics with TTL
@@ -337,7 +354,7 @@ export class RedisService {
       const rolesKey = REDIS_KEYS.GUILD_ROLES(guildId);
       const pipeline = redis.pipeline().del(rolesKey);
       
-      data.roles.forEach((role: any) => {
+      data.roles.forEach((role) => {
         pipeline.hset(rolesKey, role.id, JSON.stringify({
           ...role,
           lastUpdated: now,
@@ -353,7 +370,7 @@ export class RedisService {
       const channelsKey = REDIS_KEYS.GUILD_CHANNELS(guildId);
       const pipeline = redis.pipeline().del(channelsKey);
       
-      data.channels.forEach((channel: any) => {
+      data.channels.forEach((channel) => {
         pipeline.hset(channelsKey, channel.id, JSON.stringify({
           ...channel,
           lastUpdated: now,
@@ -371,7 +388,7 @@ export class RedisService {
     logger.warn(`[RedisService] Removed guild ${guildId} from guild set due to fetch failure`);
   }
 
-  static async publishGuildEvent(guildId: string, event: any) {
+  static async publishGuildEvent(guildId: string, event: unknown) {
     await redisPublisher.publish(
       REDIS_KEYS.GUILD_EVENTS(guildId),
       JSON.stringify(event)

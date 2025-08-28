@@ -14,7 +14,7 @@ export abstract class BaseCommand {
     if (subcommand) {
       // Check if subcommand method exists
       const methodName = subcommand.replace(/-/g, '_'); // Convert kebab-case to snake_case
-      const method = (this as any)[methodName];
+      const method = (this as Record<string, unknown>)[methodName];
       
       if (typeof method === 'function') {
         await method.call(this, interaction);
@@ -27,8 +27,8 @@ export abstract class BaseCommand {
       }
     } else {
       // No subcommand, call run method
-      if (typeof (this as any).run === 'function') {
-        await (this as any).run.call(this, interaction);
+      if (typeof (this as { run?: unknown }).run === 'function') {
+        await ((this as unknown) as { run: (interaction: ChatInputCommandInteraction) => Promise<void> }).run.call(this, interaction);
       } else {
         logger.error(`[BaseCommand] Run method not found for command '${this.name}'`);
         await interaction.reply({

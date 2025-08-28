@@ -47,12 +47,12 @@ export function createApp() {
   app.use('/messages', messageRoutes);
 
   // Error handling middleware
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.error('Unhandled error:', err);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
-      message: config.nodeEnv === 'development' ? err.message : 'Something went wrong',
+      message: config.nodeEnv === 'development' ? (err instanceof Error ? err.message : 'Unknown error') : 'Something went wrong',
     });
   });
 

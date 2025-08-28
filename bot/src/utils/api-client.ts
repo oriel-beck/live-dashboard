@@ -1,3 +1,4 @@
+import { APIChannel, APIGuild, APIRole } from 'discord.js';
 import logger from './logger';
 
 // API client for bot to communicate with the API service
@@ -5,9 +6,9 @@ export class ApiClient {
   private static readonly API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
 
   static async fetchGuildData(guildId: string): Promise<{
-    guildInfo: any;
-    roles: any[];
-    channels: any[];
+    guildInfo: APIGuild;
+    roles: APIRole[];
+    channels: APIChannel[];
   }> {
     const response = await fetch(`${this.API_BASE}/bot/guilds/${guildId}/data`, {
       method: 'GET',
@@ -23,13 +24,13 @@ export class ApiClient {
 
     const data = await response.json();
     return data as {
-      guildInfo: any;
-      roles: any[];
-      channels: any[];
+      guildInfo: APIGuild;
+      roles: APIRole[];
+      channels: APIChannel[];
     };
   }
 
-  static async sendCommandResponse(commandId: string, response: any) {
+  static async sendCommandResponse(commandId: string, response: unknown) {
     const apiResponse = await fetch(`${this.API_BASE}/commands/${commandId}/response`, {
       method: 'POST',
       headers: {
@@ -56,7 +57,7 @@ export class ApiClient {
     return url;
   }
 
-  async get(endpoint: string): Promise<any> {
+  async get(endpoint: string): Promise<unknown> {
     const response = await fetch(`${this.baseUrl}${endpoint}`);
     if (!response.ok) {
       throw new Error(
@@ -66,7 +67,7 @@ export class ApiClient {
     return response.json();
   }
 
-  async post(endpoint: string, data: any): Promise<any> {
+  async post(endpoint: string, data: unknown): Promise<unknown> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: "POST",
       headers: {
@@ -82,7 +83,7 @@ export class ApiClient {
     return response.json();
   }
 
-  async put(endpoint: string, data: any): Promise<any> {
+  async put(endpoint: string, data: unknown): Promise<unknown> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: "PUT",
       headers: {
@@ -101,9 +102,9 @@ export class ApiClient {
   async getGuildCommandConfigs(
     guildId: string,
     withSubcommands: boolean = false
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     const params = withSubcommands ? "?withSubcommands=true" : "";
-    return this.get(`/guilds/${guildId}/commands${params}`);
+    return this.get(`/guilds/${guildId}/commands${params}`) as Promise<Record<string, unknown>>;
   }
 
   // Get command config by ID
@@ -112,7 +113,7 @@ export class ApiClient {
     commandId: string,
     withSubcommands: boolean = false,
     subcommandName?: string
-  ): Promise<any> {
+  ): Promise<unknown> {
     const params = new URLSearchParams();
     if (withSubcommands) params.append("withSubcommands", "true");
     if (subcommandName) params.append("subcommandName", subcommandName);
@@ -125,8 +126,8 @@ export class ApiClient {
   async updateCommandConfig(
     guildId: string,
     commandId: string,
-    updates: any
-  ): Promise<any> {
+    updates: unknown
+  ): Promise<unknown> {
     return this.put(`/guilds/${guildId}/commands/${commandId}`, updates);
   }
 
@@ -135,8 +136,8 @@ export class ApiClient {
     guildId: string,
     commandId: string,
     subcommandName: string,
-    updates: any
-  ): Promise<any> {
+    updates: unknown
+  ): Promise<unknown> {
     return this.put(
       `/guilds/${guildId}/commands/${commandId}/${subcommandName}`,
       updates
@@ -152,7 +153,7 @@ export class ApiClient {
     enabled: boolean;
     parentId?: string | null;
     cooldown: number;
-  }): Promise<any> {
+  }): Promise<unknown> {
     return this.post("/commands/register", command);
   }
 }

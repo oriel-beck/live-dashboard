@@ -69,6 +69,9 @@ export function startDataSync(client: Client) {
   });
 
   client.on(Events.GuildRoleCreate, async (role) => {
+    // Skip managed roles
+    if (role.managed) return;
+    
     const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     const data = {
       id: role.id,
@@ -88,6 +91,9 @@ export function startDataSync(client: Client) {
   });
 
   client.on(Events.GuildRoleUpdate, async (_oldRole, role) => {
+    // Skip managed roles
+    if (role.managed) return;
+    
     const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     const data = {
       id: role.id,
@@ -116,13 +122,16 @@ export function startDataSync(client: Client) {
   });
 
   client.on(Events.ChannelCreate, async (ch) => {
+    // Skip non-text/announcement/voice channels
+    if (![0, 2, 5].includes(ch.type)) return;
+    
     const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
     const data = {
       id: ch.id,
       name: ch.name,
       type: ch.type,
-      parentId: (ch as any).parentId ?? null,
-      position: (ch as any).rawPosition ?? 0,
+      parentId: ch.parentId ?? null,
+      position: ch.rawPosition ?? 0,
       lastUpdated: Date.now(),
     };
     await hsetJson(key, ch.id, data);
@@ -135,14 +144,16 @@ export function startDataSync(client: Client) {
 
   client.on(Events.ChannelUpdate, async (_oldCh, ch) => {
     if (ch.isDMBased()) return;
+    // Skip non-text/announcement/voice channels
+    if (![0, 2, 5].includes(ch.type)) return;
 
     const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
     const data = {
       id: ch.id,
       name: ch.name,
       type: ch.type,
-      parentId: (ch as any).parentId ?? null,
-      position: (ch as any).rawPosition ?? 0,
+      parentId: ch.parentId ?? null,
+      position: ch.rawPosition ?? 0,
       lastUpdated: Date.now(),
     };
     await hsetJson(key, ch.id, data);

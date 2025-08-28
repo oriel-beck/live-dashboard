@@ -43,9 +43,9 @@ export async function makeRequestWithRetry<T = any>(
       }
 
       return await response.json() as T;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If it's a rate limit error and we haven't exhausted retries, continue
-      if (error.message?.includes('Rate limited') && attempt < maxRetries) {
+      if (error instanceof Error && error.message?.includes('Rate limited') && attempt < maxRetries) {
         const delayTime = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
         logger.warn(`[RequestUtils] Rate limit error for ${requestName}, retrying in ${delayTime}ms (attempt ${attempt}/${maxRetries})`);
         await delay(delayTime);
@@ -55,7 +55,7 @@ export async function makeRequestWithRetry<T = any>(
       // For other errors or final attempt, throw the error
       if (attempt === maxRetries) {
         logger.error(`[RequestUtils] Error fetching ${requestName} after ${maxRetries} attempts:`, error);
-        throw new Error(`Failed to fetch ${requestName}: ${error.message || 'Unknown error'}`);
+        throw new Error(`Failed to fetch ${requestName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
   }

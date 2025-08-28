@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { Guilds } from './guilds';
+import { CommandConfigDialog } from './command-config-dialog';
 
-describe('Guilds', () => {
-  let component: Guilds;
-  let fixture: ComponentFixture<Guilds>;
+describe('CommandConfigDialog', () => {
+  let component: CommandConfigDialog;
+  let fixture: ComponentFixture<CommandConfigDialog>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Guilds]
+      imports: [CommandConfigDialog]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(Guilds);
+    fixture = TestBed.createComponent(CommandConfigDialog);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

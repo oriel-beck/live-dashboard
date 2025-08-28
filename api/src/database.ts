@@ -1,5 +1,6 @@
 import { PrismaClient, DefaultCommand, CommandCategory } from "@prisma/client";
 import logger from "./utils/logger";
+import { CommandConfigData, CommandConfigUpdate } from "./types";
 
 // Create Prisma client instance
 export const prisma = new PrismaClient({
@@ -319,7 +320,7 @@ export class DefaultCommandService {
 }
 
 // Simple in-memory cache for guild command configs (10 minute TTL)
-const configCache = new Map<string, { data: any; expires: number }>();
+const configCache = new Map<string, { data: unknown; expires: number }>();
 
 export class CommandConfigService {
   // Get command config by commandId with default fallback
@@ -386,7 +387,7 @@ export class CommandConfigService {
       await DefaultCommandService.getAllMainCommandsWithSubcommands(
         includeSubcommands
       );
-    const result: any[] = [];
+    const result: CommandConfigData[] = [];
 
     for (const cmd of mainCommands) {
       const config = await this.getCommandConfig(guildId, cmd.id);
@@ -449,7 +450,7 @@ export class CommandConfigService {
   static async updateCommandConfig(
     guildId: string,
     commandId: number,
-    updates: any,
+    updates: CommandConfigUpdate,
     subcommandName?: string
   ): Promise<any> {
     const defaultCommand = await DefaultCommandService.getCommandById(
@@ -795,7 +796,7 @@ export class CommandConfigService {
   static async updateCommandConfigById(
     guildId: string,
     commandId: string,
-    updates: any,
+    updates: CommandConfigUpdate,
     subcommandName?: string
   ): Promise<any> {
     let targetCommandId: number;
@@ -829,7 +830,7 @@ export class CommandConfigService {
         .reduce((obj, key) => {
           obj[key] = updates[key];
           return obj;
-        }, {} as any);
+        }, {} as Record<string, unknown>);
 
       if (Object.keys(filteredUpdates).length === 0) {
         throw new Error(
