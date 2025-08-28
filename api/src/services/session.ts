@@ -1,13 +1,13 @@
 import { NextFunction, Response } from 'express';
-import { AuthenticatedRequest, User, UserGuild } from '../types';
-import { redis } from './redis';
+import { AuthenticatedRequest, User } from '../types';
+import logger from '../utils/logger';
 import { DiscordService } from './discord';
+import { redis } from './redis';
 
 export class SessionService {
   // Store user session data with partial data only
   static async storeUserSession(sessionId: string, userData: {
     user: User;
-    guilds: UserGuild[];
     accessToken: string;
     refreshToken: string;
     expiresIn: number;
@@ -21,20 +21,8 @@ export class SessionService {
       // email is intentionally excluded for privacy
     };
 
-    // Save only essential guild data (remove features)
-    const partialGuilds = userData.guilds.map(guild => ({
-      id: guild.id,
-      name: guild.name,
-      icon: guild.icon,
-      owner: guild.owner,
-      permissions: guild.permissions,
-      botHasAccess: guild.botHasAccess,
-      // features field is intentionally excluded
-    }));
-
     const sessionData = {
       user: partialUser,
-      guilds: partialGuilds,
       accessToken: userData.accessToken,
       refreshToken: userData.refreshToken,
       expiresAt: Date.now() + (userData.expiresIn * 1000), // Convert seconds to milliseconds
@@ -52,7 +40,6 @@ export class SessionService {
   // Retrieve user session data
   static async getUserSession(sessionId: string): Promise<{
     user: User;
-    guilds: UserGuild[];
     accessToken: string;
     refreshToken: string;
     expiresAt: number;
@@ -66,7 +53,7 @@ export class SessionService {
 
       return JSON.parse(sessionData);
     } catch (error) {
-      console.error('Error retrieving session data:', error);
+      logger.error('Error retrieving session data:', error);
       return null;
     }
   }
@@ -74,7 +61,6 @@ export class SessionService {
   // Refresh access token if expired
   static async refreshTokenIfNeeded(sessionId: string): Promise<{
     user: User;
-    guilds: UserGuild[];
     accessToken: string;
     refreshToken: string;
     expiresAt: number;
@@ -96,18 +82,14 @@ export class SessionService {
     }
 
     try {
-      console.log('Refreshing expired access token for user:', sessionData.user.id);
+      logger.info('Refreshing expired access token for user:', sessionData.user.id);
       
       // Refresh the access token
       const newTokenData = await DiscordService.refreshAccessToken(sessionData.refreshToken);
       
-      // Get fresh guilds with new token (will be partial data)
-      const freshGuilds = await DiscordService.getUserGuilds(newTokenData.access_token, sessionData.user.id);
-      
-      // Update session with new token data (keeping partial data approach)
+      // Update session with new token data (guilds are stored separately in Redis cache)
       const updatedSessionData = {
         user: sessionData.user, // Keep existing partial user data
-        guilds: freshGuilds, // Fresh partial guild data
         accessToken: newTokenData.access_token,
         refreshToken: newTokenData.refresh_token,
         expiresAt: Date.now() + (newTokenData.expires_in * 1000),
@@ -123,7 +105,7 @@ export class SessionService {
 
       return updatedSessionData;
     } catch (error) {
-      console.error('Failed to refresh token:', error);
+      logger.error('Failed to refresh token:', error);
       // If refresh fails, clear the session
       await this.clearUserSession(sessionId);
       return null;
@@ -153,10 +135,13 @@ export class SessionService {
       const sessionData = await this.refreshTokenIfNeeded(sessionId);
       
       if (sessionData) {
-        // Attach user data with guilds to the request
+        // Get fresh guilds from Redis cache (will handle TTL automatically)
+        const userGuilds = await DiscordService.getUserGuilds(sessionData.accessToken, sessionData.user.id);
+        
+        // Attach user data with fresh guilds to the request
         req.user = {
           ...sessionData.user,
-          guilds: sessionData.guilds
+          guilds: userGuilds
         };
         req.sessionId = sessionId;
         req.sessionData = {
@@ -167,7 +152,7 @@ export class SessionService {
         };
       }
     } catch (error) {
-      console.error('Error attaching user to request:', error);
+      logger.error('Error attaching user to request:', error);
       // Clear invalid session
       await this.clearUserSession(sessionId);
     }
@@ -183,8 +168,11 @@ export class SessionService {
       return false;
     }
 
+    // Get fresh guilds from Redis cache
+    const userGuilds = await DiscordService.getUserGuilds(sessionData.accessToken, sessionData.user.id);
+    
     // Check if user has manage permissions for this guild
-    const userGuild = sessionData.guilds.find(guild => guild.id === guildId);
+    const userGuild = userGuilds.find(guild => guild.id === guildId);
     
     if (!userGuild) {
       return false;

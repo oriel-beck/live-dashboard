@@ -83,7 +83,7 @@ export const CacheStore = signalStore(
             lastEvent: 'Connected',
             retryCount: 0,
           });
-          console.log(`[Dashboard] SSE Connected to guild ${store.guildId()}`);
+          // SSE Connected - removed verbose logging
         });
 
         source.addEventListener('update', (evt: MessageEvent) => {
@@ -92,10 +92,7 @@ export const CacheStore = signalStore(
               lastEvent: evt.data,
             });
             const event = JSON.parse(evt.data);
-            console.log(
-              `[Dashboard] Real-time event from guild ${store.guildId()}:`,
-              event
-            );
+            // Real-time event received - removed verbose logging
 
             switch (event.type) {
               case 'command.config.update':
@@ -153,10 +150,7 @@ export const CacheStore = signalStore(
           patchState(store, {
             lastEvent: 'Error',
           });
-          console.log(
-            `[Dashboard] SSE Error for guild ${store.guildId()}:`,
-            ev
-          );
+          // SSE Error - removed verbose logging
           obj.retryConnection();
         });
 
@@ -190,7 +184,7 @@ export const CacheStore = signalStore(
           ),
           tapResponse({
             next: (subcommand) => {
-              console.log('subcommand', subcommand);
+              // Subcommand updated - removed verbose logging
             },
             error: (error) => {
               console.error('Error toggling subcommand', error);

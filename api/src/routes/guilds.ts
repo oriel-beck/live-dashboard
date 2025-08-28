@@ -2,6 +2,7 @@ import { Request, Response, Router } from "express";
 import { CommandConfigService, DefaultCommandService } from "../database";
 import { requireAuth, requireGuildAccess } from "../middleware/auth";
 import { RedisService } from "../services/redis";
+import logger from "../utils/logger";
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get(
         },
       });
     } catch (error: any) {
-      console.error("Error fetching guild data:", error);
+      logger.error("Error fetching guild data:", error);
 
       // Handle specific error cases for dashboard redirect
       if (
@@ -77,7 +78,7 @@ router.get(
         data: result,
       });
     } catch (error) {
-      console.error("Error getting guild commands:", error);
+      logger.error("Error getting guild commands:", error);
       res.status(500).json({
         success: false,
         error: "Failed to get guild commands",
@@ -126,7 +127,7 @@ router.get(
         data: config,
       });
     } catch (error) {
-      console.error("Error getting command config:", error);
+      logger.error("Error getting command config:", error);
       res.status(500).json({
         success: false,
         error: "Failed to get command configuration",
@@ -144,9 +145,8 @@ router.put(
       const { guildId, commandId } = req.params;
       const updates = req.body;
 
-      console.log(
-        `[API] Updating command config: guildId=${guildId}, commandId=${commandId}, updates=`,
-        updates
+      logger.debug(
+        `[API] Updating command config: guildId=${guildId}, commandId=${commandId}`
       );
 
       await CommandConfigService.updateCommandConfigById(
@@ -198,7 +198,7 @@ router.put(
         data: config,
       });
     } catch (error) {
-      console.error("Error updating command config:", error);
+      logger.error("Error updating command config:", error);
       res.status(500).json({
         success: false,
         error: "Failed to update command configuration",
@@ -214,7 +214,7 @@ router.get(
   async (req: Request, res: Response) => {
     const { guildId } = req.params;
 
-    console.log("SSE started for guild:", guildId);
+    logger.info("SSE started for guild:", guildId);
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -236,7 +236,7 @@ router.get(
         })}\n\n`
       );
     } catch (error: any) {
-      console.error(`[SSE] Failed to load guild data for ${guildId}:`, error);
+      logger.error(`[SSE] Failed to load guild data for ${guildId}:`, error);
 
       // If guild fetch failed, send error event and close connection
       res.write(
@@ -261,7 +261,7 @@ router.get(
     });
 
     req.on("close", async () => {
-      console.log("SSE closed for guild:", guildId);
+      logger.info("SSE closed for guild:", guildId);
       await RedisService.unsubscribeFromGuildEvents(guildId);
       res.end();
     });

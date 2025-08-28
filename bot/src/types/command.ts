@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, SlashCommandSubcommandsOnlyBuilder } from 'discord.js';
+import logger from '../utils/logger';
 
 // ===== BASE COMMAND CLASS =====
 // Abstract base class that all commands must extend
@@ -18,7 +19,7 @@ export abstract class BaseCommand {
       if (typeof method === 'function') {
         await method.call(this, interaction);
       } else {
-        console.error(`[BaseCommand] Subcommand method '${methodName}' not found for command '${this.name}'`);
+        logger.error(`[BaseCommand] Subcommand method '${methodName}' not found for command '${this.name}'`);
         await interaction.reply({
           content: "This subcommand is not implemented yet.",
           flags: ['Ephemeral'],
@@ -29,7 +30,7 @@ export abstract class BaseCommand {
       if (typeof (this as any).run === 'function') {
         await (this as any).run.call(this, interaction);
       } else {
-        console.error(`[BaseCommand] Run method not found for command '${this.name}'`);
+        logger.error(`[BaseCommand] Run method not found for command '${this.name}'`);
         await interaction.reply({
           content: "This command is not implemented yet.",
           flags: ['Ephemeral'],

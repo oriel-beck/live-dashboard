@@ -11,6 +11,7 @@ import {
 } from "../types/command";
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
+import logger from "./logger";
 
 export class CommandManager {
   private client: Client;
@@ -30,7 +31,7 @@ export class CommandManager {
    */
   registerCommand(command: BaseCommand) {
     this.commands.set(command.name, command);
-    console.log(`[CommandManager] Registered command: ${command.name}`);
+    logger.debug(`[CommandManager] Registered command: ${command.name}`);
   }
 
   /**
@@ -46,7 +47,7 @@ export class CommandManager {
   async deployGlobalCommands() {
     try {
       if (!this.client.application) {
-        console.error(`[CommandManager] Client application not available`);
+        logger.error(`[CommandManager] Client application not available`);
         return;
       }
 
@@ -56,11 +57,11 @@ export class CommandManager {
       );
 
       await this.client.application.commands.set(commandsData);
-      console.log(
+      logger.info(
         `[CommandManager] Deployed ${commandsData.length} global commands`
       );
     } catch (error) {
-      console.error(
+      logger.error(
         `[CommandManager] Failed to deploy global commands:`,
         error
       );
@@ -96,12 +97,12 @@ export class CommandManager {
       }
 
       // No config exists - command cannot be used
-      console.warn(
+      logger.warn(
         `[CommandManager] No default config found for command ID ${commandId} in ${guildId} - command disabled`
       );
       return null;
     } catch (error) {
-      console.error(
+      logger.error(
         `[CommandManager] Error getting config for command ID ${commandId} in ${guildId}:`,
         error
       );
@@ -152,12 +153,12 @@ export class CommandManager {
       }
 
       // No config exists - subcommand cannot be used
-      console.warn(
+      logger.warn(
         `[CommandManager] No config found for subcommand ${subcommandName} of command ${commandId} in ${guildId} - subcommand disabled`
       );
       return null;
     } catch (error) {
-      console.error(
+      logger.error(
         `[CommandManager] Error getting subcommand config for ${subcommandName} in ${guildId}:`,
         error
       );
@@ -345,13 +346,13 @@ export class CommandManager {
       await command.execute(interaction);
 
       // Log command usage
-      console.log(
+      logger.info(
         `[CommandManager] ${interaction.user.tag} used ${commandName}${
           subcommandName ? ` ${subcommandName}` : ""
         } in ${interaction.guild?.name}`
       );
     } catch (error) {
-      console.error(`[CommandManager] Error executing ${commandName}:`, error);
+      logger.error(`[CommandManager] Error executing ${commandName}:`, error);
 
       const errorContent = "There was an error while executing this command!";
       if (interaction.replied || interaction.deferred) {
@@ -397,7 +398,7 @@ export class CommandManager {
 
       return result;
     } catch (error) {
-      console.error(
+      logger.error(
         `[CommandManager] Error getting all configs for guild ${guildId}:`,
         error
       );

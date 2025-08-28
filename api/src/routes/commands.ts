@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { DefaultCommandService } from '../database';
 import { requireAuth } from '../middleware/auth';
+import logger from '../utils/logger';
 
 const router = Router();
 
@@ -44,7 +45,7 @@ router.post('/register', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Error registering default command:', error);
+    logger.error('Error registering default command:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to register command'
@@ -73,7 +74,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       }))
     });
   } catch (error) {
-    console.error('Error fetching commands:', error);
+    logger.error('Error fetching commands:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch commands'
@@ -109,7 +110,7 @@ router.get('/:commandId', requireAuth, async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching command:', error);
+    logger.error('Error fetching command:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch command'

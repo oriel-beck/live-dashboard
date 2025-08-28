@@ -1,31 +1,32 @@
 import { createApp } from './app';
 import { initializeDatabase, closeDatabase } from './database';
 import { config } from './config';
+import logger from './utils/logger';
 
 // Initialize database and start server
 async function startServer() {
   try {
     // Initialize database
     await initializeDatabase();
-    console.log("[API] Database initialized successfully");
+    logger.info("[API] Database initialized successfully");
 
     // Create Express app
     const app = createApp();
 
     // Start server
     const server = app.listen(config.port, () => {
-      console.log(`[API] Server listening on port ${config.port}`);
-      console.log(`[API] Environment: ${config.nodeEnv}`);
-      console.log(`[API] CORS Origin: ${config.corsOrigin}`);
+      logger.info(`[API] Server listening on port ${config.port}`);
+      logger.info(`[API] Environment: ${config.nodeEnv}`);
+      logger.debug(`[API] CORS Origin: ${config.corsOrigin}`);
     });
 
     // Graceful shutdown handlers
     const gracefulShutdown = async (signal: string) => {
-      console.log(`[API] Received ${signal}, shutting down gracefully...`);
+      logger.info(`[API] Received ${signal}, shutting down gracefully...`);
       server.close(async () => {
-        console.log("[API] HTTP server closed");
+        logger.info("[API] HTTP server closed");
         await closeDatabase();
-        console.log("[API] Database connections closed");
+        logger.info("[API] Database connections closed");
         process.exit(0);
       });
     };
@@ -35,7 +36,7 @@ async function startServer() {
 
     return server;
   } catch (error) {
-    console.error("[API] Failed to start server:", error);
+    logger.error("[API] Failed to start server:", error);
     process.exit(1);
   }
 }

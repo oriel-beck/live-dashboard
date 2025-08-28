@@ -1,9 +1,10 @@
 import Redis from 'ioredis';
 import { config } from '../config';
-import { CACHE_TTL, REDIS_KEYS, TIME_CONSTANTS } from '../constants';
+import { CACHE_TTL, REDIS_KEYS } from '../constants';
 import { DiscordService } from './discord';
 import { UserGuild, GuildRole, GuildChannel } from '../types';
 import { makeRequestWithRetry } from '../utils/request-utils';
+import logger from '../utils/logger';
 
 // Redis client for data operations
 export const redis = new Redis({
@@ -30,25 +31,56 @@ export class RedisService {
     // Check if data exists and is not expired
     const exists = await redis.exists(key);
     if (exists === 0) {
-      // Data doesn't exist, this is a "ghost guild" or data hasn't been loaded yet
-      console.warn(`[RedisService] Guild roles not found for guild ${guildId} - may be a ghost guild`);
-      return [];
+      // Data doesn't exist, try to fetch it
+      logger.info(`[RedisService] Guild roles not found for guild ${guildId}, attempting to fetch...`);
+      try {
+        const rolesData = await makeRequestWithRetry<GuildRole[]>(
+          `${config.discord.apiUrl}/guilds/${guildId}/roles`,
+          {
+            headers: {
+              'Authorization': `Bot ${config.discord.botToken}`,
+              'Content-Type': 'application/json',
+            },
+          },
+          `guild roles (guild ${guildId})`
+        );
+
+        // Transform and cache the roles
+        const now = Date.now();
+        const roles = rolesData.map((role: any) => ({
+          id: role.id,
+          name: role.name,
+          position: role.position,
+          color: role.color,
+          permissions: role.permissions,
+          managed: role.managed,
+          lastUpdated: now,
+        }));
+
+        // Cache roles with TTL
+        if (roles.length > 0) {
+          const pipeline = redis.pipeline().del(key);
+          roles.forEach((role: any) => {
+            pipeline.hset(key, role.id, JSON.stringify(role));
+          });
+          await pipeline.exec();
+          await redis.expire(key, CACHE_TTL.GUILD_ROLES);
+        }
+
+        // Add guild to guild set
+        await redis.sadd(REDIS_KEYS.GUILD_SET, guildId);
+        
+        logger.info(`[RedisService] Successfully fetched and cached guild roles for ${guildId}`);
+        return roles;
+      } catch (error) {
+        logger.error(`[RedisService] Failed to fetch guild roles for ${guildId}:`, error);
+        throw new Error('GUILD_ROLES_FETCH_FAILED');
+      }
     }
 
     const entries = await redis.hgetall(key);
     const roles = Object.values(entries).map((s) => JSON.parse(s));
     
-    // Check if any role data is stale (older than 1 hour)
-    const now = Date.now();
-    const oneHourAgo = now - TIME_CONSTANTS.ONE_HOUR;
-    const hasStaleData = roles.some((role: any) => 
-      !role.lastUpdated || role.lastUpdated < oneHourAgo
-    );
-
-    if (hasStaleData) {
-      console.log(`[RedisService] Guild ${guildId} has stale role data, consider refreshing`);
-    }
-
     return roles;
   }
 
@@ -58,25 +90,57 @@ export class RedisService {
     // Check if data exists and is not expired
     const exists = await redis.exists(key);
     if (exists === 0) {
-      // Data doesn't exist, this is a "ghost guild" or data hasn't been loaded yet
-      console.warn(`[RedisService] Guild channels not found for guild ${guildId} - may be a ghost guild`);
-      return [];
+      // Data doesn't exist, try to fetch it
+      logger.info(`[RedisService] Guild channels not found for guild ${guildId}, attempting to fetch...`);
+      try {
+        const channelsData = await makeRequestWithRetry<GuildChannel[]>(
+          `${config.discord.apiUrl}/guilds/${guildId}/channels`,
+          {
+            headers: {
+              'Authorization': `Bot ${config.discord.botToken}`,
+              'Content-Type': 'application/json',
+            },
+          },
+          `guild channels (guild ${guildId})`
+        );
+
+        // Transform and cache the channels
+        const now = Date.now();
+        const channels = channelsData
+          .filter((channel: any) => channel.type !== 1) // Filter out DM channels
+          .map((channel: any) => ({
+            id: channel.id,
+            name: channel.name,
+            type: channel.type,
+            parentId: channel.parent_id,
+            position: channel.position,
+            lastUpdated: now,
+          }));
+
+        // Cache channels with TTL
+        if (channels.length > 0) {
+          const pipeline = redis.pipeline().del(key);
+          channels.forEach((channel: any) => {
+            pipeline.hset(key, channel.id, JSON.stringify(channel));
+          });
+          await pipeline.exec();
+          await redis.expire(key, CACHE_TTL.GUILD_CHANNELS);
+        }
+
+        // Add guild to guild set
+        await redis.sadd(REDIS_KEYS.GUILD_SET, guildId);
+        
+        logger.info(`[RedisService] Successfully fetched and cached guild channels for ${guildId}`);
+        return channels;
+      } catch (error) {
+        logger.error(`[RedisService] Failed to fetch guild channels for ${guildId}:`, error);
+        throw new Error('GUILD_CHANNELS_FETCH_FAILED');
+      }
     }
 
     const entries = await redis.hgetall(key);
     const channels = Object.values(entries).map((s) => JSON.parse(s));
     
-    // Check if any channel data is stale (older than 1 hour)
-    const now = Date.now();
-    const oneHourAgo = now - TIME_CONSTANTS.ONE_HOUR;
-    const hasStaleData = channels.some((channel: any) => 
-      !channel.lastUpdated || channel.lastUpdated < oneHourAgo
-    );
-
-    if (hasStaleData) {
-      console.log(`[RedisService] Guild ${guildId} has stale channel data, consider refreshing`);
-    }
-
     return channels;
   }
 
@@ -86,23 +150,47 @@ export class RedisService {
     // Check if data exists and is not expired
     const exists = await redis.exists(key);
     if (exists === 0) {
-      // Data doesn't exist, this is a "ghost guild" or data hasn't been loaded yet
-      console.warn(`[RedisService] Guild info not found for guild ${guildId} - may be a ghost guild`);
-      return {};
+      // Data doesn't exist, try to fetch it
+      logger.info(`[RedisService] Guild info not found for guild ${guildId}, attempting to fetch...`);
+      try {
+        const guildData = await makeRequestWithRetry<UserGuild>(
+          `${config.discord.apiUrl}/guilds/${guildId}`,
+          {
+            headers: {
+              'Authorization': `Bot ${config.discord.botToken}`,
+              'Content-Type': 'application/json',
+            },
+          },
+          `guild data (guild ${guildId})`
+        );
+
+        // Transform and cache the guild info
+        const now = Date.now();
+        const guildInfo = {
+          id: guildData.id,
+          name: guildData.name,
+          icon: guildData.icon,
+          owner: guildData.owner,
+          lastUpdated: now,
+        };
+
+        // Cache guild info with TTL
+        await redis.hset(key, Object.entries(guildInfo).flat());
+        await redis.expire(key, CACHE_TTL.GUILD_BASICS);
+
+        // Add guild to guild set
+        await redis.sadd(REDIS_KEYS.GUILD_SET, guildId);
+        
+        logger.info(`[RedisService] Successfully fetched and cached guild info for ${guildId}`);
+        return guildInfo;
+      } catch (error) {
+        logger.error(`[RedisService] Failed to fetch guild info for ${guildId}:`, error);
+        throw new Error('GUILD_INFO_FETCH_FAILED');
+      }
     }
 
     const guildInfo = await redis.hgetall(key);
     
-    // Check if guild data is stale (older than 24 hours)
-    const lastUpdated = guildInfo.lastUpdated;
-    if (lastUpdated) {
-      const now = Date.now();
-      const twentyFourHoursAgo = now - TIME_CONSTANTS.TWENTY_FOUR_HOURS;
-      if (parseInt(lastUpdated) < twentyFourHoursAgo) {
-        console.log(`[RedisService] Guild ${guildId} has stale data (last updated: ${new Date(parseInt(lastUpdated)).toISOString()})`);
-      }
-    }
-
     return guildInfo;
   }
 
@@ -120,7 +208,7 @@ export class RedisService {
 
     if (hasData) {
       // Data exists -> return data
-      console.log(`[RedisService] Returning cached guild data for ${guildId}`);
+      // Returning cached guild data - removed verbose logging
       return {
         guildInfo,
         roles: await this.getGuildRoles(guildId),
@@ -129,13 +217,13 @@ export class RedisService {
     }
 
     // Data missing -> try to fetch data
-    console.log(`[RedisService] Guild data missing for ${guildId}, attempting to fetch...`);
+    logger.info(`[RedisService] Guild data missing for ${guildId}, attempting to fetch...`);
     try {
       const fetchedData = await this.fetchGuildDataFromBot(guildId);
       
       // Data fetch works -> cache the new data with TTL -> return the data
       await this.cacheGuildData(guildId, fetchedData);
-      console.log(`[RedisService] Successfully fetched and cached guild data for ${guildId}`);
+      logger.info(`[RedisService] Successfully fetched and cached guild data for ${guildId}`);
       
       return {
         guildInfo: fetchedData.guildInfo,
@@ -144,7 +232,7 @@ export class RedisService {
       };
     } catch (error) {
       // Data fetch fails -> remove the guild from the set
-      console.error(`[RedisService] Failed to fetch guild data for ${guildId}:`, error);
+      logger.error(`[RedisService] Failed to fetch guild data for ${guildId}:`, error);
       await this.removeGuildFromSet(guildId);
       throw new Error('GUILD_FETCH_FAILED');
     }
@@ -227,7 +315,7 @@ export class RedisService {
         channels,
       };
     } catch (error: any) {
-      console.error(`[RedisService] Error fetching guild data for ${guildId}:`, error);
+      logger.error(`[RedisService] Error fetching guild data for ${guildId}:`, error);
       throw new Error(`Failed to fetch guild data from Discord API: ${error.message || 'Unknown error'}`);
     }
   }
@@ -280,7 +368,7 @@ export class RedisService {
   // Helper method to remove guild from set
   private static async removeGuildFromSet(guildId: string) {
     await redis.srem(REDIS_KEYS.GUILD_SET, guildId);
-    console.log(`[RedisService] Removed guild ${guildId} from guild set due to fetch failure`);
+    logger.warn(`[RedisService] Removed guild ${guildId} from guild set due to fetch failure`);
   }
 
   static async publishGuildEvent(guildId: string, event: any) {
@@ -311,28 +399,8 @@ export class RedisService {
     return await DiscordService.getGuildLastUpdate(guildId);
   }
 
-  // New method to check if guild data is stale
-  static async isGuildDataStale(guildId: string): Promise<boolean> {
-    return await DiscordService.isGuildDataStale(guildId);
-  }
-
   // New method to get all guild IDs from the bot's guild set
   static async getAllGuildIds(): Promise<string[]> {
     return await redis.smembers(REDIS_KEYS.GUILD_SET);
-  }
-
-  // New method to get stale guilds (guilds not updated in the last 24 hours)
-  static async getStaleGuilds(): Promise<string[]> {
-    const allGuildIds = await this.getAllGuildIds();
-    const staleGuilds: string[] = [];
-
-    for (const guildId of allGuildIds) {
-      const isStale = await this.isGuildDataStale(guildId);
-      if (isStale) {
-        staleGuilds.push(guildId);
-      }
-    }
-
-    return staleGuilds;
   }
 }

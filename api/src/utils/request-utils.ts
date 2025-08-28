@@ -1,3 +1,5 @@
+import logger from './logger';
+
 /**
  * Utility functions for making HTTP requests with retry logic
  */
@@ -27,7 +29,7 @@ export async function makeRequestWithRetry<T = any>(
         const retryAfter = getRetryAfter(response) || baseDelay;
         
         if (attempt < maxRetries) {
-          console.log(`[RequestUtils] Rate limited for ${requestName}, retrying in ${retryAfter}ms (attempt ${attempt}/${maxRetries})`);
+          logger.warn(`[RequestUtils] Rate limited for ${requestName}, retrying in ${retryAfter}ms (attempt ${attempt}/${maxRetries})`);
           await delay(retryAfter);
           continue;
         } else {
@@ -45,14 +47,14 @@ export async function makeRequestWithRetry<T = any>(
       // If it's a rate limit error and we haven't exhausted retries, continue
       if (error.message?.includes('Rate limited') && attempt < maxRetries) {
         const delayTime = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
-        console.log(`[RequestUtils] Rate limit error for ${requestName}, retrying in ${delayTime}ms (attempt ${attempt}/${maxRetries})`);
+        logger.warn(`[RequestUtils] Rate limit error for ${requestName}, retrying in ${delayTime}ms (attempt ${attempt}/${maxRetries})`);
         await delay(delayTime);
         continue;
       }
 
       // For other errors or final attempt, throw the error
       if (attempt === maxRetries) {
-        console.error(`[RequestUtils] Error fetching ${requestName} after ${maxRetries} attempts:`, error);
+        logger.error(`[RequestUtils] Error fetching ${requestName} after ${maxRetries} attempts:`, error);
         throw new Error(`Failed to fetch ${requestName}: ${error.message || 'Unknown error'}`);
       }
     }

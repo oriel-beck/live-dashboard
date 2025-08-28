@@ -23,7 +23,8 @@
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
-    "passport-discord": "^0.1.4"
+    "passport-discord": "^0.1.4",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",

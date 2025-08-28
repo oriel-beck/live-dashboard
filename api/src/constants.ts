@@ -12,7 +12,7 @@ export const REDIS_KEYS = {
 
 // Cache TTL values (in seconds)
 export const CACHE_TTL = {
-  GUILD_BASICS: 24 * 60 * 60, // 24 hours
+  GUILD_BASICS: 60 * 60, // 1 hour
   GUILD_ROLES: 60 * 60, // 1 hour
   GUILD_CHANNELS: 60 * 60, // 1 hour
   USER_GUILDS: 5 * 60, // 5 minutes

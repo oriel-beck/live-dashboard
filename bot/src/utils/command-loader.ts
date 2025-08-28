@@ -1,6 +1,7 @@
 import { readdirSync } from 'fs';
 import { join } from 'path';
 import { BaseCommand } from '../types/command';
+import logger from './logger';
 
 export class CommandLoader {
   private static async loadCommandFromFile(filePath: string): Promise<BaseCommand | null> {
@@ -20,8 +21,6 @@ export class CommandLoader {
           // Create an instance of the command class
           const CommandClass = exportValue as new () => BaseCommand;
           const commandInstance = new CommandClass();
-          
-          console.log(`[CommandLoader] Loaded command: ${commandInstance.name} from ${exportName}`);
           return commandInstance;
         }
       }
@@ -34,15 +33,13 @@ export class CommandLoader {
       ) {
         const CommandClass = commandModule.default as new () => BaseCommand;
         const commandInstance = new CommandClass();
-        
-        console.log(`[CommandLoader] Loaded command: ${commandInstance.name} from default export`);
         return commandInstance;
       }
       
-      console.warn(`[CommandLoader] No BaseCommand class found in ${filePath}`);
+      logger.warn(`[CommandLoader] No BaseCommand class found in ${filePath}`);
       return null;
     } catch (error) {
-      console.error(`[CommandLoader] Error loading command from ${filePath}:`, error);
+      logger.error(`[CommandLoader] Error loading command from ${filePath}:`, error);
       return null;
     }
   }
@@ -57,8 +54,6 @@ export class CommandLoader {
         .filter(file => file.endsWith('.ts') && !file.endsWith('.d.ts'))
         .filter(file => file !== 'index.ts'); // Skip index file if it exists
       
-      console.log(`[CommandLoader] Found ${commandFiles.length} command files:`, commandFiles);
-      
       // Load each command file
       for (const file of commandFiles) {
         const filePath = join(commandsPath, file);
@@ -69,11 +64,11 @@ export class CommandLoader {
         }
       }
       
-      console.log(`[CommandLoader] Successfully loaded ${commands.length} commands`);
+      logger.info(`[CommandLoader] Successfully loaded ${commands.length} commands`);
       return commands;
       
     } catch (error) {
-      console.error('[CommandLoader] Error reading commands directory:', error);
+      logger.error('[CommandLoader] Error reading commands directory:', error);
       return [];
     }
   }
@@ -107,14 +102,14 @@ export class CommandLoader {
           }
         }
       } catch (error) {
-        console.error(`[CommandLoader] Error reading directory ${dirPath}:`, error);
+        logger.error(`[CommandLoader] Error reading directory ${dirPath}:`, error);
       }
     };
     
     const commandsPath = join(__dirname, '../commands');
     await loadFromDirectory(commandsPath);
     
-    console.log(`[CommandLoader] Successfully loaded ${commands.length} commands recursively`);
+    logger.info(`[CommandLoader] Successfully loaded ${commands.length} commands recursively`);
     return commands;
   }
 
@@ -125,28 +120,28 @@ export class CommandLoader {
     try {
       // Check required properties
       if (!command.data) {
-        console.error(`[CommandLoader] Command missing data property`);
+        logger.error(`[CommandLoader] Command missing data property`);
         return false;
       }
       
       if (!command.data.name) {
-        console.error(`[CommandLoader] Command missing name`);
+        logger.error(`[CommandLoader] Command missing name`);
         return false;
       }
       
       if (!command.data.description) {
-        console.error(`[CommandLoader] Command ${command.data.name} missing description`);
+        logger.error(`[CommandLoader] Command ${command.data.name} missing description`);
         return false;
       }
       
       if (typeof command.execute !== 'function') {
-        console.error(`[CommandLoader] Command ${command.data.name} missing execute method`);
+        logger.error(`[CommandLoader] Command ${command.data.name} missing execute method`);
         return false;
       }
       
       return true;
     } catch (error) {
-      console.error(`[CommandLoader] Error validating command:`, error);
+      logger.error(`[CommandLoader] Error validating command:`, error);
       return false;
     }
   }

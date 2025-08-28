@@ -1,3 +1,5 @@
+import logger from '../utils/logger';
+
 // Configuration settings
 export const config = {
   // Server
@@ -48,5 +50,5 @@ export function validateConfig() {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
   
-  console.log('[Config] Configuration validated successfully');
+  logger.info('[Config] Configuration validated successfully');
 }

@@ -12,13 +12,12 @@ import {
 import { startDataSync } from "./utils/sync-data";
 import { CommandManager } from "./utils/command-manager";
 import { CommandLoader } from "./utils/command-loader";
+import logger from "./utils/logger";
 
 // Limit collections so process RAM stays low. We rely on Redis as the real cache.
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers, // include only if you truly need live perms
-    GatewayIntentBits.GuildMessages, // TODO: use interactions only
   ],
   partials: [Partials.GuildMember], // only if needed
   makeCache: Options.cacheWithLimits({
@@ -68,7 +67,7 @@ export { commandManager };
 // Load and register all commands automatically
 async function initializeCommands() {
   try {
-    console.log('[Bot] Loading commands...');
+    logger.info('[Bot] Loading commands...');
     const commands = await CommandLoader.loadAllCommands();
     
     // Validate and register each command
@@ -76,14 +75,14 @@ async function initializeCommands() {
       if (CommandLoader.validateCommand(command)) {
         commandManager.registerCommand(command);
       } else {
-        console.error(`[Bot] Failed to validate command: ${command.name || 'unknown'}`);
+        logger.error(`[Bot] Failed to validate command: ${command.name || 'unknown'}`);
       }
     }
     
-    console.log(`[Bot] Registered ${commandManager.getCommands().size} commands`);
+    logger.info(`[Bot] Registered ${commandManager.getCommands().size} commands`);
     return true;
   } catch (error) {
-    console.error('[Bot] Error loading commands:', error);
+    logger.error('[Bot] Error loading commands:', error);
     return false;
   }
 }
@@ -93,17 +92,17 @@ startDataSync(client);
 
 // Setup command system when bot is ready
 client.once('ready', async () => {
-  console.log(`Bot ready as ${client.user?.tag}`);
+  logger.info(`Bot ready as ${client.user?.tag}`);
   
   // Load and register commands
   const commandsLoaded = await initializeCommands();
   if (!commandsLoaded) {
-    console.error('[Bot] Failed to load commands, exiting...');
+    logger.error('[Bot] Failed to load commands, exiting...');
     process.exit(1);
   }
 
-  console.log('Command framework initialized successfully!');
-  console.log('Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script');
+  logger.info('Command framework initialized successfully!');
+  logger.info('Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script');
 });
 
 client.login(process.env.BOT_TOKEN!);

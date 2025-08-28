@@ -1,4 +1,5 @@
 import { PrismaClient, DefaultCommand, CommandCategory } from "@prisma/client";
+import logger from "./utils/logger";
 
 // Create Prisma client instance
 export const prisma = new PrismaClient({
@@ -18,13 +19,13 @@ export type DefaultCommandWithCategory = DefaultCommand & {
 export async function initializeDatabase() {
   try {
     await prisma.$connect();
-    console.log("[Database] Prisma connected successfully");
+    logger.info("[Database] Prisma connected successfully");
 
     // Test the connection
     await prisma.$queryRaw`SELECT 1`;
-    console.log("[Database] Database connection tested successfully");
+    logger.info("[Database] Database connection tested successfully");
   } catch (error) {
-    console.error("[Database] Error connecting to database:", error);
+    logger.error("[Database] Error connecting to database:", error);
     throw error;
   }
 }
@@ -32,7 +33,7 @@ export async function initializeDatabase() {
 // Graceful shutdown
 export async function closeDatabase() {
   await prisma.$disconnect();
-  console.log("[Database] Prisma disconnected");
+  logger.info("[Database] Prisma disconnected");
 }
 
 // Type aliases for better compatibility with existing code
@@ -225,12 +226,7 @@ export class DefaultCommandService {
       },
     });
     
-    console.log(`[Database] getCommandById for ${commandId}:`, {
-      id: result?.id,
-      name: result?.name,
-      categoryId: result?.categoryId,
-      category: result?.category
-    });
+    // Removed verbose debug logging
     
     return result;
   }
@@ -344,12 +340,7 @@ export class CommandConfigService {
       return null;
     }
     
-    console.log(`[Database] getCommandConfig for command ${commandId}:`, {
-      id: defaultCommand.id,
-      name: defaultCommand.name,
-      categoryId: defaultCommand.categoryId,
-      category: defaultCommand.category
-    });
+    // Removed verbose debug logging
 
     // Get guild config if it exists
     const guildConfig = await prisma.guildCommandConfig.findUnique({
@@ -810,10 +801,7 @@ export class CommandConfigService {
     let targetCommandId: number;
     let isSubcommand = false;
 
-    console.log(
-      `[Database] updateCommandConfigById called: guildId=${guildId}, commandId=${commandId}, updates=`,
-      updates
-    );
+    logger.debug(`[Database] updateCommandConfigById called: guildId=${guildId}, commandId=${commandId}`);
 
     if (subcommandName) {
       // Get subcommand ID by name within the parent command
@@ -852,9 +840,6 @@ export class CommandConfigService {
       updates = filteredUpdates;
     } else {
       // For now, just treat all IDs as database IDs since that's what the frontend is sending
-      console.log(
-        `[Database] Treating ${commandId} as database ID, converting to BigInt`
-      );
       targetCommandId = +commandId;
 
       // Verify that the command exists
@@ -862,18 +847,9 @@ export class CommandConfigService {
       if (!command) {
         throw new Error(`Command with ID ${+commandId} not found`);
       }
-      console.log(
-        `[Database] Found command: ${command.name} (ID: ${command.id})`
-      );
     }
 
-    console.log(
-      `[Database] Final targetCommandId: ${targetCommandId}, isSubcommand: ${isSubcommand}`
-    );
-
-    console.log(
-      `[Database] Attempting Prisma upsert with: guildId=${guildId}, commandId=${targetCommandId}`
-    );
+    // Removed verbose debug logging
 
     const result = await prisma.guildCommandConfig.upsert({
       where: {
@@ -899,7 +875,7 @@ export class CommandConfigService {
       },
     });
 
-    console.log(`[Database] Prisma upsert result:`, result);
+    logger.debug(`[Database] Command config updated successfully for guild ${guildId}, command ${targetCommandId}`);
 
     // Invalidate cache
     const cacheKey = `${guildId}:${commandId}${

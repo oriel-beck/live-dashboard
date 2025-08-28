@@ -1,3 +1,5 @@
+import logger from './logger';
+
 // API client for bot to communicate with the API service
 export class ApiClient {
   private static readonly API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
@@ -38,7 +40,7 @@ export class ApiClient {
     });
 
     if (!apiResponse.ok) {
-      console.error('Failed to send command response to API');
+      logger.error('Failed to send command response to API');
     }
   }
 
@@ -46,12 +48,10 @@ export class ApiClient {
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl ?? this.getDefaultApiUrl();
-    console.log(`[ApiClient] Using base URL: ${this.baseUrl}`);
   }
 
   private getDefaultApiUrl(): string {
     const isProduction = process.env.NODE_ENV === "production";
-    console.log(`[ApiClient] Environment detection: NODE_ENV=${process.env.NODE_ENV}, isProduction=${isProduction}`);
     const url = isProduction ? "http://api:3000" : "http://localhost:3000";
     return url;
   }

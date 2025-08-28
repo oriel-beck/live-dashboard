@@ -14,6 +14,7 @@ config({ path: resolve(__dirname, '../../.env') });
 import { REST, Routes, ApplicationCommand } from "discord.js";
 import { CommandLoader } from "./utils/command-loader";
 import { ApiClient } from "./utils/api-client";
+import logger from "./utils/logger";
 
 async function deployGlobalCommands(commands: any[]): Promise<ApplicationCommand[]> {
   const BOT_TOKEN = process.env.BOT_TOKEN!;
@@ -27,15 +28,15 @@ async function deployGlobalCommands(commands: any[]): Promise<ApplicationCommand
   // Deploy commands using REST API
   const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
  
-  console.log('[Deploy] Started refreshing application (/) commands.');
-  console.log(`[Deploy] Using application ID: ${APPLICATION_ID}`);
+  logger.info('[Deploy] Started refreshing application (/) commands.');
+  logger.info(`[Deploy] Using application ID: ${APPLICATION_ID}`);
   
   const deployedCommands = (await rest.put(
     Routes.applicationCommands(APPLICATION_ID),
     { body: commandData }
   )) as ApplicationCommand[];
 
-  console.log(
+  logger.info(
     `[Deploy] Successfully deployed ${deployedCommands.length} commands globally!`
   );
   return deployedCommands;
@@ -51,7 +52,7 @@ async function registerCommandsInDatabase(
     const localCommand = localCommands.find(cmd => cmd.name === deployedCmd.name);
  
     if (!localCommand) {
-      console.warn(
+      logger.warn(
         `[Deploy] Warning: Deployed command ${deployedCmd.name} not found in local commands`
       );
       continue;
@@ -71,7 +72,7 @@ async function registerCommandsInDatabase(
     });
 
     const mainCommandId = mainCommandResponse.command.id;
-    console.log(
+    logger.info(
       `[Deploy] Registered command: ${deployedCmd.name} (${deployedCmd.id} -> ${mainCommandId})`
     );
 
@@ -110,7 +111,7 @@ async function registerSubcommands(
       });
 
       const groupId = groupResponse.command.id;
-      console.log(
+      logger.info(
         `[Deploy] Registered subcommand group: ${option.name} (${groupId})`
       );
 
@@ -127,7 +128,7 @@ async function registerSubcommands(
               enabled: true,
               parentId: groupId,
             });
-            console.log(
+            logger.info(
               `[Deploy] Registered nested subcommand: ${subOption.name}`
             );
           }
@@ -145,17 +146,17 @@ async function registerSubcommands(
         enabled: true,
         parentId,
       });
-      console.log(`[Deploy] Registered subcommand: ${option.name}`);
+      logger.info(`[Deploy] Registered subcommand: ${option.name}`);
     }
   }
 }
 
 async function deployCommands() {
-  console.log("[Deploy] Starting command deployment...");
+  logger.info("[Deploy] Starting command deployment...");
 
   try {
     // Load and validate commands
-    console.log("[Deploy] Loading commands...");
+    logger.info("[Deploy] Loading commands...");
     const commands = await CommandLoader.loadAllCommands();
  
     // Validate commands
@@ -164,35 +165,38 @@ async function deployCommands() {
       if (CommandLoader.validateCommand(command)) {
         validCommands.push(command);
       } else {
-        console.error(
+        logger.error(
           `[Deploy] Failed to validate command: ${command.name || "unknown"}`
         );
       }
     }
  
-    console.log(`[Deploy] Loaded ${validCommands.length} valid commands`);
+    logger.info(`[Deploy] Loaded ${validCommands.length} valid commands`);
 
     // Deploy global commands to Discord
-    console.log("[Deploy] Deploying global commands...");
+    logger.info("[Deploy] Deploying global commands...");
     const deployedCommands = await deployGlobalCommands(validCommands);
  
     // Register commands in database
-    console.log("[Deploy] Registering commands in database...");
+    logger.info("[Deploy] Registering commands in database...");
     await registerCommandsInDatabase(validCommands, deployedCommands);
  
-    console.log("[Deploy] ✅ Commands deployed and registered successfully!");
-    console.log(
+    logger.info("[Deploy] ✅ Commands deployed and registered successfully!");
+    logger.info(
       "[Deploy] Note: It may take up to 1 hour for global commands to appear in all servers"
     );
   } catch (error) {
-    console.error("[Deploy] ❌ Error deploying commands:", error);
+    logger.error("[Deploy] ❌ Error deploying commands:", error);
     process.exit(1);
   }
 }
 
 // Handle script execution
 if (require.main === module) {
-  deployCommands().catch(console.error);
+  deployCommands().catch((error) => {
+    logger.error("[Deploy] Unhandled error:", error);
+    process.exit(1);
+  });
 }
 
 export { deployCommands };

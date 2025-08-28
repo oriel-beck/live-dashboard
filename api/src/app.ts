@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { config, validateConfig } from './config';
 import { attachUser } from './middleware/auth';
+import logger from './utils/logger';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -47,7 +48,7 @@ export function createApp() {
 
   // Error handling middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('Unhandled error:', err);
+    logger.error('Unhandled error:', err);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
