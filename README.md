@@ -2,6 +2,38 @@
 
 A comprehensive Discord bot management platform consisting of three containerized services: a Discord bot, REST API, and Angular dashboard. The system uses Redis for real-time data synchronization and PostgreSQL for persistent storage.
 
+## 🚀 Quick Start
+
+### Development Mode (Recommended for development)
+
+```bash
+# Copy environment template
+cp env.example .env
+
+# Edit .env with your Discord credentials
+
+# Start development environment with live reloading
+./start-dev.sh          # Linux/Mac
+start-dev.bat           # Windows
+```
+
+**Features:**
+- 🔄 Live reloading for all services
+- 📦 Shared types built locally and mounted as volumes
+- 🐳 Docker Compose development environment
+- 🎯 Hot reload for API, Bot, and Dashboard
+- ⚡ Fast builds (no Docker duplication)
+
+**Optional:** Run `watch-shared-types.sh` (Linux/Mac) or `watch-shared-types.bat` (Windows) in another terminal to automatically rebuild shared types when they change.
+
+See [DEV_SETUP.md](./DEV_SETUP.md) for detailed development instructions.
+
+### Production Mode
+
+```bash
+docker-compose up --build
+```
+
 ## 🏗️ Project Architecture
 
 ```

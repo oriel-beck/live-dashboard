@@ -3,7 +3,6 @@ import {
   DbDefaultCommand,
   DbCommandConfig,
   CommandConfigResult,
-  CommandConfigWithSubcommandResult,
 } from "@discord-bot/shared-types";
 import logger from "./utils/logger";
 import { CommandConfigData, CommandConfigUpdate } from "./types";
@@ -48,7 +47,6 @@ export {
   DbDefaultCommand,
   DbCommandConfig,
   CommandConfigResult,
-  CommandConfigWithSubcommandResult,
 };
 
 export class DefaultCommandService {
@@ -459,7 +457,7 @@ export class CommandConfigService {
     id: string,
     subcommandName?: string,
     includeSubcommands: boolean = false
-  ): Promise<CommandConfigResult | CommandConfigWithSubcommandResult | null> {
+  ): Promise<CommandConfigResult | null> {
     // If the id is longer than 17 characters, it's a Discord ID
     if (id.length > 17) {
       return await this.getCommandConfigById(

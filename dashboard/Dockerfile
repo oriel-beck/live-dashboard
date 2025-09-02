@@ -1,9 +1,18 @@
-# ---------- Base Stage ----------
 FROM node:22-alpine AS base
 WORKDIR /app
-COPY package*.json ./
+COPY dashboard/package*.json ./
 RUN npm install
-COPY . .
+
+COPY shared-types ./shared-types
+RUN cd shared-types && npm install && npm run build && npm pack && cd .. && npm install ./shared-types/*.tgz
+
+COPY dashboard/ ./
+
+# Development stage with live reloading
+FROM base AS dev
+# Expose port for development
+EXPOSE 4200
+# No CMD here - docker-compose will override it
 
 # ---------- Build Stage ----------
 FROM base AS build

@@ -1,0 +1,87 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
+      target: dev
+    develop:
+      watch:
+        - path: ./api/src
+          target: /app/src
+          action: sync
+    volumes:
+      - ./shared-types:/app/shared-types
+    command: ["npm", "run", "dev"]
+    depends_on:
+      - redis
+      - postgres
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+
+  bot:
+    build:
+      context: .
+      dockerfile: ./bot/Dockerfile
+      target: dev
+    develop:
+      watch:
+        - path: ./bot/src
+          target: /app/src
+          action: sync
+    volumes:
+      - ./shared-types:/app/shared-types
+    command: ["npm", "run", "dev"]
+    depends_on:
+      - redis
+      - api
+    env_file:
+      - .env
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: ./dashboard/Dockerfile
+      target: dev
+    develop:
+      watch:
+        - path: ./dashboard/src
+          target: /app/src
+          action: sync
+    volumes:
+      - ./shared-types:/app/shared-types
+    command: ["npm", "run", "start", "--", "--host", "0.0.0.0", "--port", "4200"]
+    depends_on:
+      - api
+    ports:
+      - "4200:4200"
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - .env
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  postgres:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d discord_bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

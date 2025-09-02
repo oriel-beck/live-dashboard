@@ -85,7 +85,7 @@ export class CommandManager {
         // Transform API response to internal format
         return {
           id: config.id,
-          commandName: config.commandName,
+          name: config.name,
           guildId: guildId,
           enabled: config.enabled,
           cooldown: config.cooldown,
@@ -131,7 +131,7 @@ export class CommandManager {
         return {
           command: {
             id: result.id,
-            commandName: result.name,
+            name: result.name,
             guildId: guildId,
             enabled: result.enabled,
             cooldown: result.cooldown,
@@ -142,7 +142,7 @@ export class CommandManager {
           },
           subcommand: {
             id: result.subcommand.id,
-            commandName: result.subcommand.name,
+            name: result.subcommand.name,
             guildId: guildId,
             enabled: result.subcommand.enabled,
             cooldown: result.subcommand.cooldown,
@@ -385,7 +385,7 @@ export class CommandManager {
       for (const [commandName, config] of Object.entries(configs)) {
         const guildConfig: GuildCommandConfig = {
           id: config.id,
-          commandName: config.commandName,
+          name: config.name,
           guildId: guildId,
           enabled: config.enabled,
           cooldown: config.cooldown,

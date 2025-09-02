@@ -1,34 +1,29 @@
-# Multi-stage build for production optimization
 FROM node:22-alpine AS base
 WORKDIR /app
+COPY bot/package*.json ./
+RUN npm install
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+COPY shared-types ./shared-types
+RUN cd shared-types && npm install && npm run build && npm pack && cd .. && npm install ./shared-types/*.tgz
 
-# Development stage
-FROM node:22-alpine AS dev
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
+COPY bot/ ./
+
+# Development stage with live reloading
+FROM base AS dev
+# Use npm run dev (Docker Compose watch handles file syncing)
 CMD ["npm", "run", "dev"]
 
 # Build stage
-FROM node:22-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
+FROM base AS build
 RUN npm run build
 
 # Production stage
-FROM base AS prod
+FROM node:22-alpine AS prod
 WORKDIR /app
-
-# Copy built application
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package*.json ./
+COPY --from=build /app/node_modules ./node_modules
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Add a non-root user for security
 RUN addgroup -g 1001 -S nodejs
