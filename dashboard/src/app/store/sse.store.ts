@@ -15,11 +15,12 @@ import { GuildService } from '../core/services/guild.service';
 import { pipe, switchMap } from 'rxjs';
 import { Router } from '@angular/router';
 import {
-  CommandConfigData as CommandConfig,
   GuildRole,
   GuildChannel,
   GuildInfo,
   CommandCategory,
+  CommandConfigResult,
+  CommandConfigResultWithCategory,
 } from '@discord-bot/shared-types';
 
 interface CacheStore {
@@ -27,7 +28,7 @@ interface CacheStore {
   guildId: string | null;
   lastEvent: string | null;
   retryCount: number;
-  commands: Map<number, CommandConfig>;
+  commands: Map<number, CommandConfigResultWithCategory>;
   roles: GuildRole[];
   channels: GuildChannel[];
   isLoading: boolean;
@@ -40,7 +41,7 @@ const initialState: CacheStore = {
   guildId: null,
   lastEvent: null,
   retryCount: 0,
-  commands: new Map<number, CommandConfig>(),
+  commands: new Map<number, CommandConfigResultWithCategory>(),
   roles: [],
   channels: [],
   isLoading: false,
@@ -123,13 +124,12 @@ export const CacheStore = signalStore(
                   guildInfo: event.guildInfo,
                   roles: event.roles,
                   channels: event.channels,
-                  commands: (event.commands as CommandConfig[]).reduce(
-                    (acc, command) => {
-                      acc.set(command.id, command);
-                      return acc;
-                    },
-                    new Map<number, CommandConfig>()
-                  ),
+                  commands: (
+                    event.commands as CommandConfigResultWithCategory[]
+                  ).reduce((acc, command) => {
+                    acc.set(command.id, command);
+                    return acc;
+                  }, new Map<number, CommandConfigResultWithCategory>()),
                 });
                 break;
               case 'guild_fetch_failed':
@@ -215,7 +215,7 @@ export const CacheStore = signalStore(
       ),
       saveCommandConfig: rxMethod<{
         commandId: number;
-        updates: Partial<CommandConfig>;
+        updates: Partial<CommandConfigResultWithCategory>;
       }>(
         pipe(
           switchMap(({ commandId, updates }) =>
@@ -255,18 +255,18 @@ export const CacheStore = signalStore(
     return {
       commandsCategories: computed(() => {
         return Array.from(store.commands().values()).reduce(
-          (acc, command: CommandConfig) => {
+          (acc, command: CommandConfigResultWithCategory) => {
             // Check if command has category information
             if (command.category && command.categoryId) {
               let data = acc.get(command.categoryId) ?? command.category;
               data.commands ??= [];
               const existingCommand = data.commands.find(
-                (c: CommandConfig) => c.id === command.id
+                (c: CommandConfigResult) => c.id === command.id
               );
               if (!existingCommand) {
                 data.commands.push(command);
               } else {
-                data.commands = data.commands.map((c: CommandConfig) =>
+                data.commands = data.commands.map((c: CommandConfigResult) =>
                   c.id === command.id ? command : c
                 );
               }

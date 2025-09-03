@@ -3,6 +3,7 @@ import {
   DbDefaultCommand,
   DbCommandConfig,
   CommandConfigResult,
+  CommandConfigResultWithCategory,
 } from "@discord-bot/shared-types";
 import logger from "./utils/logger";
 import { CommandConfigUpdate } from "./types";
@@ -316,7 +317,7 @@ export class CommandConfigService {
       await DefaultCommandService.getAllMainCommandsWithSubcommands(
         includeSubcommands
       );
-    const result: CommandConfigResult[] = [];
+    const result: CommandConfigResultWithCategory[] = [];
 
     for (const cmd of mainCommands) {
       const config = await this.getCommandConfig(guildId, cmd.id);

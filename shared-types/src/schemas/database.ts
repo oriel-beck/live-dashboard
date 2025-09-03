@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BaseCommandDataSchema } from "./command";
+import { BaseCommandDataSchema, CommandCategorySchema } from "./command";
 
 // Database-specific command schema (for Prisma operations)
 export const DbDefaultCommandSchema = z.object({
@@ -46,7 +46,13 @@ export const CommandConfigResultSchema = z.intersection(BaseCommandDataSchema, z
   subcommands: z.record(z.string(), z.lazy((): z.ZodTypeAny => CommandConfigResultSchema)),
 }));
 
+export const CommandConfigResultWithCategorySchema = z.intersection(CommandConfigResultSchema, z.object({
+  categoryId: z.number().nullable(),
+  category: CommandCategorySchema.optional(),
+}));
+
 // Export types
 export type DbDefaultCommand = z.infer<typeof DbDefaultCommandSchema>;
 export type DbCommandConfig = z.infer<typeof DbCommandConfigSchema>;
 export type CommandConfigResult = z.infer<typeof CommandConfigResultSchema>;
+export type CommandConfigResultWithCategory = z.infer<typeof CommandConfigResultWithCategorySchema>;

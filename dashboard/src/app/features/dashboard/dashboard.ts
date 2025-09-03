@@ -14,7 +14,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 
 // Import the command config dialog component
 import { CommandConfigDialog } from '../command-config-dialog/command-config-dialog';
-import { CommandCategory, CommandConfigData as CommandConfig } from '@discord-bot/shared-types';
+import { CommandCategory, CommandConfigResultWithCategory } from '@discord-bot/shared-types';
 
 @Component({
   selector: 'app-dashboard',
@@ -75,7 +75,7 @@ export class Dashboard {
     return 'https://cdn.discordapp.com/embed/avatars/0.png';
   }
 
-  openCommandConfig(command: CommandConfig) {
+  openCommandConfig(command: CommandConfigResultWithCategory) {
     const ref = this.dialogService.open(CommandConfigDialog, {
       header: `Configure Command: ${command.name}`,
       width: '700px',
@@ -87,7 +87,7 @@ export class Dashboard {
       styleClass: 'command-config-dialog',
     });
 
-    ref.onClose.subscribe((result: Partial<CommandConfig> | undefined) => {
+    ref.onClose.subscribe((result: Partial<CommandConfigResultWithCategory> | undefined) => {
       if (result) {
         this.store.saveCommandConfig({
           commandId: command.id,
@@ -97,11 +97,11 @@ export class Dashboard {
     });
   }
 
-  getSubcommands(command: CommandConfig) {
+  getSubcommands(command: CommandConfigResultWithCategory) {
     return command.subcommands ? Object.values(command.subcommands) : [];
   }
 
-  getSubcommandCount(command: CommandConfig) {
+  getSubcommandCount(command: CommandConfigResultWithCategory) {
     return command.subcommands ? Object.keys(command.subcommands).length : 0;
   }
 }

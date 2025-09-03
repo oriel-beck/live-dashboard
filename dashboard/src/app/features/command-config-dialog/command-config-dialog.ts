@@ -7,7 +7,7 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { DividerModule } from 'primeng/divider';
 import { DynamicDialogRef, DynamicDialogConfig } from 'primeng/dynamicdialog';
-import { CommandConfigData as CommandConfig, GuildRole, GuildChannel } from '@discord-bot/shared-types';
+import { CommandConfigResultWithCategory, GuildRole, GuildChannel } from '@discord-bot/shared-types';
 
 @Component({
   selector: 'app-command-config-dialog',
@@ -26,12 +26,12 @@ import { CommandConfigData as CommandConfig, GuildRole, GuildChannel } from '@di
 })
 export class CommandConfigDialog {
   // Get data from dialog config
-  command: CommandConfig;
+  command: CommandConfigResultWithCategory;
   roles: GuildRole[];
   channels: GuildChannel[];
 
   // Configuration form data
-  configForm = signal<Partial<CommandConfig>>({});
+  configForm = signal<Partial<CommandConfigResultWithCategory>>({});
 
   // MultiSelect options
   roleOptions = signal<{ label: string; value: string }[]>([]);
