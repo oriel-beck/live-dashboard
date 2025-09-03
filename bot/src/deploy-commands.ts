@@ -67,7 +67,7 @@ async function registerCommandsInDatabase(
 
     // Register main command (upsert - creates or updates)
     const mainCommandResponse = await apiClient.registerDefaultCommand({
-      discordId: deployedCmd.id,
+      discordId: BigInt(deployedCmd.id),
       name: deployedCmd.name,
       description: deployedCmd.description,
       cooldown: 0, // Default cooldown in seconds
@@ -107,7 +107,7 @@ async function registerCommandsInDatabase(
 async function registerSubcommands(
   apiClient: ApiClient,
   deployedCmd: ApplicationCommand,
-  parentId: string
+  parentId: number
 ) {
   if (!deployedCmd.options) return;
 
@@ -122,7 +122,8 @@ async function registerSubcommands(
         cooldown: 0, // Groups don't have cooldowns
         permissions: "0",
         enabled: true,
-        parentId,
+        parentId: parentId,
+        discordId: null,
       });
 
       const groupId = (groupResponse as any).command.id;
@@ -141,7 +142,8 @@ async function registerSubcommands(
               cooldown: 0, // Default subcommand cooldown
               permissions: "0",
               enabled: true,
-              parentId: groupId,
+              parentId: parseInt(groupId),
+              discordId: null,
             });
             logger.info(
               `[Deploy] Registered nested subcommand: ${subOption.name}`
@@ -159,7 +161,8 @@ async function registerSubcommands(
         cooldown: 0, // Default subcommand cooldown
         permissions: "0",
         enabled: true,
-        parentId,
+        parentId: parentId,
+        discordId: null,
       });
       logger.info(`[Deploy] Registered subcommand: ${option.name}`);
     }

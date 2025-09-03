@@ -1,3 +1,8 @@
+// @ts-expect-error Add BigInt JSON serialization support
+BigInt.prototype.toJSON = function() {
+  return this.toString();
+};
+
 import { createApp } from './app';
 import { initializeDatabase, closeDatabase } from './database';
 import { config } from './config';

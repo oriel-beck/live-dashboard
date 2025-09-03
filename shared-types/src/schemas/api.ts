@@ -1,13 +1,5 @@
 import { z } from 'zod';
 
-// API Response Schema
-export const ApiResponseSchema = z.object({
-  success: z.boolean(),
-  data: z.unknown().optional(),
-  error: z.string().optional(),
-  message: z.string().optional(),
-});
-
 // Cache Entry Schema
 export const CacheEntrySchema = z.object({
   data: z.unknown(),
@@ -44,12 +36,7 @@ export const GuildDataResponseSchema = z.object({
   })),
 });
 
-
-
-
-
 // Export types
-export type ApiResponse<T = unknown> = z.infer<typeof ApiResponseSchema> & { data?: T };
 export type CacheEntry<T = unknown> = z.infer<typeof CacheEntrySchema> & { data: T };
 export type GuildDataResponse = z.infer<typeof GuildDataResponseSchema>;
 

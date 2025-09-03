@@ -1,64 +1,45 @@
-import { APIChannel, APIGuild, APIRole } from 'discord.js';
-import logger from './logger';
-import { GuildCommandConfig } from '../types/command';
-import { 
-  GuildDataResponseSchema,
-  DefaultCommandRegistrationSchema,
-  GuildDataResponse,
-  DefaultCommandRegistration,
+import {
   ApiResponse,
+  DefaultCommandRegistration,
   DefaultCommandRegistrationResponse,
-  CommandListResponse,
-  CommandDetailResponse,
-  SubcommandConfig
+  DefaultCommandRegistrationSchema,
+  CommandConfigResult,
 } from '@discord-bot/shared-types';
+import logger from './logger';
 
 // API client for bot to communicate with the API service
 export class ApiClient {
-  private static readonly API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
-
-  static async fetchGuildData(guildId: string): Promise<GuildDataResponse> {
-    const response = await fetch(`${this.API_BASE}/bot/guilds/${guildId}/data`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.BOT_TOKEN}`, // Bot token for internal API calls
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch guild data: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    // Validate response data
-    const validatedData = GuildDataResponseSchema.parse(data);
-    return validatedData;
-  }
-
-
-
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl ?? this.getDefaultApiUrl();
+    logger.debug(`[ApiClient] Initialized with base URL: ${this.baseUrl}`);
   }
 
   private getDefaultApiUrl(): string {
-    const isProduction = process.env.NODE_ENV === "production";
-    const url = isProduction ? "http://api:3000" : "http://localhost:3000";
+    const url = process.env.API_BASE_URL  || "http://localhost:3000";
     return url;
   }
 
   async get<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`);
-    if (!response.ok) {
-      throw new Error(
-        `API request failed: ${response.status} ${response.statusText}`
-      );
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        headers: {
+          'Authorization': `Bearer ${process.env.BOT_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(
+          `API request failed: ${response.status} ${response.statusText}`
+        );
+      }
+      return await response.json() as T;
+    } catch (error) {
+      logger.error(`[ApiClient] GET request failed for endpoint ${endpoint}:`, error);
+      throw error;
     }
-    return response.json() as Promise<T>;
   }
 
   async post<T>(endpoint: string, data: unknown): Promise<T> {
@@ -66,6 +47,7 @@ export class ApiClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        'Authorization': `Bearer ${process.env.BOT_TOKEN}`,
       },
       body: JSON.stringify(data),
     });
@@ -82,6 +64,7 @@ export class ApiClient {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
+        'Authorization': `Bearer ${process.env.BOT_TOKEN}`,
       },
       body: JSON.stringify(data),
     });
@@ -96,9 +79,10 @@ export class ApiClient {
   async getGuildCommandConfigs(
     guildId: string,
     withSubcommands: boolean = false
-  ): Promise<Record<string, GuildCommandConfig>> {
+  ): Promise<Record<string, CommandConfigResult>> {
     const params = withSubcommands ? "?withSubcommands=true" : "";
-    return this.get(`/guilds/${guildId}/commands${params}`) as Promise<Record<string, GuildCommandConfig>>;
+    const response = await this.get<{ success: boolean; data: Record<string, CommandConfigResult> }>(`/guilds/${guildId}/commands${params}`);
+    return response.data;
   }
 
   // Get command config by ID
@@ -107,13 +91,18 @@ export class ApiClient {
     commandId: string,
     withSubcommands: boolean = false,
     subcommandName?: string
-  ): Promise<GuildCommandConfig> {
+  ): Promise<CommandConfigResult> {
     const params = new URLSearchParams();
     if (withSubcommands) params.append("withSubcommands", "true");
     if (subcommandName) params.append("subcommandName", subcommandName);
     
     const queryString = params.toString();
-    return this.get<GuildCommandConfig>(`/guilds/${guildId}/commands/${commandId}${queryString ? `?${queryString}` : ""}`);
+    const endpoint = `/guilds/${guildId}/commands/${commandId}`;
+    const fullEndpoint = queryString ? `${endpoint}?${queryString}` : endpoint;
+    
+    logger.debug(`[ApiClient] getCommandConfig: ${fullEndpoint}`);
+    const response = await this.get<{ success: boolean; data: CommandConfigResult }>(fullEndpoint);
+    return response.data;
   }
 
   // Update command config by ID
@@ -121,8 +110,9 @@ export class ApiClient {
     guildId: string,
     commandId: string,
     updates: unknown
-  ): Promise<ApiResponse<GuildCommandConfig>> {
-    return this.put<ApiResponse<GuildCommandConfig>>(`/guilds/${guildId}/commands/${commandId}`, updates);
+  ): Promise<ApiResponse<CommandConfigResult>> {
+    const response = await this.put<ApiResponse<CommandConfigResult>>(`/guilds/${guildId}/commands/${commandId}`, updates);
+    return response;
   }
 
   // Update subcommand config by ID and subcommand name
@@ -131,11 +121,12 @@ export class ApiClient {
     commandId: string,
     subcommandName: string,
     updates: unknown
-  ): Promise<ApiResponse<SubcommandConfig>> {
-    return this.put<ApiResponse<SubcommandConfig>>(
+  ): Promise<ApiResponse<CommandConfigResult>> {
+    const response = await this.put<ApiResponse<CommandConfigResult>>(
       `/guilds/${guildId}/commands/${commandId}/${subcommandName}`,
       updates
     );
+    return response;
   }
 
   // Register a default command in the database (upsert operation - creates or updates)

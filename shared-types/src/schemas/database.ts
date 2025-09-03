@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { BaseCommandDataSchema } from "./command";
 
+// Database-specific command schema (for Prisma operations)
 export const DbDefaultCommandSchema = z.object({
   id: z.number(),
   discordId: z.bigint().nullable(),
@@ -19,7 +21,7 @@ export const DbDefaultCommandSchema = z.object({
     .optional(),
 });
 
-// Database Command Config Schema
+// Database Command Config Schema (for guild-specific overrides)
 export const DbCommandConfigSchema = z.object({
   guildId: z.string(),
   commandId: z.number(),
@@ -34,26 +36,15 @@ export const DbCommandConfigSchema = z.object({
   defaultCommand: DbDefaultCommandSchema.optional(),
 });
 
-// Command Config Result Schema
-export const CommandConfigResultSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  cooldown: z.number(),
-  permissions: z.string(),
-  enabled: z.boolean(),
+// Command Config Result Schema (API response format)
+export const CommandConfigResultSchema = z.intersection(BaseCommandDataSchema, z.object({
   whitelistedRoles: z.array(z.string()),
   blacklistedRoles: z.array(z.string()),
   whitelistedChannels: z.array(z.string()),
   blacklistedChannels: z.array(z.string()),
   bypassRoles: z.array(z.string()),
-  createdAt: z.date().nullable(),
-  updatedAt: z.date().nullable(),
-  subcommands: z.record(z.string(), z.unknown()),
-  parentId: z.number().optional(),
-  categoryId: z.number().optional(),
-  discordId: z.bigint().optional(),
-});
+  subcommands: z.record(z.string(), z.lazy((): z.ZodTypeAny => CommandConfigResultSchema)),
+}));
 
 // Export types
 export type DbDefaultCommand = z.infer<typeof DbDefaultCommandSchema>;

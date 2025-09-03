@@ -7,11 +7,11 @@ import {
 import {
   BaseCommand,
   CommandInfo,
-  GuildCommandConfig
 } from "../types/command";
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
 import logger from "./logger";
+import { CommandConfigResult } from "@discord-bot/shared-types";
 
 export class CommandManager {
   private client: Client;
@@ -74,7 +74,7 @@ export class CommandManager {
   async getGuildCommandConfig(
     guildId: string,
     commandId: string
-  ): Promise<GuildCommandConfig | null> {
+  ): Promise<CommandConfigResult | null> {
     try {
       // Fetch from API using command ID
       const config = await this.apiClient.getCommandConfig(
@@ -82,18 +82,8 @@ export class CommandManager {
         commandId
       );
       if (config) {
-        // Transform API response to internal format
-        return {
-          id: config.id,
-          name: config.name,
-          guildId: guildId,
-          enabled: config.enabled,
-          cooldown: config.cooldown,
-          permissions: config.permissions,
-          subcommands: config.subcommands || {},
-          createdAt: config.createdAt,
-          updatedAt: config.updatedAt,
-        };
+        // Return the API response directly since subcommands and regular commands use the same schema
+        return config;
       }
 
       // No config exists - command cannot be used
@@ -115,7 +105,7 @@ export class CommandManager {
     guildId: string,
     commandId: string,
     subcommandName: string
-  ): Promise<{ command: GuildCommandConfig; subcommand: GuildCommandConfig } | null> {
+  ): Promise<{ command: CommandConfigResult; subcommand: CommandConfigResult } | null> {
     try {
       // Fetch both main and subcommand config in one API call
       const config = await this.apiClient.getCommandConfig(
@@ -125,32 +115,11 @@ export class CommandManager {
         subcommandName
       );
       
-      // The API returns a CommandConfigWithSubcommandResult when subcommandName is provided
-      if (config && 'subcommand' in config) {
-        const result = config as any; // Type assertion for now
+      // Check if the config exists and has the requested subcommand
+      if (config && config.subcommands && config.subcommands[subcommandName]) {
         return {
-          command: {
-            id: result.id,
-            name: result.name,
-            guildId: guildId,
-            enabled: result.enabled,
-            cooldown: result.cooldown,
-            permissions: result.permissions,
-            subcommands: result.subcommands || {},
-            createdAt: result.createdAt,
-            updatedAt: result.updatedAt,
-          },
-          subcommand: {
-            id: result.subcommand.id,
-            name: result.subcommand.name,
-            guildId: guildId,
-            enabled: result.subcommand.enabled,
-            cooldown: result.subcommand.cooldown,
-            permissions: result.subcommand.permissions,
-            subcommands: {},
-            createdAt: result.subcommand.createdAt,
-            updatedAt: result.subcommand.updatedAt,
-          }
+          command: config,
+          subcommand: config.subcommands[subcommandName]
         };
       }
 
@@ -232,8 +201,8 @@ export class CommandManager {
     try {
       // Check if this is a subcommand execution
       const subcommandName = interaction.options.getSubcommand(false);
-      let activeConfig: GuildCommandConfig;
-      let mainConfig: GuildCommandConfig | null = null;
+      let activeConfig: CommandConfigResult;
+      let mainConfig: CommandConfigResult;
 
       if (subcommandName) {
         // Fetch specific subcommand config from API (includes main command config)
@@ -278,6 +247,8 @@ export class CommandManager {
           interaction.commandId
         );
 
+
+
         if (!mainCommandConfig) {
           await interaction.reply({
             content: "This command is not configured and cannot be used.",
@@ -299,7 +270,13 @@ export class CommandManager {
       }
 
       // Check permissions using the active config
-      const guildPermissions = activeConfig.permissions;
+      const guildPermissions = {
+        whitelistedRoles: activeConfig.whitelistedRoles,
+        blacklistedRoles: activeConfig.blacklistedRoles,
+        whitelistedChannels: activeConfig.whitelistedChannels,
+        blacklistedChannels: activeConfig.blacklistedChannels,
+        bypassRoles: activeConfig.bypassRoles,
+      };
 
       const permissionResult = await PermissionChecker.checkPermissions(
         interaction,
@@ -376,26 +353,20 @@ export class CommandManager {
    */
   async getAllGuildCommandConfigs(
     guildId: string
-  ): Promise<Record<string, GuildCommandConfig>> {
+  ): Promise<Record<string, CommandConfigResult>> {
     try {
       const configs = await this.apiClient.getGuildCommandConfigs(guildId);
 
       // Transform API response to internal format
-      const result: Record<string, GuildCommandConfig> = {};
+      const result: Record<string, CommandConfigResult> = {};
       for (const [commandName, config] of Object.entries(configs)) {
-        const guildConfig: GuildCommandConfig = {
-          id: config.id,
-          name: config.name,
-          guildId: guildId,
-          enabled: config.enabled,
-          cooldown: config.cooldown,
-          permissions: config.permissions,
-          subcommands: config.subcommands || {},
-          createdAt: config.createdAt,
-          updatedAt: config.updatedAt,
+        // Ensure subcommands property exists
+        const configWithSubcommands: CommandConfigResult = {
+          ...config,
+          subcommands: config.subcommands || {}
         };
 
-        result[commandName] = guildConfig;
+        result[commandName] = configWithSubcommands;
       }
 
       return result;

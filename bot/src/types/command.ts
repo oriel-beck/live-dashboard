@@ -2,7 +2,6 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, SlashCommandSubcomman
 import logger from '../utils/logger';
 import {
   GuildCommandConfig,
-  SubcommandConfig,
   CommandExecutionContext,
   PermissionCheckResult,
   CommandInfo,
@@ -63,7 +62,6 @@ export abstract class BaseCommand {
 // Re-export shared types for convenience
 export {
   GuildCommandConfig,
-  SubcommandConfig as GuildSubcommandConfig,
   CommandExecutionContext,
   PermissionCheckResult,
   CommandInfo,

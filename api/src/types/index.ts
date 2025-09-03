@@ -11,7 +11,6 @@ import {
   CachedGuildRole,
   CachedGuildChannel,
   CachedGuildInfo,
-  CommandConfigData,
   CommandConfigUpdate,
 } from '@discord-bot/shared-types';
 
@@ -19,6 +18,7 @@ export interface AuthenticatedRequest extends Request {
   user?: User;
   sessionId?: string;
   sessionData?: SessionData;
+  isBotRequest?: boolean;
 }
 
 // Re-export shared types for convenience
@@ -33,6 +33,5 @@ export {
   CachedGuildRole,
   CachedGuildChannel,
   CachedGuildInfo,
-  CommandConfigData,
   CommandConfigUpdate,
 };

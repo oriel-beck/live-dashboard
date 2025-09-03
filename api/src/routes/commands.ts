@@ -1,12 +1,12 @@
 import { Request, Response, Router } from 'express';
 import { DefaultCommandService } from '../database';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireBotAuth } from '../middleware/auth';
 import logger from '../utils/logger';
 
 const router = Router();
 
 // Register a default command (called by deploy script)
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', requireBotAuth, async (req: Request, res: Response) => {
   try {
     const {
       discordId,

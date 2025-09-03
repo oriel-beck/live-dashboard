@@ -5,7 +5,7 @@ import {
   CommandConfigResult,
 } from "@discord-bot/shared-types";
 import logger from "./utils/logger";
-import { CommandConfigData, CommandConfigUpdate } from "./types";
+import { CommandConfigUpdate } from "./types";
 
 // Create Prisma client instance
 export const prisma = new PrismaClient({
@@ -181,7 +181,7 @@ export class DefaultCommandService {
   ): Promise<
     (DefaultCommandWithSubcommands & DefaultCommandWithCategory) | null
   > {
-    return await prisma.defaultCommand.findUnique({
+    const result = await prisma.defaultCommand.findUnique({
       where: { discordId: BigInt(commandId) },
       include: {
         category: true,
@@ -212,6 +212,7 @@ export class DefaultCommandService {
           : {}),
       },
     });
+    return result;
   }
 
   // Get all main commands with optional subcommands
@@ -315,7 +316,7 @@ export class CommandConfigService {
       await DefaultCommandService.getAllMainCommandsWithSubcommands(
         includeSubcommands
       );
-    const result: CommandConfigData[] = [];
+    const result: CommandConfigResult[] = [];
 
     for (const cmd of mainCommands) {
       const config = await this.getCommandConfig(guildId, cmd.id);
@@ -423,161 +424,57 @@ export class CommandConfigService {
     return result;
   }
 
-  // Get command config by database ID with default fallback
+  // Get command config by ID (Discord ID or database ID) with optional subcommand
   static async getCommandConfigById(
     guildId: string,
     id: string,
     subcommandName?: string,
     includeSubcommands: boolean = false
   ): Promise<CommandConfigResult | null> {
-    // If the id is longer than 17 characters, it's a Discord ID
+    let defaultCommand: DefaultCommandWithSubcommands | null = null;
+    
+    // Determine if ID is Discord ID (>17 chars) or database ID (≤17 chars)
     if (id.length > 17) {
-      return await this.getCommandConfigById(
-        guildId,
+      // Discord ID - get command by Discord ID
+      defaultCommand = await DefaultCommandService.getCommandByDiscordId(
         id,
+        subcommandName,
+        includeSubcommands
+      );
+    } else {
+      // Database ID - get command by database ID
+      defaultCommand = await DefaultCommandService.getCommandById(
+        +id,
         subcommandName,
         includeSubcommands
       );
     }
 
-    // Get default command by database ID
-    const defaultCommand = await DefaultCommandService.getCommandById(
-      +id,
-      subcommandName,
-      includeSubcommands
-    );
     if (!defaultCommand) {
       return null;
     }
 
-    // Determine if we need to fetch parent command
-    const needsParentCommand = defaultCommand.parentId && !subcommandName;
-    const commandIds = new Set<number>([defaultCommand.id]);
-
-    if (needsParentCommand && defaultCommand.parentId) {
-      commandIds.add(defaultCommand.parentId);
-    }
-
-    // If subcommandName is provided and this is a main command, also fetch subcommand config
-    if (
-      subcommandName &&
-      !defaultCommand.parentId &&
-      defaultCommand.subcommands
-    ) {
-      const subcommand = defaultCommand.subcommands.find(
-        (sub) => sub.name === subcommandName
-      );
-      if (subcommand) {
-        commandIds.add(subcommand.id);
-      }
-    }
-
-    // Batch fetch all required guild configs in a single query
-    const guildConfigs = await prisma.guildCommandConfig.findMany({
+    // Get guild config for this command
+    const guildConfig = await prisma.guildCommandConfig.findUnique({
       where: {
-        guildId,
-        commandId: { in: Array.from(commandIds) },
+        guildId_commandId: {
+          guildId,
+          commandId: defaultCommand.id,
+        },
       },
     });
 
-    // Create a map for quick lookup
-    const guildConfigMap = new Map(
-      guildConfigs.map((config) => [config.commandId, config])
-    );
-
-    // Handle subcommand with parent command case
-    if (needsParentCommand && defaultCommand.parentId) {
-      const parentCommand = await DefaultCommandService.getCommandById(
-        defaultCommand.parentId,
-        undefined,
-        includeSubcommands
-      );
-      if (!parentCommand) {
-        return null;
-      }
-
-      const mainGuildConfig = guildConfigMap.get(parentCommand.id);
-      const subGuildConfig = guildConfigMap.get(defaultCommand.id);
-
-      const result: CommandConfigResult = {
-        id: defaultCommand.id.toString(),
-        name: defaultCommand.name,
-        description: defaultCommand.description,
-        cooldown: defaultCommand.cooldown,
-        permissions: defaultCommand.permissions.toString(),
-        enabled: subGuildConfig?.enabled ?? defaultCommand.enabled,
-        whitelistedRoles: mainGuildConfig?.whitelistedRoles ?? [],
-        blacklistedRoles: mainGuildConfig?.blacklistedRoles ?? [],
-        whitelistedChannels: mainGuildConfig?.whitelistedChannels ?? [],
-        blacklistedChannels: mainGuildConfig?.blacklistedChannels ?? [],
-        bypassRoles: mainGuildConfig?.bypassRoles ?? [],
-        createdAt: mainGuildConfig?.createdAt ?? null,
-        updatedAt: mainGuildConfig?.updatedAt ?? null,
-        subcommands: {},
-      };
-
-      return result;
-    }
-
-    // Handle main command with specific subcommand case
-    if (
-      subcommandName &&
-      !defaultCommand.parentId &&
-      defaultCommand.subcommands
-    ) {
-      const subcommand = defaultCommand.subcommands.find(
-        (sub) => sub.name === subcommandName
-      );
-      if (!subcommand) {
-        return null;
-      }
-
-      const mainGuildConfig = guildConfigMap.get(defaultCommand.id);
-      const subGuildConfig = guildConfigMap.get(subcommand.id);
-
-      const result: CommandConfigResult = {
-        id: defaultCommand.id.toString(),
-        name: defaultCommand.name,
-        description: defaultCommand.description,
-        cooldown: defaultCommand.cooldown,
-        permissions: defaultCommand.permissions.toString(),
-        enabled: mainGuildConfig?.enabled ?? defaultCommand.enabled,
-        whitelistedRoles: mainGuildConfig?.whitelistedRoles ?? [],
-        blacklistedRoles: mainGuildConfig?.blacklistedRoles ?? [],
-        whitelistedChannels: mainGuildConfig?.whitelistedChannels ?? [],
-        blacklistedChannels: mainGuildConfig?.blacklistedChannels ?? [],
-        bypassRoles: mainGuildConfig?.bypassRoles ?? [],
-        createdAt: mainGuildConfig?.createdAt ?? null,
-        updatedAt: mainGuildConfig?.updatedAt ?? null,
-        subcommands: {
-          [subcommand.name]: {
-            id: subcommand.id.toString(),
-            name: subcommand.name,
-            description: subcommand.description,
-            enabled: subGuildConfig?.enabled ?? subcommand.enabled,
-            cooldown: subcommand.cooldown,
-            whitelistedRoles: subGuildConfig?.whitelistedRoles ?? [],
-            blacklistedRoles: subGuildConfig?.blacklistedRoles ?? [],
-            whitelistedChannels: subGuildConfig?.whitelistedChannels ?? [],
-            blacklistedChannels: subGuildConfig?.blacklistedChannels ?? [],
-            bypassRoles: subGuildConfig?.bypassRoles ?? [],
-          },
-        },
-      };
-
-      return result;
-    }
-
-    // Regular command request
-    const guildConfig = guildConfigMap.get(defaultCommand.id);
-
+    // Build base result
     const result: CommandConfigResult = {
-      id: defaultCommand.id.toString(),
+      id: defaultCommand.id,
       name: defaultCommand.name,
       description: defaultCommand.description,
       cooldown: defaultCommand.cooldown,
       permissions: defaultCommand.permissions.toString(),
       enabled: guildConfig?.enabled ?? defaultCommand.enabled,
+      parentId: defaultCommand.parentId,
+      discordId: defaultCommand.discordId,
+      categoryId: defaultCommand.categoryId,
       whitelistedRoles: guildConfig?.whitelistedRoles ?? [],
       blacklistedRoles: guildConfig?.blacklistedRoles ?? [],
       whitelistedChannels: guildConfig?.whitelistedChannels ?? [],
@@ -588,12 +485,40 @@ export class CommandConfigService {
       subcommands: {},
     };
 
-    // Include subcommands if requested and this is a main command
-    if (
-      includeSubcommands &&
-      defaultCommand.subcommands &&
-      !defaultCommand.parentId
-    ) {
+    // If subcommandName is provided, include the specific subcommand
+    if (subcommandName && defaultCommand.subcommands) {
+      const subcommand = defaultCommand.subcommands.find(
+        (sub) => sub.name === subcommandName
+      );
+      if (subcommand) {
+        // Get guild config for this specific subcommand if it exists
+        const subcommandGuildConfig = await prisma.guildCommandConfig.findUnique({
+          where: {
+            guildId_commandId: {
+              guildId,
+              commandId: subcommand.id,
+            },
+          },
+        });
+
+        result.subcommands = {
+          [subcommand.name]: {
+            id: subcommand.id.toString(),
+            name: subcommand.name,
+            description: subcommand.description,
+            enabled: subcommandGuildConfig?.enabled ?? subcommand.enabled,
+            cooldown: subcommand.cooldown,
+            whitelistedRoles: subcommandGuildConfig?.whitelistedRoles ?? [],
+            blacklistedRoles: subcommandGuildConfig?.blacklistedRoles ?? [],
+            whitelistedChannels: subcommandGuildConfig?.whitelistedChannels ?? [],
+            blacklistedChannels: subcommandGuildConfig?.blacklistedChannels ?? [],
+            bypassRoles: subcommandGuildConfig?.bypassRoles ?? [],
+          },
+        };
+      }
+    }
+    // If includeSubcommands is true and no specific subcommand requested, include all subcommands
+    else if (includeSubcommands && defaultCommand.subcommands && !defaultCommand.parentId) {
       const subcommandConfigs = await this.buildSubcommandConfigs(
         guildId,
         defaultCommand.subcommands

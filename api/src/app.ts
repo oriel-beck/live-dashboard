@@ -32,11 +32,7 @@ export function createApp() {
 
   // Health check endpoint
   app.get('/health', (req, res) => {
-    res.json({
-      success: true,
-      message: 'API is healthy',
-      timestamp: new Date().toISOString(),
-    });
+    res.status(204).send(); // No content, just success
   });
 
   // API routes
