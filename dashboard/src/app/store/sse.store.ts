@@ -143,6 +143,48 @@ export const CacheStore = signalStore(
                 store.source()?.close();
                 router.navigate(['/servers']);
                 break;
+              case 'channel.create':
+                patchState(store, {
+                  channels: [...store.channels(), event.data],
+                });
+                break;
+              case 'channel.update':
+                patchState(store, {
+                  channels: store
+                    .channels()
+                    .map((channel) =>
+                      channel.id === event.channelId ? event.data : channel
+                    ),
+                });
+                break;
+              case 'channel.delete':
+                patchState(store, {
+                  channels: store
+                    .channels()
+                    .filter((channel) => channel.id !== event.channelId),
+                });
+                break;
+              case 'role.create':
+                patchState(store, {
+                  roles: [...store.roles(), event.data],
+                });
+                break;
+              case 'role.update':
+                patchState(store, {
+                  roles: store
+                    .roles()
+                    .map((role) =>
+                      role.id === event.roleId ? event.data : role
+                    ),
+                });
+                break;
+              case 'role.delete':
+                patchState(store, {
+                  roles: store
+                    .roles()
+                    .filter((role) => role.id !== event.roleId),
+                });
+                break;
             }
           } catch {
             /* ignore malformed */

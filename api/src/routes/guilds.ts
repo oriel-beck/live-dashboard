@@ -7,7 +7,6 @@ import { CommandConfigService } from "../database";
 import { requireAuth, requireGuildAccess } from "../middleware/auth";
 import { RedisService } from "../services/redis";
 import logger from "../utils/logger";
-import { config } from "../config";
 
 const router = Router();
 

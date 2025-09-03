@@ -80,9 +80,9 @@ export class Dashboard {
       header: `Configure Command: ${command.name}`,
       width: '700px',
       data: {
-        command,
-        roles: this.store.roles(),
-        channels: this.store.channels(),
+        command: this.store.commands().get(command.id),
+        roles: this.store.roles,
+        channels: this.store.channels,
       },
       styleClass: 'command-config-dialog',
     });
