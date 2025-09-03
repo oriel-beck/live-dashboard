@@ -2,7 +2,12 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, catchError, of, tap, map } from 'rxjs';
 import { ApiService } from './api.service';
-import { ApiResponse, AuthState, User, UserGuild } from '@discord-bot/shared-types';
+import {
+  ApiResponse,
+  AuthState,
+  User,
+  UserGuild,
+} from '@discord-bot/shared-types';
 
 @Injectable({
   providedIn: 'root',
