@@ -8,21 +8,7 @@ export class DiscordService {
   private static readonly API_BASE = config.discord.apiUrl;
   private static readonly BOT_TOKEN = config.discord.botToken;
 
-  static async sendMessage(channelId: string, content: string) {
-    const response = await fetch(
-      `${this.API_BASE}/channels/${channelId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bot ${this.BOT_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ content }),
-      }
-    );
 
-    return response;
-  }
 
   static async getUserGuilds(
     accessToken: string,

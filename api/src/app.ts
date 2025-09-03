@@ -9,7 +9,6 @@ import logger from './utils/logger';
 import authRoutes from './routes/auth';
 import guildRoutes from './routes/guilds';
 import commandRoutes from './routes/commands';
-import messageRoutes from './routes/messages';
 
 export function createApp() {
   // Validate configuration
@@ -44,7 +43,6 @@ export function createApp() {
   app.use('/auth', authRoutes);
   app.use('/guilds', guildRoutes);
   app.use('/commands', commandRoutes);
-  app.use('/messages', messageRoutes);
 
   // Error handling middleware
   app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {

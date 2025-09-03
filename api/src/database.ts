@@ -130,21 +130,7 @@ export class DefaultCommandService {
     });
   }
 
-  // Get subcommands by parent name
-  static async getSubcommandsByParentName(
-    parentName: string
-  ): Promise<DefaultCommand[]> {
-    const parent = await prisma.defaultCommand.findFirst({
-      where: { name: parentName, parentId: null },
-    });
 
-    if (!parent) return [];
-
-    return await prisma.defaultCommand.findMany({
-      where: { parentId: parent.id },
-      orderBy: { name: "asc" },
-    });
-  }
 
   static async getCommandById(
     commandId: number,
@@ -259,21 +245,7 @@ export class DefaultCommandService {
     return commands;
   }
 
-  // Get subcommands by parent ID
-  static async getSubcommandsByParentId(
-    parentId: number
-  ): Promise<(DefaultCommandWithSubcommands & DefaultCommandWithCategory)[]> {
-    return await prisma.defaultCommand.findMany({
-      where: { parentId: parentId },
-      include: {
-        category: true,
-        subcommands: {
-          orderBy: { name: "asc" },
-        },
-      },
-      orderBy: { name: "asc" },
-    });
-  }
+
 }
 
 // Simple in-memory cache for guild command configs (10 minute TTL)

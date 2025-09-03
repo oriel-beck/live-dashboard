@@ -73,45 +73,7 @@ export class CommandLoader {
     }
   }
 
-  /**
-   * Load commands from subdirectories as well (for organized command structure)
-   */
-  static async loadAllCommandsRecursive(): Promise<BaseCommand[]> {
-    const commands: BaseCommand[] = [];
-    
-    const loadFromDirectory = async (dirPath: string): Promise<void> => {
-      try {
-        const items = readdirSync(dirPath, { withFileTypes: true });
-        
-        for (const item of items) {
-          const fullPath = join(dirPath, item.name);
-          
-          if (item.isDirectory()) {
-            // Recursively load from subdirectories
-            await loadFromDirectory(fullPath);
-          } else if (
-            item.isFile() && 
-            item.name.endsWith('.ts') && 
-            !item.name.endsWith('.d.ts') &&
-            item.name !== 'index.ts'
-          ) {
-            const command = await this.loadCommandFromFile(fullPath);
-            if (command) {
-              commands.push(command);
-            }
-          }
-        }
-      } catch (error) {
-        logger.error(`[CommandLoader] Error reading directory ${dirPath}:`, error);
-      }
-    };
-    
-    const commandsPath = join(__dirname, '../commands');
-    await loadFromDirectory(commandsPath);
-    
-    logger.info(`[CommandLoader] Successfully loaded ${commands.length} commands recursively`);
-    return commands;
-  }
+
 
   /**
    * Validate that a command is properly configured

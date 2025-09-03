@@ -13,7 +13,6 @@ import {
   CachedGuildInfo,
   CommandConfigData,
   CommandConfigUpdate,
-  CacheEntry,
 } from '@discord-bot/shared-types';
 
 export interface AuthenticatedRequest extends Request {
@@ -36,5 +35,4 @@ export {
   CachedGuildInfo,
   CommandConfigData,
   CommandConfigUpdate,
-  CacheEntry,
 };

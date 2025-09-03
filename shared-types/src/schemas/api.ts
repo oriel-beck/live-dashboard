@@ -44,32 +44,13 @@ export const GuildDataResponseSchema = z.object({
   })),
 });
 
-// Message Send Request Schema
-export const MessageSendRequestSchema = z.object({
-  channelId: z.string(),
-  content: z.string().optional(),
-  embeds: z.array(z.unknown()).optional(),
-  components: z.array(z.unknown()).optional(),
-});
 
-// Message Send Response Schema
-export const MessageSendResponseSchema = z.object({
-  success: z.boolean(),
-  messageId: z.string().optional(),
-  error: z.string().optional(),
-});
 
-// Health Check Response Schema
-export const HealthCheckResponseSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  timestamp: z.string(),
-});
+
 
 // Export types
 export type ApiResponse<T = unknown> = z.infer<typeof ApiResponseSchema> & { data?: T };
 export type CacheEntry<T = unknown> = z.infer<typeof CacheEntrySchema> & { data: T };
 export type GuildDataResponse = z.infer<typeof GuildDataResponseSchema>;
-export type MessageSendRequest = z.infer<typeof MessageSendRequestSchema>;
-export type MessageSendResponse = z.infer<typeof MessageSendResponseSchema>;
-export type HealthCheckResponse = z.infer<typeof HealthCheckResponseSchema>;
+
+

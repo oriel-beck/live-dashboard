@@ -11,7 +11,7 @@ services:
           action: sync
     volumes:
       - ./shared-types:/app/shared-types
-    command: ["npm", "run", "dev"]
+    command: ["sh", "./startup.sh"]
     depends_on:
       - redis
       - postgres

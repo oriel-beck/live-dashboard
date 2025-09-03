@@ -58,13 +58,7 @@ export abstract class BaseCommand {
   }
 }
 
-// ===== HARDCODED COMMAND DEFINITION =====
-// These values are defined in code and cannot be changed through the dashboard
 
-export interface CommandDefinition {
-  data: SlashCommandBuilder;
-  execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
-}
 
 // Re-export shared types for convenience
 export {

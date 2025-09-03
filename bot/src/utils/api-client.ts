@@ -5,7 +5,12 @@ import {
   GuildDataResponseSchema,
   DefaultCommandRegistrationSchema,
   GuildDataResponse,
-  DefaultCommandRegistration
+  DefaultCommandRegistration,
+  ApiResponse,
+  DefaultCommandRegistrationResponse,
+  CommandListResponse,
+  CommandDetailResponse,
+  SubcommandConfig
 } from '@discord-bot/shared-types';
 
 // API client for bot to communicate with the API service
@@ -32,20 +37,7 @@ export class ApiClient {
     return validatedData;
   }
 
-  static async sendCommandResponse(commandId: string, response: unknown) {
-    const apiResponse = await fetch(`${this.API_BASE}/commands/${commandId}/response`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.BOT_TOKEN}`,
-      },
-      body: JSON.stringify(response),
-    });
 
-    if (!apiResponse.ok) {
-      logger.error('Failed to send command response to API');
-    }
-  }
 
   private baseUrl: string;
 
@@ -115,7 +107,7 @@ export class ApiClient {
     commandId: string,
     withSubcommands: boolean = false,
     subcommandName?: string
-  ) {
+  ): Promise<GuildCommandConfig> {
     const params = new URLSearchParams();
     if (withSubcommands) params.append("withSubcommands", "true");
     if (subcommandName) params.append("subcommandName", subcommandName);
@@ -129,8 +121,8 @@ export class ApiClient {
     guildId: string,
     commandId: string,
     updates: unknown
-  ): Promise<unknown> {
-    return this.put(`/guilds/${guildId}/commands/${commandId}`, updates);
+  ): Promise<ApiResponse<GuildCommandConfig>> {
+    return this.put<ApiResponse<GuildCommandConfig>>(`/guilds/${guildId}/commands/${commandId}`, updates);
   }
 
   // Update subcommand config by ID and subcommand name
@@ -139,17 +131,17 @@ export class ApiClient {
     commandId: string,
     subcommandName: string,
     updates: unknown
-  ): Promise<unknown> {
-    return this.put(
+  ): Promise<ApiResponse<SubcommandConfig>> {
+    return this.put<ApiResponse<SubcommandConfig>>(
       `/guilds/${guildId}/commands/${commandId}/${subcommandName}`,
       updates
     );
   }
 
   // Register a default command in the database (upsert operation - creates or updates)
-  async registerDefaultCommand(command: DefaultCommandRegistration): Promise<unknown> {
+  async registerDefaultCommand(command: DefaultCommandRegistration): Promise<ApiResponse<DefaultCommandRegistrationResponse['data']>> {
     // Validate command data
     const validatedCommand = DefaultCommandRegistrationSchema.parse(command);
-    return this.post("/commands/register", validatedCommand);
+    return this.post<ApiResponse<DefaultCommandRegistrationResponse['data']>>("/commands/register", validatedCommand);
   }
 }

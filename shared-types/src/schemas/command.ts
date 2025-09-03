@@ -104,6 +104,58 @@ export const DefaultCommandRegistrationSchema = z.object({
   cooldown: z.number(),
 });
 
+// Default Command Registration Response Schema
+export const DefaultCommandRegistrationResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: z.object({
+    id: z.string(),
+    discordId: z.string().nullable(),
+    name: z.string(),
+    description: z.string(),
+    cooldown: z.number(),
+    permissions: z.string(),
+    enabled: z.boolean(),
+    parentId: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  }),
+});
+
+// Command List Response Schema
+export const CommandListResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(z.object({
+    id: z.string(),
+    discordId: z.string().nullable(),
+    name: z.string(),
+    description: z.string(),
+    cooldown: z.number(),
+    permissions: z.string(),
+    enabled: z.boolean(),
+    parentId: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })),
+});
+
+// Command Detail Response Schema
+export const CommandDetailResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({
+    id: z.string(),
+    discordId: z.string().nullable(),
+    name: z.string(),
+    description: z.string(),
+    cooldown: z.number(),
+    permissions: z.string(),
+    enabled: z.boolean(),
+    parentId: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  }),
+});
+
 // Export types
 export type CommandPermissions = z.infer<typeof CommandPermissionsSchema>;
 export type CommandCategory = z.infer<typeof CommandCategorySchema>;
@@ -115,3 +167,6 @@ export type CommandInfo = z.infer<typeof CommandInfoSchema>;
 export type PermissionCheckResult = z.infer<typeof PermissionCheckResultSchema>;
 export type CommandExecutionContext = z.infer<typeof CommandExecutionContextSchema>;
 export type DefaultCommandRegistration = z.infer<typeof DefaultCommandRegistrationSchema>;
+export type DefaultCommandRegistrationResponse = z.infer<typeof DefaultCommandRegistrationResponseSchema>;
+export type CommandListResponse = z.infer<typeof CommandListResponseSchema>;
+export type CommandDetailResponse = z.infer<typeof CommandDetailResponseSchema>;

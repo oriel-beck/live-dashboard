@@ -24,11 +24,4 @@ echo Starting Docker Compose services with file watching...
 echo Note: API service will automatically set up the database with Prisma
 docker-compose -f docker-compose.dev.yml watch
 
-echo Development environment started with live reloading!
-echo Dashboard: http://localhost:4200
-echo API: http://localhost:3000
-echo Bot: http://localhost:3001
-echo Database: localhost:5432
-echo Redis: localhost:6379
-
 pause
