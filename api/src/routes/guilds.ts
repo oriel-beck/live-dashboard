@@ -1,11 +1,12 @@
-import {
-  CommandConfigUpdateSchema,
-  GuildDataResponseSchema,
-} from "@discord-bot/shared-types";
 import { Request, Response, Router } from "express";
-import { CommandConfigService } from "../database";
+import { DefaultCommandService } from "../database";
 import { requireAuth, requireGuildAccess } from "../middleware/auth";
 import { RedisService } from "../services/redis";
+import { DiscordService } from "../services/discord";
+import { SessionService } from "../services/session";
+import { config } from "../config";
+import { redis } from "../services/redis";
+import { REDIS_KEYS } from "../constants";
 import logger from "../utils/logger";
 
 const router = Router();
@@ -32,12 +33,9 @@ router.get(
         isStale: false, // Data was just fetched or is fresh
       };
 
-      // Validate response data
-      const validatedData = GuildDataResponseSchema.parse(responseData);
-
       res.json({
         success: true,
-        data: validatedData,
+        data: responseData,
       });
     } catch (error: unknown) {
       logger.error("Error fetching guild data:", error);
@@ -63,19 +61,13 @@ router.get(
   }
 );
 
-// Get guild commands with configuration
+// Get guild commands (basic info only)
 router.get(
   "/:guildId/commands",
   requireGuildAccess,
   async (req: Request, res: Response) => {
     try {
-      const { withSubcommands } = req.query;
-      const includeSubcommands = withSubcommands === "true";
-
-      const commands = await CommandConfigService.getGuildCommands(
-        req.params.guildId,
-        includeSubcommands
-      );
+      const commands = await DefaultCommandService.getAllMainCommands();
 
       // Transform to keyed object by command ID
       const result: Record<string, any> = {};
@@ -103,29 +95,29 @@ router.get(
   requireGuildAccess,
   async (req: Request, res: Response) => {
     try {
-      const { guildId, commandId } = req.params;
-      const { withSubcommands, subcommandName } = req.query;
+      const { commandId } = req.params;
 
-      const includeSubcommands = withSubcommands === "true";
-      const subcommand = subcommandName as string | undefined;
+      const command = await DefaultCommandService.getCommandById(+commandId);
 
-      const commandConfig = await CommandConfigService.getCommandConfigById(
-        guildId,
-        commandId,
-        subcommand,
-        includeSubcommands
-      );
-
-      if (!commandConfig) {
+      if (!command) {
         return res.status(404).json({
           success: false,
           error: "Command not found",
         });
       }
 
+      const commandData = {
+        id: command.id,
+        name: command.name,
+        description: command.description,
+        cooldown: command.cooldown,
+        enabled: command.enabled,
+        categoryId: command.categoryId,
+      };
+
       res.json({
         success: true,
-        data: commandConfig,
+        data: commandData,
       });
     } catch (error) {
       logger.error("Error getting command config:", error);
@@ -137,40 +129,236 @@ router.get(
   }
 );
 
-// Update command config
-router.put(
-  "/:guildId/commands/:commandId",
+// Get command permissions for a specific command
+router.get(
+  "/:guildId/commands/:commandId/permissions",
   requireGuildAccess,
   async (req: Request, res: Response) => {
     try {
       const { guildId, commandId } = req.params;
-      const updates = req.body;
 
-      // Validate update data
-      const validatedUpdates = CommandConfigUpdateSchema.parse(updates);
-
-      const result = await CommandConfigService.updateCommandConfig(
-        guildId,
-        +commandId,
-        validatedUpdates
-      );
-
-      if (!result.success) {
-        return res.status(400).json(result);
+      // Get the Discord command ID from our database
+      const command = await DefaultCommandService.getCommandByDiscordId(BigInt(commandId));
+      if (!command || !command.discordId) {
+        return res.status(404).json({
+          success: false,
+          error: "Command not found or not registered with Discord",
+        });
       }
 
-      RedisService.publishGuildEvent(guildId, {
-        type: "command.config.update",
-        command: result.command,
-        subcommand: result.subcommand,
-      });
+      // Get permissions from Discord
+      const permissions = await DiscordService.getCommandPermissions(
+        guildId, 
+        command.discordId.toString()
+      );
 
-      res.json(result);
+      res.json({
+        success: true,
+        data: permissions,
+      });
     } catch (error) {
-      logger.error("Error updating command config:", error);
+      logger.error("Error fetching command permissions:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to update command config",
+        error: "Failed to fetch command permissions",
+      });
+    }
+  }
+);
+
+// Update command permissions
+router.put(
+  "/:guildId/commands/:commandId/permissions",
+  requireGuildAccess,
+  async (req: Request, res: Response) => {
+    try {
+      const { guildId, commandId } = req.params;
+      const { permissions } = req.body;
+
+      if (!Array.isArray(permissions)) {
+        return res.status(400).json({
+          success: false,
+          error: "Permissions must be an array",
+        });
+      }
+
+      // Get the Discord command ID from our database
+      const command = await DefaultCommandService.getCommandByDiscordId(BigInt(commandId));
+      if (!command || !command.discordId) {
+        return res.status(404).json({
+          success: false,
+          error: "Command not found or not registered with Discord",
+        });
+      }
+
+      // Get user's Discord access token for updating permissions
+      const authReq = req as any; // AuthenticatedRequest
+      if (!authReq.user) {
+        return res.status(401).json({
+          success: false,
+          error: "User authentication required for updating command permissions",
+        });
+      }
+
+      // Get user's access token from session (with automatic refresh if needed)
+      const sessionData = await SessionService.refreshTokenIfNeeded(authReq.sessionId || "");
+      if (!sessionData || !sessionData.accessToken) {
+        return res.status(401).json({
+          success: false,
+          error: "Discord access token not found or could not be refreshed. Please re-authenticate.",
+        });
+      }
+
+      // Update permissions on Discord using user's Bearer token
+      let result;
+      try {
+        result = await DiscordService.updateCommandPermissions(
+          guildId,
+          command.discordId.toString(),
+          permissions,
+          sessionData.accessToken
+        );
+      } catch (error) {
+        logger.error("Error updating command permissions:", error);
+        
+        // Check if it's an authentication error
+        if (error instanceof Error && error.message.includes("401")) {
+          return res.status(401).json({
+            success: false,
+            error: "Discord authentication failed. Your session may have expired. Please re-authenticate.",
+          });
+        }
+        
+        // Check if it's a permissions error
+        if (error instanceof Error && error.message.includes("403")) {
+          return res.status(403).json({
+            success: false,
+            error: "You don't have permission to update command permissions. You need 'Manage Guild' and 'Manage Roles' permissions.",
+          });
+        }
+        
+        // Generic error
+        return res.status(500).json({
+          success: false,
+          error: "Failed to update command permissions. Please try again.",
+        });
+      }
+
+      // Publish update event for real-time dashboard updates
+      RedisService.publishGuildEvent(guildId, {
+        type: "command.permissions.update",
+        command: {
+          id: commandId,
+          permissions: result,
+        },
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Error updating command permissions:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update command permissions",
+      });
+    }
+  }
+);
+
+// Delete command permissions (sync with application-level permissions)
+router.delete(
+  "/:guildId/commands/:commandId/permissions",
+  requireGuildAccess,
+  async (req: Request, res: Response) => {
+    try {
+      const { guildId, commandId } = req.params;
+
+      // Get the Discord command ID from our database
+      const command = await DefaultCommandService.getCommandByDiscordId(BigInt(commandId));
+      if (!command || !command.discordId) {
+        return res.status(404).json({
+          success: false,
+          error: "Command not found or not registered with Discord",
+        });
+      }
+
+      // Get user's Discord access token for updating permissions
+      const authReq = req as any; // AuthenticatedRequest
+      if (!authReq.user) {
+        return res.status(401).json({
+          success: false,
+          error: "User authentication required for updating command permissions",
+        });
+      }
+
+      // Get user's access token from session (with automatic refresh if needed)
+      const sessionData = await SessionService.refreshTokenIfNeeded(authReq.sessionId || "");
+      if (!sessionData || !sessionData.accessToken) {
+        return res.status(401).json({
+          success: false,
+          error: "Discord access token not found or could not be refreshed. Please re-authenticate.",
+        });
+      }
+
+      // Delete command-specific permissions using user's Bearer token
+      // This will make the command inherit application-level permissions
+      const response = await fetch(
+        `${config.discord.apiUrl}/applications/${config.discord.clientId}/guilds/${guildId}/commands/${command.discordId}/permissions`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${sessionData.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to delete command permissions: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      // Invalidate cache
+      const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(guildId);
+      await redis.del(cacheKey);
+
+      // Publish update event for real-time dashboard updates
+      RedisService.publishGuildEvent(guildId, {
+        type: "command.permissions.sync",
+        command: {
+          id: commandId,
+          synced: true,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "Command synced with application permissions",
+      });
+    } catch (error) {
+      logger.error("Error deleting command permissions:", error);
+      
+      // Check if it's an authentication error
+      if (error instanceof Error && error.message.includes("401")) {
+        return res.status(401).json({
+          success: false,
+          error: "Discord authentication failed. Your session may have expired. Please re-authenticate.",
+        });
+      }
+      
+      // Check if it's a permissions error
+      if (error instanceof Error && error.message.includes("403")) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to update command permissions. You need 'Manage Guild' and 'Manage Roles' permissions.",
+        });
+      }
+      
+      // Generic error
+      res.status(500).json({
+        success: false,
+        error: "Failed to sync command permissions. Please try again.",
       });
     }
   }
@@ -193,6 +381,7 @@ router.get(
     // Send initial data with lazy loading
     try {
       const guildData = await RedisService.getGuildDataWithLazyLoad(guildId);
+      const commands = await DefaultCommandService.getAllMainCommands();
 
       res.write(
         `event: update\ndata: ${JSON.stringify({
@@ -201,7 +390,7 @@ router.get(
           guildInfo: guildData.guildInfo,
           roles: guildData.roles,
           channels: guildData.channels,
-          commands: await CommandConfigService.getGuildCommands(guildId, true),
+          commands: commands,
         })}\n\n`
       );
     } catch (error: unknown) {

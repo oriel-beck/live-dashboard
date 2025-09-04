@@ -11,6 +11,11 @@ import { config } from "dotenv";
 import { resolve } from "path";
 config({ path: resolve(__dirname, "../../.env") });
 
+// @ts-expect-error Add BigInt JSON serialization support
+BigInt.prototype.toJSON = function() {
+  return this.toString();
+};
+
 import { REST, Routes, ApplicationCommand } from "discord.js";
 import { CommandLoader } from "./utils/command-loader";
 import { ApiClient } from "./utils/api-client";
@@ -28,8 +33,21 @@ async function deployGlobalCommands(
     "base64"
   ).toString();
 
-  // Get command data for Discord API
-  const commandData = commands.map((command) => command.data.toJSON());
+  // Get command data for Discord API with default permissions
+  const commandData = commands.map((command) => {
+    const baseData = command.data.toJSON();
+    
+    // Set default member permissions based on command requirements
+    // If no permissions required, allow all members (0)
+    // If permissions required, use the permission bits
+    const defaultMemberPermissions = command.defaultPermissions || 0n;
+    
+    return {
+      ...baseData,
+      default_member_permissions: defaultMemberPermissions.toString(),
+      dm_permission: false, // Commands only work in servers
+    };
+  });
 
   // Deploy commands using REST API
   const rest = new REST({ version: "10" }).setToken(BOT_TOKEN);
@@ -45,6 +63,9 @@ async function deployGlobalCommands(
   logger.info(
     `[Deploy] Successfully deployed ${deployedCommands.length} commands globally!`
   );
+  logger.info("[Deploy] Commands now use Discord's application command permissions system.");
+  logger.info("[Deploy] Server admins can manage permissions via Discord's interface.");
+  
   return deployedCommands;
 }
 
@@ -52,7 +73,7 @@ async function registerCommandsInDatabase(
   localCommands: BaseCommand[],
   deployedCommands: ApplicationCommand[]
 ) {
-  const apiClient = new ApiClient();
+  const apiClient = new ApiClient('http://localhost:3000');
   for (const deployedCmd of deployedCommands) {
     const localCommand = localCommands.find(
       (cmd) => cmd.name === deployedCmd.name
@@ -71,17 +92,12 @@ async function registerCommandsInDatabase(
       name: deployedCmd.name,
       description: deployedCmd.description,
       cooldown: 0, // Default cooldown in seconds
-      permissions: ((localCommand as any).requiredPermissions || [])
-        .reduce(
-          (acc: bigint, perm: unknown) => acc | BigInt(perm as string),
-          0n
-        )
-        .toString(),
+      permissions: localCommand.defaultPermissions.toString(),
       enabled: true,
       parentId: null,
     });
 
-    const mainCommandId = mainCommandResponse.data?.id;
+    const mainCommandId = Number(mainCommandResponse.data?.id);
     if (!mainCommandId) {
       logger.error(
         `[Deploy] Failed to register command: ${deployedCmd.name}`
@@ -98,7 +114,8 @@ async function registerCommandsInDatabase(
       await registerSubcommands(
         apiClient,
         deployedCmd,
-        mainCommandId
+        mainCommandId,
+        localCommand
       );
     }
   }
@@ -107,7 +124,8 @@ async function registerCommandsInDatabase(
 async function registerSubcommands(
   apiClient: ApiClient,
   deployedCmd: ApplicationCommand,
-  parentId: number
+  parentId: number,
+  parentCommand: BaseCommand
 ) {
   if (!deployedCmd.options) return;
 
@@ -120,13 +138,13 @@ async function registerSubcommands(
         name: option.name,
         description: option.description || "Subcommand group",
         cooldown: 0, // Groups don't have cooldowns
-        permissions: "0",
+        permissions: parentCommand.defaultPermissions?.toString() || "0",
         enabled: true,
         parentId: parentId,
         discordId: null,
       });
 
-      const groupId = (groupResponse as any).command.id;
+      const groupId = groupResponse.data!.id;
       logger.info(
         `[Deploy] Registered subcommand group: ${option.name} (${groupId})`
       );
@@ -140,9 +158,9 @@ async function registerSubcommands(
               name: subOption.name,
               description: subOption.description || "Subcommand",
               cooldown: 0, // Default subcommand cooldown
-              permissions: "0",
+              permissions: parentCommand.defaultPermissions?.toString() || "0",
               enabled: true,
-              parentId: parseInt(groupId),
+              parentId: groupId,
               discordId: null,
             });
             logger.info(
@@ -159,7 +177,7 @@ async function registerSubcommands(
         name: option.name,
         description: option.description || "Subcommand",
         cooldown: 0, // Default subcommand cooldown
-        permissions: "0",
+        permissions: parentCommand.defaultPermissions?.toString() || "0",
         enabled: true,
         parentId: parentId,
         discordId: null,
@@ -211,10 +229,8 @@ async function deployCommands() {
 
 // Handle script execution
 if (require.main === module) {
-  deployCommands().catch((error) => {
-    logger.error("[Deploy] Unhandled error:", error);
-    process.exit(1);
-  });
+  deployCommands();
 }
 
 export { deployCommands };
+

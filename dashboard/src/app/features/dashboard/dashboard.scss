@@ -79,7 +79,12 @@
     }
 
     .guild-avatar-skeleton {
-      background: linear-gradient(90deg, var(--color-bg-secondary) 25%, var(--color-bg-tertiary) 50%, var(--color-bg-secondary) 75%);
+      background: linear-gradient(
+        90deg,
+        var(--color-bg-secondary) 25%,
+        var(--color-bg-tertiary) 50%,
+        var(--color-bg-secondary) 75%
+      );
       background-size: 200% 100%;
       animation: shimmer 2s infinite;
     }
@@ -95,7 +100,12 @@
       .guild-name-skeleton {
         width: 200px;
         height: 24px;
-        background: linear-gradient(90deg, var(--color-bg-secondary) 25%, var(--color-bg-tertiary) 50%, var(--color-bg-secondary) 75%);
+        background: linear-gradient(
+          90deg,
+          var(--color-bg-secondary) 25%,
+          var(--color-bg-tertiary) 50%,
+          var(--color-bg-secondary) 75%
+        );
         background-size: 200% 100%;
         animation: shimmer 2s infinite;
         border-radius: var(--radius-sm);
@@ -168,13 +178,22 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 // Main Content
@@ -309,13 +328,18 @@
       overflow: hidden;
 
       &::before {
-        content: '';
+        content: "";
         position: absolute;
         top: 0;
         left: -100%;
         width: 100%;
         height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.05),
+          transparent
+        );
         transition: left var(--transition-slow);
       }
 
@@ -379,8 +403,6 @@
     }
   }
 
-
-
   .commands-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
@@ -407,13 +429,18 @@
     overflow: hidden;
 
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       top: 0;
       left: -100%;
       width: 100%;
       height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.03),
+        transparent
+      );
       transition: left var(--transition-slow);
     }
 
@@ -429,7 +456,7 @@
 
     &.disabled {
       opacity: 0.6;
-      
+
       .command-name {
         text-decoration: line-through;
       }
@@ -457,10 +484,6 @@
           margin: 0;
           line-height: 1.5;
         }
-      }
-
-      .command-controls {
-        margin-left: var(--space-md);
       }
     }
 

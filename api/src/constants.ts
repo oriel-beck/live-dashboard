@@ -8,6 +8,7 @@ export const REDIS_KEYS = {
   MEMBER_PERMS: (guildId: string, userId: string) => `member:${guildId}:${userId}:perms`,
   GUILD_EVENTS: (guildId: string) => `events:guild:${guildId}`,
   USER_EVENTS: (userId: string) => `events:user:${userId}`,
+  GUILD_COMMAND_PERMISSIONS: (guildId: string) => `guild:${guildId}:command_permissions`,
 } as const;
 
 // Cache TTL values (in seconds)

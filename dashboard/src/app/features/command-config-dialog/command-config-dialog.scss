@@ -1,161 +1,506 @@
-// Command Configuration Dialog Styles
+// Discord-style dialog styling
 :host {
   display: block;
+  font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  background: #36393f;
+  color: #ffffff;
+  overflow: hidden;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
 }
 
-// Dialog Content
-.config-dialog-content {
-  padding: var(--space-xl);
-  max-height: 70vh;
-  overflow-y: auto;
-  background: var(--color-bg-secondary);
+// Override PrimeNG dialog content scrolling
+::ng-deep .p-dialog-content {
+  overflow: hidden !important; // Let our internal layout handle scrolling
+  max-height: 80vh !important;
+  height: 80vh !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
 
-  .config-section {
-    margin-bottom: var(--space-2xl);
+// Discord-style Information Banner (Fixed to top)
+.discord-info-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #2c2f33;
+  border-bottom: 1px solid #4f545c;
+  flex-shrink: 0; // Prevent shrinking
 
-    &:last-child {
-      margin-bottom: 0;
+  .info-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: #5865f2;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    svg {
+      width: 12px;
+      height: 12px;
+      color: #ffffff;
     }
+  }
+
+  .info-text {
+    flex: 1;
+    font-size: 14px;
+    color: #b9bbbe;
+    line-height: 1.4;
+
+    strong {
+      color: #ffffff;
+      font-weight: 600;
+    }
+  }
+
+  .view-btn {
+    background: #4f545c;
+    border: none;
+    color: #ffffff;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #5d6269;
+    }
+  }
+}
+
+// Dialog Content (Scrollable center area)
+.dialog-content {
+  flex: 1;
+  padding: 0;
+  min-height: 0; // Allow flex child to shrink
+  overflow-y: auto; // Enable vertical scrolling for content
+  overflow-x: hidden; // Prevent horizontal scrolling
+
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    gap: 16px;
+
+    p {
+      margin: 0;
+      color: #b9bbbe;
+      font-size: 14px;
+    }
+  }
+}
+
+// Discord-style Sections
+.discord-section {
+  padding: 24px;
+  border-bottom: 1px solid #4f545c;
+
+  &:last-of-type {
+    border-bottom: none;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
 
     h3 {
-      font-size: 1.25rem;
+      margin: 0;
+      font-size: 16px;
       font-weight: 600;
-      color: var(--color-text-primary);
-      margin: 0 0 var(--space-lg) 0;
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-
-      &::before {
-        content: '';
-        width: 3px;
-        height: 20px;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        border-radius: 2px;
-      }
+      color: #ffffff;
     }
 
-    .config-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: var(--space-lg);
-      gap: var(--space-lg);
-      padding: var(--space-lg);
-      background: var(--color-bg-tertiary);
-      border: 1px solid var(--color-border-primary);
-      border-radius: var(--radius-lg);
-      transition: all var(--transition-fast);
+    .add-btn {
+      background: #4f545c;
+      border: none;
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
 
       &:hover {
-        border-color: #6366f1;
-        background: rgba(99, 102, 241, 0.05);
+        background: #5d6269;
       }
+    }
+  }
 
-      &:last-child {
-        margin-bottom: 0;
-      }
+  .no-overrides {
+    text-align: center;
+    color: #b9bbbe;
+    font-size: 14px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 0 0 4px 4px; // Only rounded on bottom
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-width: 0 1px 1px 1px;
+  }
 
-      label {
+  .multi-select-container {
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px 4px 0 0; // Only rounded on top
+    border: 1px solid rgba(255, 255, 255, 0.1);
+
+    .multi-select-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 16px;
+
+      .cancel-btn {
+        background: #4f545c;
+        border: none;
+        color: #ffffff;
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-size: 14px;
         font-weight: 500;
-        color: var(--color-text-primary);
-        font-size: 0.95rem;
-        min-width: 150px;
-        flex-shrink: 0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: #5d6269;
+        }
       }
 
-      // Custom MultiSelect Styles
-      ::ng-deep .custom-multiselect {
-        flex: 1;
-        min-width: 200px;
+      .add-btn {
+        background: #5865f2;
+        border: none;
+        color: #ffffff;
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover:not(:disabled) {
+          background: #4752c4;
+        }
+
+        &:disabled {
+          background: #4f545c;
+          color: #b9bbbe;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+
+  .overrides-list {
+    display: flex;
+    flex-direction: column;
+    border-radius: 0 0 4px 4px; // Only rounded on bottom
+
+    .override-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-width: 0 1px 1px 1px;
+      transition: all 0.2s ease;
+
+      .override-item + .override-item {
+        border-top: none;
+      }
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .override-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        .override-name {
+          font-weight: 500;
+          color: #ffffff;
+          font-size: 14px;
+        }
+
+        .override-type {
+          font-size: 12px;
+          color: #b9bbbe;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+      }
+
+      .override-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .permission-toggle {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          .permission-toggle-group {
+            display: flex;
+            gap: 2px;
+            background: #4f545c;
+            border-radius: 6px;
+            padding: 2px;
+
+            .permission-btn {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 32px;
+              height: 32px;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              background: transparent;
+              color: #b9bbbe;
+
+              &:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #ffffff;
+              }
+
+              &.selected {
+                background: #43b581;
+                color: #ffffff;
+
+                &:hover {
+                  background: #3ca374;
+                }
+              }
+
+              &.deny-btn.selected {
+                background: #f04747;
+
+                &:hover {
+                  background: #d84040;
+                }
+              }
+
+              svg {
+                width: 16px;
+                height: 16px;
+              }
+            }
+          }
+
+          .permission-label {
+            font-size: 12px;
+            font-weight: 500;
+            min-width: 50px;
+
+            &.allow {
+              color: #3ba55c;
+            }
+
+            &.deny {
+              color: #ed4245;
+            }
+          }
+        }
+
+        .remove-btn {
+          background: none;
+          border: none;
+          color: #ed4245;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+
+          &:hover {
+            color: #f04747;
+          }
+
+          svg {
+            width: 16px;
+            height: 16px;
+          }
+        }
       }
     }
   }
 }
 
-// Dialog Footer
-.dialog-footer {
+// Command Details Section (Pinned to bottom)
+.command-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border-top: 1px solid #4f545c;
+  flex-shrink: 0; // Prevent shrinking
+
+  .command-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: #5865f2;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    svg {
+      width: 20px;
+      height: 20px;
+      color: #ffffff;
+    }
+  }
+
+  .command-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .command-name {
+      font-weight: 600;
+      color: #ffffff;
+      font-size: 14px;
+    }
+
+    .command-description {
+      color: #b9bbbe;
+      font-size: 12px;
+    }
+  }
+}
+
+// Discord-style Footer (Fixed to bottom)
+.discord-footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-md);
-  padding: var(--space-xl);
-  background: var(--color-bg-tertiary);
-  border-top: 1px solid var(--color-border-primary);
-}
+  gap: 12px;
+  padding: 16px 24px;
+  background: #2f3136;
+  border-top: 1px solid #4f545c;
+  flex-shrink: 0; // Prevent shrinking
 
-// Button Styles
-::ng-deep .p-button {
-  &.p-button-text {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--color-text-secondary);
-    transition: all var(--transition-fast);
+  .cancel-btn {
+    background: #4f545c;
+    border: none;
+    color: #ffffff;
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
 
     &:hover {
-      background: var(--color-bg-secondary);
-      border-color: var(--color-border-primary);
-      color: var(--color-text-primary);
+      background: #5d6269;
     }
   }
 
-  &.p-button-success {
-    background: #10b981;
-    border: 1px solid #10b981;
-    color: white;
-    transition: all var(--transition-fast);
+  .save-btn {
+    background: #5865f2;
+    border: none;
+    color: #ffffff;
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 
-    &:hover {
-      background: #059669;
-      border-color: #059669;
+    &:hover:not(:disabled) {
+      background: #4752c4;
+    }
+
+    &:disabled {
+      background: #4f545c;
+      color: #b9bbbe;
+      cursor: not-allowed;
+    }
+
+    &.loading {
+      background: #4752c4;
     }
   }
 }
 
-// Responsive Design
+// PrimeNG Message Overrides
+:host ::ng-deep {
+  .p-message {
+    margin: 16px 24px;
+
+    &.p-message-error {
+      background: rgba(237, 66, 69, 0.1);
+      border: 1px solid rgba(237, 66, 69, 0.3);
+      color: #f04747;
+    }
+
+    &.p-message-success {
+      background: rgba(59, 165, 92, 0.1);
+      border: 1px solid rgba(59, 165, 92, 0.3);
+      color: #3ba55c;
+    }
+  }
+
+  .p-progressspinner {
+    .p-progressspinner-circle {
+      stroke: #5865f2;
+    }
+  }
+}
+
+// Responsive design
 @media (max-width: 768px) {
-  .config-dialog-content {
-    padding: var(--space-lg);
+  .discord-section {
+    .section-header {
+      flex-direction: column;
+      gap: 12px;
+      align-items: flex-start;
+    }
 
-    .config-section {
-      .config-row {
+    .overrides-list {
+      border-radius: 0 0 4px 4px; // Only rounded on bottom
+      
+      .override-item {
         flex-direction: column;
         align-items: flex-start;
-        gap: var(--space-md);
+        gap: 12px;
 
-        label {
-          min-width: auto;
-        }
-
-        ::ng-deep .custom-multiselect {
+        .override-controls {
           width: 100%;
-          min-width: auto;
+          justify-content: space-between;
         }
       }
     }
   }
 
-  .dialog-footer {
-    padding: var(--space-lg);
-  }
-}
+  .discord-footer {
+    flex-direction: column;
 
-// Scrollbar Styles
-.config-dialog-content {
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: var(--color-bg-tertiary);
-    border-radius: 3px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--color-border-primary);
-    border-radius: 3px;
-
-    &:hover {
-      background: #6366f1;
+    .cancel-btn,
+    .save-btn {
+      width: 100%;
+      justify-content: center;
     }
   }
 }

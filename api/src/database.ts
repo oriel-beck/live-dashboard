@@ -1,54 +1,6 @@
-import { PrismaClient, DefaultCommand, CommandCategory } from "@prisma/client";
-import {
-  DbDefaultCommand,
-  DbCommandConfig,
-  CommandConfigResult,
-  CommandConfigResultWithCategory,
-} from "@discord-bot/shared-types";
-import logger from "./utils/logger";
-import { CommandConfigUpdate } from "./types";
+import { PrismaClient, DefaultCommand, CommandCategory } from '@prisma/client';
 
-// Create Prisma client instance
-export const prisma = new PrismaClient({
-  log: ["query", "info", "warn", "error"],
-});
-
-// Extended types for commands with subcommands
-export type DefaultCommandWithSubcommands = DefaultCommand & {
-  subcommands?: DefaultCommandWithSubcommands[];
-};
-
-export type DefaultCommandWithCategory = DefaultCommand & {
-  category: CommandCategory | null;
-};
-
-// Initialize database connection
-export async function initializeDatabase() {
-  try {
-    await prisma.$connect();
-    logger.info("[Database] Prisma connected successfully");
-
-    // Test the connection
-    await prisma.$queryRaw`SELECT 1`;
-    logger.info("[Database] Database connection tested successfully");
-  } catch (error) {
-    logger.error("[Database] Error connecting to database:", error);
-    throw error;
-  }
-}
-
-// Graceful shutdown
-export async function closeDatabase() {
-  await prisma.$disconnect();
-  logger.info("[Database] Prisma disconnected");
-}
-
-// Re-export shared types for convenience
-export {
-  DbDefaultCommand,
-  DbCommandConfig,
-  CommandConfigResult,
-};
+const prisma = new PrismaClient();
 
 export class DefaultCommandService {
   // Register or update a default command from deployment
@@ -123,535 +75,120 @@ export class DefaultCommandService {
     }
   }
 
-  // Get all main commands (for dashboard listing)
-  static async getAllMainCommands(): Promise<DefaultCommand[]> {
+  // Get command by ID
+  static async getCommandById(id: number): Promise<DefaultCommand | null> {
+    return await prisma.defaultCommand.findUnique({
+      where: { id },
+      include: {
+        category: true,
+      },
+    });
+  }
+
+  // Get command by Discord ID
+  static async getCommandByDiscordId(discordId: bigint) {
+    return await prisma.defaultCommand.findUnique({
+      where: { discordId },
+      include: {
+        category: true,
+      },
+    });
+  }
+
+  // Get all main commands (no parent)
+  static async getAllMainCommands() {
     return await prisma.defaultCommand.findMany({
       where: { parentId: null },
+      include: {
+        category: true,
+      },
       orderBy: { name: "asc" },
     });
   }
 
-
-
-  static async getCommandById(
-    commandId: number,
-    subcommandName?: string,
-    includeSubcommands: boolean = false
-  ): Promise<
-    (DefaultCommandWithSubcommands & DefaultCommandWithCategory) | null
-  > {
-    const result = await prisma.defaultCommand.findUnique({
-      where: { id: commandId },
-      include: {
-        category: true,
-        ...(includeSubcommands
-          ? {
-              subcommands: {
-                orderBy: { name: "asc" },
-                include: {
-                  subcommands: {
-                    orderBy: { name: "asc" },
-                    include: {
-                      category: true,
-                    },
-                  },
-                  category: true,
-                },
-              },
-            }
-          : subcommandName
-          ? {
-              subcommands: {
-                where: { name: subcommandName },
-              },
-            }
-          : {}),
-      },
+  // Update command enabled status
+  static async updateCommandEnabled(id: number, enabled: boolean): Promise<DefaultCommand> {
+    return await prisma.defaultCommand.update({
+      where: { id },
+      data: { enabled },
     });
-
-    // Removed verbose debug logging
-
-    return result;
   }
 
-  // Get command by ID
-  static async getCommandByDiscordId(
-    commandId: string,
-    subcommandName?: string,
-    includeSubcommands: boolean = false
-  ): Promise<
-    (DefaultCommandWithSubcommands & DefaultCommandWithCategory) | null
-  > {
-    const result = await prisma.defaultCommand.findUnique({
-      where: { discordId: BigInt(commandId) },
-      include: {
-        category: true,
-        ...(includeSubcommands
-          ? {
-              subcommands: {
-                orderBy: { name: "asc" },
-                include: {
-                  subcommands: {
-                    orderBy: { name: "asc" },
-                    include: {
-                      category: true,
-                    },
-                  },
-                  category: true,
-                },
-              },
-            }
-          : subcommandName
-          ? {
-              subcommands: {
-                where: { name: subcommandName },
-                include: {
-                  category: true,
-                },
-              },
-            }
-          : {}),
-      },
+  // Update command cooldown
+  static async updateCommandCooldown(id: number, cooldown: number): Promise<DefaultCommand> {
+    return await prisma.defaultCommand.update({
+      where: { id },
+      data: { cooldown },
     });
-    return result;
   }
 
-  // Get all main commands with optional subcommands
-  static async getAllMainCommandsWithSubcommands(
-    includeSubcommands: boolean = false
-  ): Promise<(DefaultCommandWithSubcommands & DefaultCommandWithCategory)[]> {
-    const commands = await prisma.defaultCommand.findMany({
-      where: { parentId: null },
+  // Delete command
+  static async deleteCommand(id: number): Promise<DefaultCommand> {
+    return await prisma.defaultCommand.delete({
+      where: { id },
+    });
+  }
+}
+
+export class CommandCategoryService {
+  // Get category by ID
+  static async getCategoryById(id: number): Promise<CommandCategory | null> {
+    return await prisma.commandCategory.findUnique({
+      where: { id },
       include: {
-        category: true,
-        ...(includeSubcommands
-          ? {
-              subcommands: {
-                orderBy: { name: "asc" },
-                include: {
-                  subcommands: {
-                    orderBy: { name: "asc" },
-                    include: {
-                      category: true,
-                    },
-                  },
-                  category: true,
-                },
-              },
-            }
-          : {}),
+        commands: true,
+      },
+    });
+  }
+
+  // Get category by name
+  static async getCategoryByName(name: string): Promise<CommandCategory | null> {
+    return await prisma.commandCategory.findFirst({
+      where: { name },
+      include: {
+        commands: true,
+      },
+    });
+  }
+
+  // Get all categories
+  static async getAllCategories(): Promise<CommandCategory[]> {
+    return await prisma.commandCategory.findMany({
+      include: {
+        commands: true,
       },
       orderBy: { name: "asc" },
     });
-
-    return commands;
   }
 
+  // Create category
+  static async createCategory(data: {
+    name: string;
+    description: string;
+  }): Promise<CommandCategory> {
+    return await prisma.commandCategory.create({
+      data,
+    });
+  }
 
+  // Update category
+  static async updateCategory(
+    id: number,
+    data: { name?: string; description?: string }
+  ): Promise<CommandCategory> {
+    return await prisma.commandCategory.update({
+      where: { id },
+      data,
+    });
+  }
+
+  // Delete category
+  static async deleteCategory(id: number): Promise<CommandCategory> {
+    return await prisma.commandCategory.delete({
+      where: { id },
+    });
+  }
 }
 
-// Simple in-memory cache for guild command configs (10 minute TTL)
-const configCache = new Map<string, { data: unknown; expires: number }>();
-
-export class CommandConfigService {
-  // Get command config by commandId with default fallback
-  static async getCommandConfig(
-    guildId: string,
-    commandId: number,
-    subcommandName?: string
-  ): Promise<any | null> {
-    // Get default command
-    const defaultCommand = await DefaultCommandService.getCommandById(
-      commandId,
-      subcommandName || undefined,
-      false // includeSubcommands - we don't need subcommands here, just category
-    );
-    if (!defaultCommand) {
-      // Command doesn't exist at all - this is the only case we return null
-      return null;
-    }
-
-    // Removed verbose debug logging
-
-    // Get guild config if it exists
-    const guildConfig = await prisma.guildCommandConfig.findUnique({
-      where: {
-        guildId_commandId: {
-          guildId,
-          commandId: defaultCommand.id,
-        },
-      },
-    });
-
-    // Always merge default + guild config (guild config can be null)
-    const result = {
-      id: defaultCommand.id.toString(),
-      name: defaultCommand.name,
-      description: defaultCommand.description,
-      cooldown: defaultCommand.cooldown,
-      permissions: defaultCommand.permissions.toString(),
-      // If the default command is disabled, the guild config should be disabled too
-      enabled: !defaultCommand.enabled
-        ? false
-        : guildConfig?.enabled ?? defaultCommand.enabled,
-      whitelistedRoles: guildConfig?.whitelistedRoles || [],
-      blacklistedRoles: guildConfig?.blacklistedRoles || [],
-      whitelistedChannels: guildConfig?.whitelistedChannels || [],
-      blacklistedChannels: guildConfig?.blacklistedChannels || [],
-      bypassRoles: guildConfig?.bypassRoles || [],
-      createdAt: guildConfig?.createdAt || null,
-      updatedAt: guildConfig?.updatedAt || null,
-      categoryId: defaultCommand.categoryId,
-      category: defaultCommand.category,
-    };
-
-    return result;
-  }
-
-  // Get all main commands for a guild
-  static async getGuildCommands(
-    guildId: string,
-    includeSubcommands: boolean = false
-  ): Promise<any[]> {
-    const mainCommands =
-      await DefaultCommandService.getAllMainCommandsWithSubcommands(
-        includeSubcommands
-      );
-    const result: CommandConfigResultWithCategory[] = [];
-
-    for (const cmd of mainCommands) {
-      const config = await this.getCommandConfig(guildId, cmd.id);
-      if (config) {
-        if (
-          includeSubcommands &&
-          cmd.subcommands &&
-          cmd.subcommands.length > 0
-        ) {
-          // Build hierarchical subcommand structure
-          const subcommandConfigs = await this.buildSubcommandConfigs(
-            guildId,
-            cmd.subcommands
-          );
-          result.push({
-            ...config,
-            subcommands: subcommandConfigs,
-          });
-        } else {
-          result.push({
-            ...config,
-            subcommands: {},
-          });
-        }
-      }
-    }
-
-    return result;
-  }
-
-  // Helper method to build nested subcommand configurations
-  private static async buildSubcommandConfigs(
-    guildId: string,
-    subcommands: DefaultCommandWithSubcommands[]
-  ): Promise<Record<string, any>> {
-    const result: Record<string, any> = {};
-
-    for (const sub of subcommands) {
-      const subConfig = await this.getCommandConfigById(
-        guildId,
-        sub.id.toString()
-      );
-      if (subConfig) {
-        if (sub.subcommands && sub.subcommands.length > 0) {
-          const nestedSubcommands = await this.buildSubcommandConfigs(
-            guildId,
-            sub.subcommands
-          );
-          result[sub.name] = {
-            ...subConfig,
-            subcommands: nestedSubcommands,
-          };
-        } else {
-          result[sub.name] = subConfig;
-        }
-      }
-    }
-
-    return result;
-  }
-
-  // Update command config
-  static async updateCommandConfig(
-    guildId: string,
-    commandId: number,
-    updates: CommandConfigUpdate,
-    subcommandName?: string
-  ): Promise<any> {
-    const defaultCommand = await DefaultCommandService.getCommandById(
-      commandId,
-      subcommandName || undefined
-    );
-
-    if (!defaultCommand) {
-      throw new Error("Command not found");
-    }
-
-    const result = await prisma.guildCommandConfig.upsert({
-      where: {
-        guildId_commandId: {
-          guildId,
-          commandId: defaultCommand.id,
-        },
-      },
-      update: updates,
-      create: {
-        guildId,
-        commandId: defaultCommand.id,
-        enabled: true,
-        whitelistedRoles: [],
-        blacklistedRoles: [],
-        whitelistedChannels: [],
-        blacklistedChannels: [],
-        bypassRoles: [],
-        ...updates,
-      },
-    });
-
-    // Invalidate cache
-    const cacheKey = `${guildId}:${commandId}${
-      subcommandName ? `:${subcommandName}` : ""
-    }`;
-    configCache.delete(cacheKey);
-
-    return result;
-  }
-
-  // Get command config by ID (Discord ID or database ID) with optional subcommand
-  static async getCommandConfigById(
-    guildId: string,
-    id: string,
-    subcommandName?: string,
-    includeSubcommands: boolean = false
-  ): Promise<CommandConfigResult | null> {
-    let defaultCommand: DefaultCommandWithSubcommands | null = null;
-    
-    // Determine if ID is Discord ID (>17 chars) or database ID (≤17 chars)
-    if (id.length > 17) {
-      // Discord ID - get command by Discord ID
-      defaultCommand = await DefaultCommandService.getCommandByDiscordId(
-        id,
-        subcommandName,
-        includeSubcommands
-      );
-    } else {
-      // Database ID - get command by database ID
-      defaultCommand = await DefaultCommandService.getCommandById(
-        +id,
-        subcommandName,
-        includeSubcommands
-      );
-    }
-
-    if (!defaultCommand) {
-      return null;
-    }
-
-    // Get guild config for this command
-    const guildConfig = await prisma.guildCommandConfig.findUnique({
-      where: {
-        guildId_commandId: {
-          guildId,
-          commandId: defaultCommand.id,
-        },
-      },
-    });
-
-    // Build base result
-    const result: CommandConfigResult = {
-      id: defaultCommand.id,
-      name: defaultCommand.name,
-      description: defaultCommand.description,
-      cooldown: defaultCommand.cooldown,
-      permissions: defaultCommand.permissions.toString(),
-      enabled: guildConfig?.enabled ?? defaultCommand.enabled,
-      parentId: defaultCommand.parentId,
-      discordId: defaultCommand.discordId,
-      categoryId: defaultCommand.categoryId,
-      whitelistedRoles: guildConfig?.whitelistedRoles ?? [],
-      blacklistedRoles: guildConfig?.blacklistedRoles ?? [],
-      whitelistedChannels: guildConfig?.whitelistedChannels ?? [],
-      blacklistedChannels: guildConfig?.blacklistedChannels ?? [],
-      bypassRoles: guildConfig?.bypassRoles ?? [],
-      createdAt: guildConfig?.createdAt ?? null,
-      updatedAt: guildConfig?.updatedAt ?? null,
-      subcommands: {},
-    };
-
-    // If subcommandName is provided, include the specific subcommand
-    if (subcommandName && defaultCommand.subcommands) {
-      const subcommand = defaultCommand.subcommands.find(
-        (sub) => sub.name === subcommandName
-      );
-      if (subcommand) {
-        // Get guild config for this specific subcommand if it exists
-        const subcommandGuildConfig = await prisma.guildCommandConfig.findUnique({
-          where: {
-            guildId_commandId: {
-              guildId,
-              commandId: subcommand.id,
-            },
-          },
-        });
-
-        result.subcommands = {
-          [subcommand.name]: {
-            id: subcommand.id.toString(),
-            name: subcommand.name,
-            description: subcommand.description,
-            enabled: subcommandGuildConfig?.enabled ?? subcommand.enabled,
-            cooldown: subcommand.cooldown,
-            whitelistedRoles: subcommandGuildConfig?.whitelistedRoles ?? [],
-            blacklistedRoles: subcommandGuildConfig?.blacklistedRoles ?? [],
-            whitelistedChannels: subcommandGuildConfig?.whitelistedChannels ?? [],
-            blacklistedChannels: subcommandGuildConfig?.blacklistedChannels ?? [],
-            bypassRoles: subcommandGuildConfig?.bypassRoles ?? [],
-          },
-        };
-      }
-    }
-    // If includeSubcommands is true and no specific subcommand requested, include all subcommands
-    else if (includeSubcommands && defaultCommand.subcommands && !defaultCommand.parentId) {
-      const subcommandConfigs = await this.buildSubcommandConfigs(
-        guildId,
-        defaultCommand.subcommands
-      );
-      result.subcommands = subcommandConfigs;
-    }
-
-    return result;
-  }
-
-  // Update command config by ID (handles both Discord IDs and database IDs)
-  static async updateCommandConfigById(
-    guildId: string,
-    commandId: string,
-    updates: CommandConfigUpdate,
-    subcommandName?: string
-  ): Promise<any> {
-    let targetCommandId: number;
-    let isSubcommand = false;
-
-    logger.debug(
-      `[Database] updateCommandConfigById called: guildId=${guildId}, commandId=${commandId}`
-    );
-
-    if (subcommandName) {
-      // Get subcommand ID by name within the parent command
-      const parentCommand = await DefaultCommandService.getCommandByDiscordId(
-        commandId,
-        subcommandName
-      );
-
-      if (!parentCommand) {
-        throw new Error("Parent command not found");
-      }
-
-      const subcommand = parentCommand.subcommands?.find(
-        (sub) => sub.name === subcommandName
-      );
-      if (!subcommand) {
-        throw new Error("Subcommand not found");
-      }
-
-      targetCommandId = subcommand.id;
-      isSubcommand = true;
-
-      // For subcommands, only allow updating the enabled field
-      const allowedFields = ["enabled"];
-      const filteredUpdates = Object.keys(updates)
-        .filter((key) => allowedFields.includes(key))
-        .reduce((obj, key) => {
-          obj[key] = updates[key];
-          return obj;
-        }, {} as Record<string, unknown>);
-
-      if (Object.keys(filteredUpdates).length === 0) {
-        throw new Error(
-          'No valid fields to update for subcommand. Only "enabled" is allowed.'
-        );
-      }
-
-      updates = filteredUpdates;
-    } else {
-      // For now, just treat all IDs as database IDs since that's what the frontend is sending
-      targetCommandId = +commandId;
-
-      // Verify that the command exists
-      const command = await DefaultCommandService.getCommandById(+commandId);
-      if (!command) {
-        throw new Error(`Command with ID ${+commandId} not found`);
-      }
-    }
-
-    // Removed verbose debug logging
-
-    const result = await prisma.guildCommandConfig.upsert({
-      where: {
-        guildId_commandId: {
-          guildId,
-          commandId: targetCommandId,
-        },
-      },
-      update: updates,
-      create: {
-        guildId,
-        commandId: targetCommandId,
-        enabled: true,
-        // Only set these for main commands
-        ...(isSubcommand
-          ? {}
-          : {
-              whitelistedRoles: [],
-              blacklistedChannels: [],
-              bypassRoles: [],
-            }),
-        ...updates,
-      },
-    });
-
-    logger.debug(
-      `[Database] Command config updated successfully for guild ${guildId}, command ${targetCommandId}`
-    );
-
-    // Invalidate cache
-    const cacheKey = `${guildId}:${commandId}${
-      subcommandName ? `:${subcommandName}` : ""
-    }`;
-    configCache.delete(cacheKey);
-
-    return result;
-  }
-
-  // Invalidate cache when config changes
-  static invalidateCache(
-    guildId: string,
-    commandName: string,
-    subcommandName?: string
-  ): void {
-    const cacheKey = `${guildId}:${commandName}${
-      subcommandName ? `:${subcommandName}` : ""
-    }`;
-    configCache.delete(cacheKey);
-  }
-
-  // Invalidate cache by command ID
-  static invalidateCacheById(
-    guildId: string,
-    commandId: string,
-    subcommandName?: string
-  ): void {
-    const cacheKey = `${guildId}:${commandId}${
-      subcommandName ? `:${subcommandName}` : ""
-    }`;
-    configCache.delete(cacheKey);
-  }
-}
+// Export Prisma client for direct use if needed
+export { prisma };

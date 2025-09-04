@@ -6,12 +6,16 @@ import {
 } from "discord.js";
 import {
   BaseCommand,
-  CommandInfo,
 } from "../types/command";
+
+// Local type definition for command info
+interface CommandInfo {
+  name: string;
+  description: string;
+}
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
 import logger from "./logger";
-import { CommandConfigResult } from "@discord-bot/shared-types";
 
 export class CommandManager {
   private client: Client;
@@ -42,7 +46,7 @@ export class CommandManager {
   }
 
   /**
-   * Deploy global commands to Discord (no longer per-guild)
+   * Deploy global commands to Discord
    */
   async deployGlobalCommands() {
     try {
@@ -52,14 +56,22 @@ export class CommandManager {
       }
 
       // Deploy all registered commands globally
-      const commandsData = Array.from(this.commands.values()).map((cmd) =>
-        cmd.data.toJSON()
-      );
+      const commandsData = Array.from(this.commands.values()).map((cmd) => {
+        const baseData = cmd.data.toJSON();
+        
+        // Add default permission requirements for the applications.commands.permissions.update scope
+        return {
+          ...baseData,
+          default_member_permissions: "0", // Allow all members by default, server admins can restrict
+          dm_permission: false, // Commands only work in servers
+        };
+      });
 
       await this.client.application.commands.set(commandsData);
       logger.info(
         `[CommandManager] Deployed ${commandsData.length} global commands`
       );
+      logger.info("[CommandManager] Commands now use Discord's application command permissions system.");
     } catch (error) {
       logger.error(
         `[CommandManager] Failed to deploy global commands:`,
@@ -67,80 +79,6 @@ export class CommandManager {
       );
     }
   }
-
-  /**
-   * Get guild command configuration by ID, requiring API default config to exist
-   */
-  async getGuildCommandConfig(
-    guildId: string,
-    commandId: string
-  ): Promise<CommandConfigResult | null> {
-    try {
-      // Fetch from API using command ID
-      const config = await this.apiClient.getCommandConfig(
-        guildId,
-        commandId
-      );
-      if (config) {
-        // Return the API response directly since subcommands and regular commands use the same schema
-        return config;
-      }
-
-      // No config exists - command cannot be used
-      logger.warn(
-        `[CommandManager] No default config found for command ID ${commandId} in ${guildId} - command disabled`
-      );
-      return null;
-    } catch (error) {
-      logger.error(
-        `[CommandManager] Error getting config for command ID ${commandId} in ${guildId}:`,
-        error
-      );
-      // No fallback - command cannot be used without API config
-      return null;
-    }
-  }
-
-  async getGuildSubcommandConfig(
-    guildId: string,
-    commandId: string,
-    subcommandName: string
-  ): Promise<{ command: CommandConfigResult; subcommand: CommandConfigResult } | null> {
-    try {
-      // Fetch both main and subcommand config in one API call
-      const config = await this.apiClient.getCommandConfig(
-        guildId,
-        commandId,
-        false, // Don't need all subcommands, just the specific one
-        subcommandName
-      );
-      
-      // Check if the config exists and has the requested subcommand
-      if (config && config.subcommands && config.subcommands[subcommandName]) {
-        return {
-          command: config,
-          subcommand: config.subcommands[subcommandName]
-        };
-      }
-
-      // No config exists - subcommand cannot be used
-      logger.warn(
-        `[CommandManager] No config found for subcommand ${subcommandName} of command ${commandId} in ${guildId} - subcommand disabled`
-      );
-      return null;
-    } catch (error) {
-      logger.error(
-        `[CommandManager] Error getting subcommand config for ${subcommandName} in ${guildId}:`,
-        error
-      );
-      return null;
-    }
-  }
-
-  /**
-   * Note: Command configurations are now managed entirely through the API.
-   * The bot only reads configurations when needed during command execution.
-   */
 
   /**
    * Check cooldown for a command locally
@@ -175,16 +113,13 @@ export class CommandManager {
   }
 
   /**
-   * Setup event listeners for command interactions and cache invalidation
+   * Setup event listeners for command interactions
    */
   private setupEventListeners() {
     this.client.on(Events.InteractionCreate, async (interaction) => {
       if (!interaction.isChatInputCommand()) return;
       await this.handleCommandInteraction(interaction);
     });
-
-    // No longer need guild-specific setup since we use global commands
-    // Command configs are created on-demand when first used
   }
 
   /**
@@ -199,88 +134,25 @@ export class CommandManager {
     if (!command) return;
 
     try {
-      // Check if this is a subcommand execution
-      const subcommandName = interaction.options.getSubcommand(false);
-      let activeConfig: CommandConfigResult;
-      let mainConfig: CommandConfigResult;
+      // Check if command is enabled via API
+      const commandConfig = await this.apiClient.getCommandConfig(
+        interaction.guildId!,
+        interaction.commandId
+      );
 
-      if (subcommandName) {
-        // Fetch specific subcommand config from API (includes main command config)
-        const subcommandResponse = await this.getGuildSubcommandConfig(
-          interaction.guildId!,
-          interaction.commandId,
-          subcommandName
-        );
-
-        if (!subcommandResponse || !subcommandResponse.command || !subcommandResponse.subcommand) {
-          await interaction.reply({
-            content: "This command is not configured and cannot be used.",
-            flags: ["Ephemeral"],
-          });
-          return;
-        }
-
-        mainConfig = subcommandResponse.command;
-        const subcommandConfig = subcommandResponse.subcommand;
-
-        if (!mainConfig.enabled) {
-          await interaction.reply({
-            content: "This command is currently disabled.",
-            flags: ['Ephemeral'],
-          });
-          return;
-        }
-
-        if (!subcommandConfig || !subcommandConfig.enabled) {
-          await interaction.reply({
-            content: "This subcommand is currently disabled.",
-            flags: ['Ephemeral'],
-          });
-          return;
-        }
-
-        activeConfig = subcommandConfig;
-      } else {
-        // Regular command execution - fetch main command config by ID
-        const mainCommandConfig = await this.getGuildCommandConfig(
-          interaction.guildId!,
-          interaction.commandId
-        );
-
-
-
-        if (!mainCommandConfig) {
-          await interaction.reply({
-            content: "This command is not configured and cannot be used.",
-            flags: ["Ephemeral"],
-          });
-          return;
-        }
-
-        if (!mainCommandConfig.enabled) {
-          await interaction.reply({
-            content: "This command is currently disabled.",
-            flags: ['Ephemeral'],
-          });
-          return;
-        }
-
-        activeConfig = mainCommandConfig;
-        mainConfig = mainCommandConfig;
+      if (!commandConfig || !commandConfig.enabled) {
+        await interaction.reply({
+          content: "This command is currently disabled.",
+          flags: ['Ephemeral'],
+        });
+        return;
       }
 
-      // Check permissions using the active config
-      const guildPermissions = {
-        whitelistedRoles: activeConfig.whitelistedRoles,
-        blacklistedRoles: activeConfig.blacklistedRoles,
-        whitelistedChannels: activeConfig.whitelistedChannels,
-        blacklistedChannels: activeConfig.blacklistedChannels,
-        bypassRoles: activeConfig.bypassRoles,
-      };
-
+      // Check permissions - only need to verify command is enabled
+      // Discord handles all role and channel permissions via application command permissions
       const permissionResult = await PermissionChecker.checkPermissions(
         interaction,
-        guildPermissions
+        commandConfig.enabled
       );
 
       if (!permissionResult.allowed) {
@@ -295,40 +167,34 @@ export class CommandManager {
         return;
       }
 
-      // Get cooldown from the active config (main command or subcommand)
-      const cooldownTime = activeConfig.cooldown || 0;
+      // Get cooldown from the command config
+      const cooldownTime = commandConfig.cooldown || 0;
 
       if (cooldownTime > 0) {
-        // Use main command name for cooldown key - subcommands share cooldown with main command
-        const cooldownKey = commandName;
-
         const cooldownResult = this.checkCooldown(
           interaction.user.id,
-          cooldownKey,
+          commandName,
           cooldownTime
         );
 
         if (!cooldownResult.allowed) {
           const remainingTime = cooldownResult.remainingTime || cooldownTime;
-          const subcommandText = subcommandName ? ` ${subcommandName}` : "";
           await interaction.reply({
             content: `Please wait ${Math.ceil(
               remainingTime
-            )} seconds before using the \`${commandName}${subcommandText}\` command again.`,
+            )} seconds before using the \`${commandName}\` command again.`,
             flags: ["Ephemeral"],
           });
           return;
         }
       }
 
-      // Execute the command (handles both main commands and subcommands)
+      // Execute the command
       await command.execute(interaction);
 
       // Log command usage
       logger.info(
-        `[CommandManager] ${interaction.user.tag} used ${commandName}${
-          subcommandName ? ` ${subcommandName}` : ""
-        } in ${interaction.guild?.name}`
+        `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name}`
       );
     } catch (error) {
       logger.error(`[CommandManager] Error executing ${commandName}:`, error);
@@ -349,38 +215,7 @@ export class CommandManager {
   }
 
   /**
-   * Get all guild command configurations for a guild via API (no caching)
-   */
-  async getAllGuildCommandConfigs(
-    guildId: string
-  ): Promise<Record<string, CommandConfigResult>> {
-    try {
-      const configs = await this.apiClient.getGuildCommandConfigs(guildId);
-
-      // Transform API response to internal format
-      const result: Record<string, CommandConfigResult> = {};
-      for (const [commandName, config] of Object.entries(configs)) {
-        // Ensure subcommands property exists
-        const configWithSubcommands: CommandConfigResult = {
-          ...config,
-          subcommands: config.subcommands || {}
-        };
-
-        result[commandName] = configWithSubcommands;
-      }
-
-      return result;
-    } catch (error) {
-      logger.error(
-        `[CommandManager] Error getting all configs for guild ${guildId}:`,
-        error
-      );
-      return {};
-    }
-  }
-
-  /**
-   * Get command information (hardcoded definition details) for API/Dashboard
+   * Get command information for API/Dashboard
    */
   getCommandInfo(commandName: string): CommandInfo | null {
     const command = this.commands.get(commandName);

@@ -220,9 +220,7 @@ export const CacheStore = signalStore(
               commandId,
               subcommandName,
               {
-                enabled: !store.commands().get(commandId)?.subcommands?.[
-                  subcommandName
-                ]?.enabled,
+                enabled: false, // TODO: Implement subcommand toggle when subcommands are available
               }
             )
           ),

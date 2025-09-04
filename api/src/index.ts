@@ -4,16 +4,14 @@ BigInt.prototype.toJSON = function() {
 };
 
 import { createApp } from './app';
-import { initializeDatabase, closeDatabase } from './database';
 import { config } from './config';
 import logger from './utils/logger';
+import { prisma } from './database';
 
-// Initialize database and start server
+// Start server
 async function startServer() {
   try {
-    // Initialize database
-    await initializeDatabase();
-    logger.info("[API] Database initialized successfully");
+    logger.info("[API] Starting server...");
 
     // Create Express app
     const app = createApp();
@@ -30,7 +28,7 @@ async function startServer() {
       logger.info(`[API] Received ${signal}, shutting down gracefully...`);
       server.close(async () => {
         logger.info("[API] HTTP server closed");
-        await closeDatabase();
+        await prisma.$disconnect();
         logger.info("[API] Database connections closed");
         process.exit(0);
       });

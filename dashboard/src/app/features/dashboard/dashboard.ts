@@ -16,6 +16,14 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { CommandConfigDialog } from '../command-config-dialog/command-config-dialog';
 import { CommandCategory, CommandConfigResultWithCategory } from '@discord-bot/shared-types';
 
+// Temporary interface for subcommands until they're properly implemented
+interface Subcommand {
+  id: number;
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
 @Component({
   selector: 'app-dashboard',
   imports: [
@@ -77,14 +85,17 @@ export class Dashboard {
 
   openCommandConfig(command: CommandConfigResultWithCategory) {
     const ref = this.dialogService.open(CommandConfigDialog, {
-      header: `Configure Command: ${command.name}`,
+      header: 'Configure Permissions',
       width: '700px',
       data: {
         command: this.store.commands().get(command.id),
+        guildId: this.store.guildInfo()?.id,
         roles: this.store.roles,
         channels: this.store.channels,
       },
       styleClass: 'command-config-dialog',
+      closable: true,
+      modal: true,
     });
 
     ref.onClose.subscribe((result: Partial<CommandConfigResultWithCategory> | undefined) => {
@@ -97,11 +108,14 @@ export class Dashboard {
     });
   }
 
-  getSubcommands(command: CommandConfigResultWithCategory) {
-    return command.subcommands ? Object.values(command.subcommands) : [];
+  getSubcommands(command: CommandConfigResultWithCategory): Subcommand[] {
+    // For now, return empty array since subcommands are not included in the current schema
+    // This will be populated when the API includes subcommands in the response
+    return [];
   }
 
   getSubcommandCount(command: CommandConfigResultWithCategory) {
-    return command.subcommands ? Object.keys(command.subcommands).length : 0;
+    // For now, return 0 since subcommands are not included in the current schema
+    return 0;
   }
 }

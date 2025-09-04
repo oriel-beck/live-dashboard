@@ -1,104 +1,264 @@
-<div class="config-dialog-content">
+<!-- Discord-style Information Banner -->
+@if (hasRequiredPermissions()) {
+<div class="discord-info-banner">
+  <div class="info-icon">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path
+        d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,7H13V9H11V7M11,11H13V17H11V11Z"
+      />
+    </svg>
+  </div>
+  <div class="info-text">
+    Members need <strong>{{requiredPermissions()}}</strong> to use this command.
+    To override this, add roles or channels below.
+  </div>
+</div>
+}
 
-  <!-- Channel Permissions -->
-  <div class="config-section">
-    <h3>Channel Permissions</h3>
-    <div class="config-row">
-      <label>Whitelisted Channels</label>
-      <p-multiSelect
-        [(ngModel)]="configForm().whitelistedChannels"
-        [options]="channelOptions()"
-        [filter]="true"
-        appendTo="body"
-        filterPlaceholder="Search channels..."
-        placeholder="Select channels to whitelist"
-        class="custom-multiselect"
-        optionLabel="label"
-        optionValue="value"
-        [dt]="multiselectTokens"
-      ></p-multiSelect>
+<div class="dialog-content">
+  <!-- Loading State -->
+  @if (loading()) {
+  <div class="loading-container">
+    <p-progressSpinner
+      [style]="{ width: '50px', height: '50px' }"
+    ></p-progressSpinner>
+    <p>Loading permissions...</p>
+  </div>
+  }
+
+  <!-- Error Message -->
+  @if (error()) {
+  <p-message severity="error" [closable]="true" (onClose)="error.set(null)"
+    >{{error()}}</p-message
+  >
+  }
+
+  <!-- Success Message -->
+  @if (success()) {
+  <p-message severity="success" [closable]="true" (onClose)="success.set(null)"
+    >{{success()}}</p-message
+  >
+  }
+
+  <!-- Permission Management -->
+  @if (!loading()) {
+  <!-- Role & Member Overrides Section -->
+  <div class="discord-section">
+    <div class="section-header">
+      <h3>Role Overrides</h3>
     </div>
-    <div class="config-row">
-      <label>Blacklisted Channels</label>
+
+    <!-- Role Multi-Select -->
+    <div class="multi-select-container">
       <p-multiSelect
-        [(ngModel)]="configForm().blacklistedChannels"
-        [options]="channelOptions()"
+        [dt]="selectMenuDt"
+        [(ngModel)]="selectedRoles"
+        [options]="availableRoles()"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="Select roles to add"
+        [showToggleAll]="false"
         [filter]="true"
-        appendTo="body"
-        filterPlaceholder="Search channels..."
-        placeholder="Select channels to blacklist"
-        class="custom-multiselect"
-        optionLabel="label"
-        optionValue="value"
-        [dt]="multiselectTokens"
+        filterPlaceholder="Search roles..."
+        [maxSelectedLabels]="3"
+        selectedItemsLabel="{0} roles selected"
       ></p-multiSelect>
+      <div class="multi-select-actions">
+        <button class="cancel-btn" (click)="cancelRoleSelection()">
+          Cancel
+        </button>
+        <button
+          class="add-btn"
+          (click)="addSelectedRoles()"
+          [disabled]="!canAddRoles()"
+        >
+          Add {{ selectedRolesCount() }} Role{{ selectedRolesCount() !== 1 ? 's'
+          : '' }}
+        </button>
+      </div>
     </div>
+
+    @if (rolePermissions().length === 0) {
+    <div class="no-overrides">This command has no role overrides</div>
+    } @else {
+    <div class="overrides-list">
+      @for (permission of rolePermissions(); track permission.id; let i =
+      $index) {
+      <div class="override-item">
+        <div class="override-info">
+          <div class="override-name">{{ permission.name }}</div>
+        </div>
+        <div class="override-controls">
+          <div class="permission-toggle">
+            <div class="permission-toggle-group">
+              <button
+                class="permission-btn allow-btn"
+                [class.selected]="permission.permission"
+                (click)="setPermission(getPermissionIndex(permission.id), true)"
+                title="Allow"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"
+                  />
+                </svg>
+              </button>
+              <button
+                class="permission-btn deny-btn"
+                [class.selected]="!permission.permission"
+                (click)="setPermission(getPermissionIndex(permission.id), false)"
+                title="Deny"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button
+            class="remove-btn"
+            (click)="removePermission(getPermissionIndex(permission.id))"
+            title="Remove permission"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+      }
+    </div>
+    }
   </div>
 
-  <p-divider></p-divider>
+  <!-- Channel Overrides Section -->
+  <div class="discord-section">
+    <div class="section-header">
+      <h3>Channel Overrides</h3>
+    </div>
 
-  <!-- Role Permissions -->
-  <div class="config-section">
-    <h3>Role Permissions</h3>
-    <div class="config-row">
-      <label>Whitelisted Roles</label>
+    <!-- Channel Multi-Select -->
+    <div class="multi-select-container">
       <p-multiSelect
-        [(ngModel)]="configForm().whitelistedRoles"
-        [options]="roleOptions()"
+        [dt]="selectMenuDt"
+        [(ngModel)]="selectedChannels"
+        [options]="availableChannels()"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="Select channels to add"
+        [showToggleAll]="false"
         [filter]="true"
-        appendTo="body"
-        filterPlaceholder="Search roles..."
-        placeholder="Select roles to whitelist"
-        class="custom-multiselect"
-        optionLabel="label"
-        optionValue="value"
-        [dt]="multiselectTokens"
+        filterPlaceholder="Search channels..."
+        [maxSelectedLabels]="3"
+        selectedItemsLabel="{0} channels selected"
       ></p-multiSelect>
+      <div class="multi-select-actions">
+        <button class="cancel-btn" (click)="cancelChannelSelection()">
+          Cancel
+        </button>
+        <button
+          class="add-btn"
+          (click)="addSelectedChannels()"
+          [disabled]="!canAddChannels()"
+        >
+          Add {{ selectedChannelsCount() }} Channel{{ selectedChannelsCount()
+          !== 1 ? 's' : '' }}
+        </button>
+      </div>
     </div>
-    <div class="config-row">
-      <label>Blacklisted Roles</label>
-      <p-multiSelect
-        [(ngModel)]="configForm().blacklistedRoles"
-        [options]="roleOptions()"
-        [filter]="true"
-        appendTo="body"
-        filterPlaceholder="Search roles..."
-        placeholder="Select roles to blacklist"
-        class="custom-multiselect"
-        optionLabel="label"
-        optionValue="value"
-        [dt]="multiselectTokens"
-      ></p-multiSelect>
+
+    @if (channelPermissions().length === 0) {
+    <div class="no-overrides">This command has no channel overrides</div>
+    } @else {
+    <div class="overrides-list">
+      @for (permission of channelPermissions(); track permission.id; let i =
+      $index) {
+      <div class="override-item">
+        <div class="override-info">
+          <div class="override-name">{{ permission.name }}</div>
+        </div>
+        <div class="override-controls">
+          <div class="permission-toggle">
+            <div class="permission-toggle-group">
+              <button
+                class="permission-btn allow-btn"
+                [class.selected]="permission.permission"
+                (click)="setPermission(getPermissionIndex(permission.id), true)"
+                title="Allow"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"
+                  />
+                </svg>
+              </button>
+              <button
+                class="permission-btn deny-btn"
+                [class.selected]="!permission.permission"
+                (click)="setPermission(getPermissionIndex(permission.id), false)"
+                title="Deny"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button
+            class="remove-btn"
+            (click)="removePermission(getPermissionIndex(permission.id))"
+            title="Remove permission"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+      }
     </div>
-    <div class="config-row">
-      <label>Bypass Roles</label>
-      <p-multiSelect
-        [(ngModel)]="configForm().bypassRoles"
-        [options]="roleOptions()"
-        [filter]="true"
-        appendTo="body"
-        filterPlaceholder="Search roles..."
-        placeholder="Select roles that can bypass restrictions"
-        class="custom-multiselect"
-        optionLabel="label"
-        optionValue="value"
-        [dt]="multiselectTokens"
-      ></p-multiSelect>
-    </div>
+    }
+  </div>
+
+  }
+</div>
+
+<!-- Command Details Section (Pinned to bottom) -->
+<div class="command-details">
+  <div class="command-avatar">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path
+        d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12A6,6 0 0,0 12,6M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8Z"
+      />
+    </svg>
+  </div>
+  <div class="command-info">
+    <div class="command-name">/{{ command().name }}</div>
+    <div class="command-description">{{ command().description }}</div>
   </div>
 </div>
 
-<div class="dialog-footer">
-  <p-button
-    label="Cancel"
-    icon="pi pi-times"
-    (onClick)="onCancel()"
-    [styleClass]="'p-button-text'"
-  ></p-button>
-  <p-button
-    label="Save Changes"
-    icon="pi pi-check"
-    (onClick)="onSave()"
-    [styleClass]="'p-button-success'"
-  ></p-button>
+<!-- Discord-style Footer -->
+<div class="discord-footer">
+  <button class="cancel-btn" (click)="onCancel()">Cancel</button>
+  <button
+    class="save-btn"
+    (click)="onSave()"
+    [disabled]="saving()"
+    [class.loading]="saving()"
+  >
+    @if (saving()) {
+    <p-progressSpinner
+      [style]="{ width: '16px', height: '16px' }"
+    ></p-progressSpinner>
+    } Save
+  </button>
 </div>

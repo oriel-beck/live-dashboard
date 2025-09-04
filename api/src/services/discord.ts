@@ -1,8 +1,12 @@
-import { User, UserGuild } from "../types";
+import {
+  ApplicationCommandPermission,
+  GuildApplicationCommandPermissions,
+  DiscordApplicationCommand
+} from "@discord-bot/shared-types";
 import { config } from "../config";
+import { CACHE_TTL, REDIS_KEYS, TIME_CONSTANTS } from "../constants";
+import { User, UserGuild } from "../types";
 import { redis } from "./redis";
-import { REDIS_KEYS, CACHE_TTL, TIME_CONSTANTS } from "../constants";
-import logger from "../utils/logger";
 
 export class DiscordService {
   private static readonly API_BASE = config.discord.apiUrl;
@@ -136,5 +140,102 @@ export class DiscordService {
 
     const twentyFourHoursAgo = Date.now() - TIME_CONSTANTS.TWENTY_FOUR_HOURS;
     return lastUpdate < twentyFourHoursAgo;
+  }
+
+  // Get application command permissions for a guild
+  static async getGuildApplicationCommandPermissions(guildId: string): Promise<GuildApplicationCommandPermissions[]> {
+    const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(guildId);
+    const cached = await redis.get(cacheKey);
+
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
+    const response = await fetch(
+      `${this.API_BASE}/applications/${config.discord.clientId}/guilds/${guildId}/commands/permissions`,
+      {
+        headers: {
+          Authorization: `Bot ${this.BOT_TOKEN}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch command permissions: ${response.status} ${response.statusText}`);
+    }
+
+    const permissions = await response.json() as GuildApplicationCommandPermissions[];
+
+    // Cache for 5 minutes
+    await redis.setex(cacheKey, 300, JSON.stringify(permissions));
+
+    return permissions;
+  }
+
+  // Get application command permissions for a specific command
+  static async getCommandPermissions(guildId: string, commandId: string): Promise<GuildApplicationCommandPermissions | null> {
+    const allPermissions = await this.getGuildApplicationCommandPermissions(guildId);
+    return allPermissions.find(p => p.id === commandId) || null;
+  }
+
+  // Update application command permissions
+  // NOTE: This method requires a Bearer token with applications.commands.permissions.update scope
+  // Bot tokens cannot be used to update command permissions according to Discord API docs
+  // The user must have:
+  // - Manage Guild and Manage Roles permissions in the guild
+  // - Ability to run the command being edited
+  // - Permission to manage the resources that will be affected
+  static async updateCommandPermissions(
+    guildId: string, 
+    commandId: string, 
+    permissions: ApplicationCommandPermission[],
+    bearerToken?: string
+  ): Promise<GuildApplicationCommandPermissions> {
+    if (!bearerToken) {
+      throw new Error('Bearer token is required to update command permissions. Bot tokens are not supported for this operation.');
+    }
+
+    const response = await fetch(
+      `${this.API_BASE}/applications/${config.discord.clientId}/guilds/${guildId}/commands/${commandId}/permissions`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${bearerToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ permissions }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update command permissions: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json() as GuildApplicationCommandPermissions;
+
+    // Invalidate cache
+    const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(guildId);
+    await redis.del(cacheKey);
+
+    return result;
+  }
+
+  // Get guild application commands (to get command IDs)
+  static async getGuildApplicationCommands(guildId: string): Promise<DiscordApplicationCommand[]> {
+    const response = await fetch(
+      `${this.API_BASE}/applications/${config.discord.clientId}/guilds/${guildId}/commands`,
+      {
+        headers: {
+          Authorization: `Bot ${this.BOT_TOKEN}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch guild commands: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json() as DiscordApplicationCommand[];
   }
 }

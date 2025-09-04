@@ -60,18 +60,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     
     res.json({
       success: true,
-      data: commands.map(cmd => ({
-        id: cmd.id.toString(),
-        discordId: cmd.discordId?.toString(),
-        name: cmd.name,
-        description: cmd.description,
-        cooldown: cmd.cooldown,
-        permissions: cmd.permissions.toString(),
-        enabled: cmd.enabled,
-        parentId: cmd.parentId?.toString(),
-        createdAt: cmd.createdAt,
-        updatedAt: cmd.updatedAt,
-      }))
+      data: commands
     });
   } catch (error) {
     logger.error('Error fetching commands:', error);
@@ -85,7 +74,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 // Get command by ID
 router.get('/:commandId', requireAuth, async (req: Request, res: Response) => {
   try {
-    const command = await DefaultCommandService.getCommandByDiscordId(req.params.commandId);
+    const command = await DefaultCommandService.getCommandByDiscordId(BigInt(req.params.commandId));
     
     if (!command) {
       return res.status(404).json({
@@ -96,18 +85,7 @@ router.get('/:commandId', requireAuth, async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      data: {
-        id: command.id.toString(),
-        discordId: command.discordId?.toString(),
-        name: command.name,
-        description: command.description,
-        cooldown: command.cooldown,
-        permissions: command.permissions.toString(),
-        enabled: command.enabled,
-        parentId: command.parentId?.toString(),
-        createdAt: command.createdAt,
-        updatedAt: command.updatedAt,
-      }
+      data: command
     });
   } catch (error) {
     logger.error('Error fetching command:', error);

@@ -15,7 +15,7 @@ router.get("/discord", (req: Request, res: Response) => {
   discordAuthUrl.searchParams.set("client_id", config.discord.clientId || "");
   discordAuthUrl.searchParams.set("redirect_uri", config.discord.redirectUri);
   discordAuthUrl.searchParams.set("response_type", "code");
-  discordAuthUrl.searchParams.set("scope", "identify guilds");
+  discordAuthUrl.searchParams.set("scope", "identify guilds applications.commands.permissions.update");
 
   res.redirect(discordAuthUrl.toString());
 });

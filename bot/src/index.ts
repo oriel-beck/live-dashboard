@@ -3,6 +3,11 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 config({ path: resolve(__dirname, '../../.env') });
 
+// @ts-expect-error Add BigInt JSON serialization support
+BigInt.prototype.toJSON = function() {
+  return this.toString();
+};
+
 import {
   Client,
   GatewayIntentBits,
