@@ -1,5 +1,7 @@
 // Discord-style dialog styling
 :host {
+  --p-inputtext-background: #414449;
+  --p-dialog-background: #36393f;
   display: block;
   font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial,
     sans-serif;
@@ -136,6 +138,30 @@
 
       &:hover {
         background: #5d6269;
+      }
+    }
+
+    .clear-btn {
+      background: #ed4245;
+      border: none;
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      &:hover {
+        background: #f04747;
+      }
+
+      svg {
+        width: 16px;
+        height: 16px;
       }
     }
   }
@@ -480,7 +506,7 @@
 
     .overrides-list {
       border-radius: 0 0 4px 4px; // Only rounded on bottom
-      
+
       .override-item {
         flex-direction: column;
         align-items: flex-start;

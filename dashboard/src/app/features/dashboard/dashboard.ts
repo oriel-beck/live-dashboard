@@ -14,7 +14,10 @@ import { MultiSelectModule } from 'primeng/multiselect';
 
 // Import the command config dialog component
 import { CommandConfigDialog } from '../command-config-dialog/command-config-dialog';
-import { CommandCategory, CommandConfigResultWithCategory } from '@discord-bot/shared-types';
+import {
+  CommandCategory,
+  CommandConfigResultWithCategory,
+} from '@discord-bot/shared-types';
 
 // Temporary interface for subcommands until they're properly implemented
 interface Subcommand {
@@ -46,11 +49,11 @@ export class Dashboard {
 
   // Selected category
   selectedCategory = signal<CommandCategory | null>(null);
-  
+
   constructor() {
     // Select first category when available, but only if no category is currently selected
     effect(() => {
-      if (this.store.commandsCategories() && !this.selectedCategory()) {  
+      if (this.store.commandsCategories() && !this.selectedCategory()) {
         this.selectedCategory.set(
           this.store.commandsCategories().values().next().value!
         );
@@ -84,7 +87,7 @@ export class Dashboard {
   }
 
   openCommandConfig(command: CommandConfigResultWithCategory) {
-    const ref = this.dialogService.open(CommandConfigDialog, {
+    this.dialogService.open(CommandConfigDialog, {
       header: 'Configure Permissions',
       width: '700px',
       data: {
@@ -92,19 +95,11 @@ export class Dashboard {
         guildId: this.store.guildInfo()?.id,
         roles: this.store.roles,
         channels: this.store.channels,
+        commandPermissions: this.store.commandPermissions,
       },
       styleClass: 'command-config-dialog',
       closable: true,
       modal: true,
-    });
-
-    ref.onClose.subscribe((result: Partial<CommandConfigResultWithCategory> | undefined) => {
-      if (result) {
-        this.store.saveCommandConfig({
-          commandId: command.id,
-          updates: result,
-        });
-      }
     });
   }
 

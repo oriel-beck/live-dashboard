@@ -46,6 +46,18 @@
   <div class="discord-section">
     <div class="section-header">
       <h3>Role Overrides</h3>
+      @if (rolePermissions().length > 0) {
+      <button 
+        class="clear-btn" 
+        (click)="clearAllRoles($event)"
+        title="Clear all role overrides"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
+        </svg>
+        Clear All
+      </button>
+      }
     </div>
 
     <!-- Role Multi-Select -->
@@ -139,6 +151,18 @@
   <div class="discord-section">
     <div class="section-header">
       <h3>Channel Overrides</h3>
+      @if (channelPermissions().length > 0) {
+      <button 
+        class="clear-btn" 
+        (click)="clearAllChannels($event)"
+        title="Clear all channel overrides"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
+        </svg>
+        Clear All
+      </button>
+      }
     </div>
 
     <!-- Channel Multi-Select -->
@@ -262,3 +286,7 @@
     } Save
   </button>
 </div>
+
+<!-- Confirm Popup -->
+<p-confirmpopup></p-confirmpopup>
+

@@ -1,4 +1,4 @@
-import { REDIS_KEYS } from "../constants";
+import { REDIS_KEYS } from "@discord-bot/shared-types";
 import redis from "../redis";
 
 export async function hsetJson(key: string, field: string, value: unknown) {

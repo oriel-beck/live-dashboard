@@ -1,10 +1,10 @@
 import Redis from 'ioredis';
 import { config } from '../config';
-import { CACHE_TTL, REDIS_KEYS } from '../constants';
 import { DiscordService } from './discord';
 import { UserGuild, GuildRole, GuildChannel, CachedGuildRole, CachedGuildChannel, CachedGuildInfo } from '../types';
 import { makeRequestWithRetry } from '../utils/request-utils';
 import logger from '../utils/logger';
+import { CACHE_TTL, REDIS_KEYS } from '@discord-bot/shared-types';
 
 // Redis client for data operations
 export const redis = new Redis({

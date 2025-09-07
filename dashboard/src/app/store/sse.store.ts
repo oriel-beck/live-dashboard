@@ -21,6 +21,7 @@ import {
   CommandCategory,
   CommandConfigResult,
   CommandConfigResultWithCategory,
+  GuildApplicationCommandPermissions,
 } from '@discord-bot/shared-types';
 
 interface CacheStore {
@@ -29,6 +30,7 @@ interface CacheStore {
   lastEvent: string | null;
   retryCount: number;
   commands: Map<number, CommandConfigResultWithCategory>;
+  commandPermissions: Map<string, GuildApplicationCommandPermissions>;
   roles: GuildRole[];
   channels: GuildChannel[];
   isLoading: boolean;
@@ -42,6 +44,7 @@ const initialState: CacheStore = {
   lastEvent: null,
   retryCount: 0,
   commands: new Map<number, CommandConfigResultWithCategory>(),
+  commandPermissions: new Map<string, GuildApplicationCommandPermissions>(),
   roles: [],
   channels: [],
   isLoading: false,
@@ -130,6 +133,12 @@ export const CacheStore = signalStore(
                     acc.set(command.id, command);
                     return acc;
                   }, new Map<number, CommandConfigResultWithCategory>()),
+                  commandPermissions: (
+                    event.commandPermissions as GuildApplicationCommandPermissions[]
+                  ).reduce((acc, permission) => {
+                    acc.set(permission.id, permission);
+                    return acc;
+                  }, new Map<string, GuildApplicationCommandPermissions>()),
                 });
                 break;
               case 'guild_fetch_failed':
@@ -185,6 +194,16 @@ export const CacheStore = signalStore(
                     .filter((role) => role.id !== event.roleId),
                 });
                 break;
+              case 'command.permissions.update':
+                const copyPermissions = new Map(store.commandPermissions());
+                const data = copyPermissions.get(event.commandId);
+                if (data) {
+                  data.permissions = event.permissions;
+                  patchState(store, {
+                    commandPermissions: copyPermissions,
+                  });
+                }
+                break;
             }
           } catch {
             /* ignore malformed */
@@ -208,87 +227,7 @@ export const CacheStore = signalStore(
   withMethods((store) => {
     const guildService = inject(GuildService);
 
-    const obj = {
-      toggleSubcommand: rxMethod<{
-        commandId: number;
-        subcommandName: string;
-      }>(
-        pipe(
-          switchMap(({ commandId, subcommandName }) =>
-            guildService.updateSubcommandConfig(
-              store.guildId()!,
-              commandId,
-              subcommandName,
-              {
-                enabled: false, // TODO: Implement subcommand toggle when subcommands are available
-              }
-            )
-          ),
-          tapResponse({
-            next: () => {
-              // Subcommand updated successfully
-            },
-            error: (error) => {
-              console.error('Error toggling subcommand', error);
-            },
-          })
-        )
-      ),
-      toggleCommand: rxMethod<{
-        commandId: number;
-      }>(
-        pipe(
-          switchMap(({ commandId }) =>
-            guildService.updateCommandConfig(store.guildId()!, commandId, {
-              enabled: !store.commands().get(commandId)?.enabled,
-            })
-          ),
-          tapResponse({
-            next: () => {
-              // Command updated successfully
-            },
-            error: (error) => {
-              console.error('Error toggling command', error);
-            },
-          })
-        )
-      ),
-      saveCommandConfig: rxMethod<{
-        commandId: number;
-        updates: Partial<CommandConfigResultWithCategory>;
-      }>(
-        pipe(
-          switchMap(({ commandId, updates }) =>
-            guildService.updateCommandConfig(
-              store.guildId()!,
-              commandId,
-              updates
-            )
-          ),
-          tapResponse({
-            next: () => {
-              // Command config saved successfully
-            },
-            error: (error) => {
-              console.error('Error saving command config', error);
-            },
-          })
-        )
-      ),
-      refreshGuildInfo: rxMethod<void>(
-        pipe(
-          switchMap(() => guildService.getGuildInfo(store.guildId()!)),
-          tapResponse({
-            next: (guildInfo) => {
-              patchState(store, { guildInfo: guildInfo || null });
-            },
-            error: (error) => {
-              console.error('Error refreshing guild info', error);
-            },
-          })
-        )
-      ),
-    };
+    const obj = {};
     return obj;
   }),
   withComputed((store) => {

@@ -15,7 +15,10 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     providePrimeNG({
       theme: {
-        preset: customDarkTheme
+        preset: customDarkTheme,
+        options: {
+          darkModeSelector: '.dark-mode',
+        }
       }
     }),
     DialogService

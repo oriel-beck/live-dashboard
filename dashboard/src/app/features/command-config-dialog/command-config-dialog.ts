@@ -25,12 +25,14 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
+import { ConfirmationService } from 'primeng/api';
 import { ApiService } from '../../core/services/api.service';
+import { ConfirmPopupModule } from 'primeng/confirmpopup';
 
 interface PermissionItem {
   id: string;
   name: string;
-  type: 'role' | 'channel';
+  type: 'role' | 'channel' | 'user';
   permission: boolean;
   originalPermission?: boolean;
 }
@@ -51,15 +53,18 @@ interface PermissionItem {
     InputTextModule,
     MessageModule,
     ProgressSpinnerModule,
+    ConfirmPopupModule,
   ],
   templateUrl: './command-config-dialog.html',
   styleUrl: './command-config-dialog.scss',
+  providers: [ConfirmationService],
 })
 export class CommandConfigDialog {
   ref = inject(DynamicDialogRef);
   config = inject(DynamicDialogConfig);
   apiService = inject(ApiService);
   dialogService = inject(DialogService);
+  confirmationService = inject(ConfirmationService);
 
   // Get data from dialog config
   command: Signal<CommandConfigResultWithCategory> = signal(
@@ -68,6 +73,8 @@ export class CommandConfigDialog {
   guildId: Signal<string> = signal(this.config.data.guildId);
   roles: Signal<GuildRole[]> = this.config.data.roles;
   channels: Signal<GuildChannel[]> = this.config.data.channels;
+  commandPermissions: Signal<Map<string, GuildApplicationCommandPermissions>> =
+    this.config.data.commandPermissions;
 
   // Permissions state
   permissions = signal<PermissionItem[]>([]);
@@ -222,47 +229,26 @@ export class CommandConfigDialog {
   }
 
   async loadPermissions() {
-    this.loading.set(true);
-    this.error.set(null);
-
     const command = this.command();
     if (!command.discordId) {
       throw new Error('Command not registered with Discord');
     }
 
     // Get specific command permissions
-    this.apiService
-      .get<GuildApplicationCommandPermissions>(
-        `/guilds/${this.guildId()}/commands/${command.discordId}/permissions`
-      )
-      .subscribe({
-        next: (response) => {
-          if (response.success && response.data && response.data.permissions) {
-            const commandPermissionItems: PermissionItem[] =
-              response.data.permissions.map(
-                (perm: ApplicationCommandPermission) => ({
-                  id: perm.id,
-                  name: this.getPermissionName(perm.id, perm.type),
-                  type: this.getPermissionTypeName(perm.type),
-                  permission: perm.permission,
-                  originalPermission: perm.permission,
-                })
-              );
-            this.permissions.set(commandPermissionItems);
-          } else {
-            // No command-specific permissions, use application-level
-            this.permissions.set([]);
-          }
-        },
-        error: (error) => {
-          console.error('Error loading command specific permissions:', error);
-          // If command-specific permissions don't exist, use application-level
-          this.permissions.set([]);
-        },
-        complete: () => {
-          this.loading.set(false);
-        },
-      });
+    const permissions = this.commandPermissions().get(
+      command.discordId.toString()
+    );
+    if (permissions) {
+      this.permissions.set(
+        permissions.permissions.map((perm) => ({
+          id: perm.id,
+          name: this.getPermissionName(perm.id, perm.type),
+          type: this.getPermissionTypeName(perm.type),
+          permission: perm.permission,
+          originalPermission: perm.permission,
+        }))
+      );
+    }
   }
 
   getPermissionName(id: string, type: number): string {
@@ -292,23 +278,27 @@ export class CommandConfigDialog {
     }
   }
 
-  getPermissionTypeName(type: number): 'role' | 'channel' {
+  getPermissionTypeName(type: number): 'role' | 'channel' | 'user' {
     switch (type) {
       case DISCORD_PERMISSION_TYPES.ROLE:
         return 'role';
       case DISCORD_PERMISSION_TYPES.CHANNEL:
         return 'channel';
+      case DISCORD_PERMISSION_TYPES.USER:
+        return 'user';
       default:
         return 'role';
     }
   }
 
-  getPermissionTypeNumber(type: 'role' | 'channel'): number {
+  getPermissionTypeNumber(type: 'role' | 'channel' | 'user'): number {
     switch (type) {
       case 'role':
         return DISCORD_PERMISSION_TYPES.ROLE;
       case 'channel':
         return DISCORD_PERMISSION_TYPES.CHANNEL;
+      case 'user':
+        return DISCORD_PERMISSION_TYPES.USER;
     }
   }
 
@@ -384,7 +374,9 @@ export class CommandConfigDialog {
   }
 
   rolePermissions = computed(() => {
-    return this.permissions().filter((p) => p.type === 'role');
+    return this.permissions().filter(
+      (p) => p.type === 'role' || p.type === 'user'
+    );
   });
 
   channelPermissions = computed(() => {
@@ -467,23 +459,64 @@ export class CommandConfigDialog {
     this.ref.close();
   }
 
-  selectMenuDt = {
-    colorScheme: {
-      dark: {
-        root: {
-          color: '#ffffff',
-        },
-        option: {
-          color: '#ffffff',
-          selectedBackground: '#36393f',
-          selectedColor: '#ffffff',
-          focusBackground: '#4a4b54', //lighter than selectedBackground
-          focusColor: '#ffffff',
-        },
-        overlay: {
-          background: '#36393f',
-        },
+  clearAllRoles(event: Event) {
+    this.confirmationService.confirm({
+      target: event.currentTarget as EventTarget,
+      message: 'Are you sure you want to clear all role overrides?',
+      icon: 'pi pi-exclamation-triangle',
+      rejectButtonProps: {
+        label: 'Cancel',
+        severity: 'secondary',
+        outlined: true,
       },
+      acceptButtonProps: {
+        label: 'Clear All',
+        severity: 'danger',
+      },
+      accept: () => {
+        this.permissions.update((perms) =>
+          perms.filter((perm) => perm.type !== 'role' && perm.type !== 'user')
+        );
+        this.error.set(null);
+      },
+    });
+  }
+
+  clearAllChannels(event: Event) {
+    this.confirmationService.confirm({
+      target: event.currentTarget as EventTarget,
+      message: 'Are you sure you want to clear all channel overrides?',
+      icon: 'pi pi-exclamation-triangle',
+      rejectButtonProps: {
+        label: 'Cancel',
+        severity: 'secondary',
+        outlined: true,
+      },
+      acceptButtonProps: {
+        label: 'Clear All',
+        severity: 'danger',
+      },
+      accept: () => {
+        this.permissions.update((perms) =>
+          perms.filter((perm) => perm.type !== 'channel')
+        );
+        this.error.set(null);
+      },
+    });
+  }
+
+  selectMenuDt = {
+    color: '#ffffff',
+    background: '#36393f',
+    option: {
+      color: '#ffffff',
+      selectedBackground: '#36393f',
+      selectedColor: '#ffffff',
+      focusBackground: '#4a4b54', //lighter than selectedBackground
+      focusColor: '#ffffff',
+    },
+    overlay: {
+      background: '#36393f',
     },
   };
 }

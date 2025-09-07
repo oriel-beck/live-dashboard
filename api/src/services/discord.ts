@@ -1,25 +1,29 @@
 import {
   ApplicationCommandPermission,
+  CACHE_TTL,
+  DiscordApplicationCommand,
   GuildApplicationCommandPermissions,
-  DiscordApplicationCommand
+  REDIS_KEYS
 } from "@discord-bot/shared-types";
 import { config } from "../config";
-import { CACHE_TTL, REDIS_KEYS, TIME_CONSTANTS } from "../constants";
 import { User, UserGuild } from "../types";
 import { redis } from "./redis";
+import { SessionService } from "./session";
 
 export class DiscordService {
   private static readonly API_BASE = config.discord.apiUrl;
   private static readonly BOT_TOKEN = config.discord.botToken;
 
 
+  static async getUserGuilds(sessionId: string): Promise<UserGuild[]> {
+    // Get session data with automatic refresh if needed
+    const sessionData = await SessionService.refreshTokenIfNeeded(sessionId);
+    if (!sessionData || !sessionData.accessToken) {
+      throw new Error("Invalid session - please re-authenticate");
+    }
 
-  static async getUserGuilds(
-    accessToken: string,
-    userId: string
-  ): Promise<UserGuild[]> {
     // Check cache first
-    const cacheKey = REDIS_KEYS.USER_GUILDS(userId);
+    const cacheKey = REDIS_KEYS.USER_GUILDS(sessionData.user.id);
     const cachedGuilds = await redis.get(cacheKey);
 
     if (cachedGuilds) {
@@ -30,7 +34,7 @@ export class DiscordService {
     // Fetch fresh guilds from Discord
     const response = await fetch(`${this.API_BASE}/users/@me/guilds`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${sessionData.accessToken}`,
       },
     });
 
@@ -74,10 +78,16 @@ export class DiscordService {
     return accessibleGuilds;
   }
 
-  static async getUserInfo(accessToken: string): Promise<User> {
+  static async getUserInfo(sessionId: string): Promise<User> {
+    // Get session data with automatic refresh if needed
+    const sessionData = await SessionService.refreshTokenIfNeeded(sessionId);
+    if (!sessionData || !sessionData.accessToken) {
+      throw new Error("Invalid session - please re-authenticate");
+    }
+
     const response = await fetch(`${this.API_BASE}/users/@me`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${sessionData.accessToken}`,
       },
     });
 
@@ -133,15 +143,6 @@ export class DiscordService {
     return lastUpdated ? parseInt(lastUpdated) : null;
   }
 
-  // New method to check if guild data is stale (older than 24 hours)
-  static async isGuildDataStale(guildId: string): Promise<boolean> {
-    const lastUpdate = await this.getGuildLastUpdate(guildId);
-    if (!lastUpdate) return true;
-
-    const twentyFourHoursAgo = Date.now() - TIME_CONSTANTS.TWENTY_FOUR_HOURS;
-    return lastUpdate < twentyFourHoursAgo;
-  }
-
   // Get application command permissions for a guild
   static async getGuildApplicationCommandPermissions(guildId: string): Promise<GuildApplicationCommandPermissions[]> {
     const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(guildId);
@@ -189,10 +190,12 @@ export class DiscordService {
     guildId: string, 
     commandId: string, 
     permissions: ApplicationCommandPermission[],
-    bearerToken?: string
+    sessionId: string
   ): Promise<GuildApplicationCommandPermissions> {
-    if (!bearerToken) {
-      throw new Error('Bearer token is required to update command permissions. Bot tokens are not supported for this operation.');
+    // Get session data with automatic refresh if needed
+    const sessionData = await SessionService.refreshTokenIfNeeded(sessionId);
+    if (!sessionData || !sessionData.accessToken) {
+      throw new Error("Invalid session - please re-authenticate");
     }
 
     const response = await fetch(
@@ -200,7 +203,7 @@ export class DiscordService {
       {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${bearerToken}`,
+          Authorization: `Bearer ${sessionData.accessToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ permissions }),
@@ -219,6 +222,38 @@ export class DiscordService {
     await redis.del(cacheKey);
 
     return result;
+  }
+
+  // Delete application command permissions
+  static async deleteCommandPermissions(
+    guildId: string,
+    commandId: string,
+    sessionId: string
+  ): Promise<void> {
+    // Get session data with automatic refresh if needed
+    const sessionData = await SessionService.refreshTokenIfNeeded(sessionId);
+    if (!sessionData || !sessionData.accessToken) {
+      throw new Error("Invalid session - please re-authenticate");
+    }
+
+    const response = await fetch(
+      `${this.API_BASE}/applications/${config.discord.clientId}/guilds/${guildId}/commands/${commandId}/permissions`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${sessionData.accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to delete command permissions: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    // Invalidate cache
+    const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(guildId);
+    await redis.del(cacheKey);
   }
 
   // Get guild application commands (to get command IDs)

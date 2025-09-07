@@ -136,7 +136,7 @@ export class SessionService {
       
       if (sessionData) {
         // Get fresh guilds from Redis cache (will handle TTL automatically)
-        const userGuilds = await DiscordService.getUserGuilds(sessionData.accessToken, sessionData.user.id);
+        const userGuilds = await DiscordService.getUserGuilds(sessionId);
         
         // Attach user data with fresh guilds to the request
         req.user = {
@@ -169,7 +169,7 @@ export class SessionService {
     }
 
     // Get fresh guilds from Redis cache
-    const userGuilds = await DiscordService.getUserGuilds(sessionData.accessToken, sessionData.user.id);
+    const userGuilds = await DiscordService.getUserGuilds(sessionId);
     
     // Check if user has manage permissions for this guild
     const userGuild = userGuilds.find(guild => guild.id === guildId);

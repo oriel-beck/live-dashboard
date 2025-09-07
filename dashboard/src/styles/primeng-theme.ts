@@ -17,44 +17,7 @@ export const customDarkTheme = definePreset(Aura, {
       900: '{indigo.900}',
       950: '{indigo.950}',
     },
-    
-    // Dark mode color scheme
-    colorScheme: {
-      dark: {
-        // Surface colors for dark glass morphism
-        surface: {
-          0: 'rgba(255, 255, 255, 0.02)',
-          50: '#0a0b0d',
-          100: '#141518',
-          200: '#1e1f23',
-          300: '#2a2b30',
-          400: '#3a3b42',
-          500: '#4a4b54',
-          600: '#5a5b66',
-          700: '#6a6b78',
-          800: '#7a7b8a',
-          900: '#8a8b9c',
-          950: '#9a9bae',
-        },
-        
-        // Primary color configuration for dark mode
-        primary: {
-          color: '#6366f1',
-          inverseColor: '#ffffff',
-          hoverColor: '#8b5cf6',
-          activeColor: '#7c3aed',
-        },
-        
-        // Highlight configuration for dark mode
-        highlight: {
-          background: 'rgba(99, 102, 241, 0.16)',
-          focusBackground: 'rgba(99, 102, 241, 0.24)',
-          color: 'rgba(255, 255, 255, 0.87)',
-          focusColor: 'rgba(255, 255, 255, 0.87)',
-        },
-      },
-    },
-    
+
     // Focus ring configuration
     focusRing: {
       width: '3px',
@@ -63,7 +26,7 @@ export const customDarkTheme = definePreset(Aura, {
       offset: '2px',
     },
   },
-  
+
   // Extended custom tokens
   extend: {
     glass: {
@@ -82,7 +45,18 @@ export const customDarkTheme = definePreset(Aura, {
       slow: '0.5s cubic-bezier(0.4, 0, 0.2, 1)',
     },
   },
-  
+  components: {
+    checkbox: {
+      colorScheme: {
+        dark: {
+          root: {
+            background: '#36393f',
+          }
+        }
+      }
+    }
+  },
+
   // Additional CSS for glass effects and custom styling
   css: ({ dt }) => `
     /* Glass effect utility class */
@@ -109,82 +83,6 @@ export const customDarkTheme = definePreset(Aura, {
     
     .p-component::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.15);
-    }
-    
-    /* Multi-select styling for Discord theme */
-    .p-multiselect {
-      background: #2f3136 !important;
-      border: 1px solid #4f545c !important;
-      color: #ffffff !important;
-    }
-    
-    .p-multiselect-label {
-      color: #ffffff !important;
-    }
-    
-    .p-multiselect-label-container {
-      color: #ffffff !important;
-    }
-    
-    .p-multiselect-panel {
-      background: #2f3136 !important;
-      border: 1px solid #4f545c !important;
-      color: #ffffff !important;
-    }
-    
-    .p-multiselect-items {
-      background: #2f3136 !important;
-    }
-    
-    .p-multiselect-item {
-      color: #ffffff !important;
-      background: transparent !important;
-    }
-    
-    .p-multiselect-item:hover {
-      background: #4f545c !important;
-    }
-    
-    .p-multiselect-item:focus {
-      background: #5865f2 !important;
-    }
-    
-    .p-multiselect-item.p-highlight {
-      background: #5865f2 !important;
-      color: #ffffff !important;
-    }
-    
-    .p-multiselect-item-group {
-      color: #b9bbbe !important;
-      background: #36393f !important;
-    }
-    
-    .p-multiselect-filter-container {
-      background: #2f3136 !important;
-      border-bottom: 1px solid #4f545c !important;
-    }
-    
-    .p-multiselect-filter {
-      background: #36393f !important;
-      border: 1px solid #4f545c !important;
-      color: #ffffff !important;
-    }
-    
-    .p-multiselect-filter::placeholder {
-      color: #b9bbbe !important;
-    }
-    
-    .p-multiselect-token {
-      background: #5865f2 !important;
-      color: #ffffff !important;
-    }
-    
-    .p-multiselect-token-label {
-      color: #ffffff !important;
-    }
-    
-    .p-multiselect-token-icon {
-      color: #ffffff !important;
     }
   `,
 });

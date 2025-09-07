@@ -185,14 +185,6 @@
                   <span class="subcommand-description"
                     >{{ subcommand.description }}</span
                   >
-                  <label class="toggle-switch toggle-switch-sm">
-                    <input
-                      type="checkbox"
-                      [checked]="subcommand.enabled"
-                      (change)="store.toggleSubcommand({ commandId: command.id, subcommandName: subcommand.name })"
-                    />
-                    <span class="toggle-slider"></span>
-                  </label>
                 </div>
                 }
               </div>

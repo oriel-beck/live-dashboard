@@ -12,8 +12,9 @@ import {
   publishGuildEvent,
   publishUserEvent,
 } from "./redis-cache-utils";
-import { REDIS_KEYS, CACHE_TTL } from "../constants";
+import { REDIS_KEYS, CACHE_TTL } from "@discord-bot/shared-types";
 import logger from "./logger";
+import { GuildApplicationCommandPermissions } from "@discord-bot/shared-types";
 
 let initiated = false;
 
@@ -71,7 +72,7 @@ export function startDataSync(client: Client) {
   client.on(Events.GuildRoleCreate, async (role) => {
     // Skip managed roles
     if (role.managed) return;
-    
+
     const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     const data = {
       id: role.id,
@@ -93,7 +94,7 @@ export function startDataSync(client: Client) {
   client.on(Events.GuildRoleUpdate, async (_oldRole, role) => {
     // Skip managed roles
     if (role.managed) return;
-    
+
     const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     const data = {
       id: role.id,
@@ -124,7 +125,7 @@ export function startDataSync(client: Client) {
   client.on(Events.ChannelCreate, async (ch) => {
     // Skip non-text/announcement/voice channels
     if (![0, 2, 5].includes(ch.type)) return;
-    
+
     const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
     const data = {
       id: ch.id,
@@ -189,5 +190,64 @@ export function startDataSync(client: Client) {
       guildId: newM.guild.id,
       perms,
     });
+  });
+
+  // This event is triggered when the permissions for a command are updated
+  // It does not include the entire guild permissions, only the permissions for the command
+  client.on(Events.ApplicationCommandPermissionsUpdate, async (data) => {
+    try {
+      // Only process if the command belongs to this bot
+      const botApplicationId = process.env.DISCORD_CLIENT_ID;
+      if (data.applicationId !== botApplicationId) {
+        logger.debug(
+          `[SyncData] Ignoring command permissions update for different bot: ${data.applicationId}`
+        );
+        return;
+      }
+      
+      // Update the cached permissions if they are already cached
+      const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(data.guildId);
+
+      const guildPermissions = await redis.get(cacheKey);
+      if (!guildPermissions) {
+        logger.info(
+          `[SyncData] Command permissions cache for guild ${data.guildId} does not exist, will be re-fetched from Discord API when needed`
+        );
+        return;
+      }
+
+      // Update the permissions for the command
+      const parsedPermissions = JSON.parse(guildPermissions) as GuildApplicationCommandPermissions[];
+
+      const updatedPermissions = parsedPermissions.map((permission) => {
+        if (permission.id === data.id) {
+          return data.permissions;
+        }
+        return permission;
+      });
+
+      await redis.setex(
+        cacheKey,
+        CACHE_TTL.COMMAND_PERMISSIONS,
+        JSON.stringify(updatedPermissions)
+      );
+
+      logger.info(
+        `[SyncData] Updated command permissions cache for guild ${data.guildId}`
+      );
+
+      // Publish the event for real-time updates
+      await publishGuildEvent(data.guildId, {
+        type: "command.permissions.update",
+        guildId: data.guildId,
+        commandId: data.id,
+        permissions: data.permissions,
+      });
+    } catch (error) {
+      logger.error(
+        `[SyncData] Error handling command permissions update:`,
+        error
+      );
+    }
   });
 }
