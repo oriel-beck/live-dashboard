@@ -53,18 +53,18 @@ async function deployGlobalCommands(
   const rest = new REST({ version: "10" }).setToken(BOT_TOKEN);
 
   logger.info("[Deploy] Started refreshing application (/) commands.");
-  logger.info(`[Deploy] Using application ID: ${APPLICATION_ID}`);
+  logger.debug(`[Deploy] Using application ID: ${APPLICATION_ID}`);
 
   const deployedCommands = (await rest.put(
     Routes.applicationCommands(APPLICATION_ID),
     { body: commandData }
   )) as ApplicationCommand[];
 
-  logger.info(
+  logger.debug(
     `[Deploy] Successfully deployed ${deployedCommands.length} commands globally!`
   );
-  logger.info("[Deploy] Commands now use Discord's application command permissions system.");
-  logger.info("[Deploy] Server admins can manage permissions via Discord's interface.");
+  logger.debug("[Deploy] Commands now use Discord's application command permissions system.");
+  logger.debug("[Deploy] Server admins can manage permissions via Discord's interface.");
   
   return deployedCommands;
 }
@@ -105,7 +105,7 @@ async function registerCommandsInDatabase(
       continue;
     }
 
-    logger.info(
+    logger.debug(
       `[Deploy] Registered command: ${deployedCmd.name} (${deployedCmd.id} -> ${mainCommandId})`
     );
 
@@ -145,7 +145,7 @@ async function registerSubcommands(
       });
 
       const groupId = groupResponse.data!.id;
-      logger.info(
+      logger.debug(
         `[Deploy] Registered subcommand group: ${option.name} (${groupId})`
       );
 
@@ -163,7 +163,7 @@ async function registerSubcommands(
               parentId: groupId,
               discordId: null,
             });
-            logger.info(
+            logger.debug(
               `[Deploy] Registered nested subcommand: ${subOption.name}`
             );
           }
@@ -182,7 +182,7 @@ async function registerSubcommands(
         parentId: parentId,
         discordId: null,
       });
-      logger.info(`[Deploy] Registered subcommand: ${option.name}`);
+      logger.debug(`[Deploy] Registered subcommand: ${option.name}`);
     }
   }
 }
@@ -192,7 +192,7 @@ async function deployCommands() {
 
   try {
     // Load and validate commands
-    logger.info("[Deploy] Loading commands...");
+    logger.debug("[Deploy] Loading commands...");
     const commands = await CommandLoader.loadAllCommands();
 
     // Validate commands
@@ -207,18 +207,18 @@ async function deployCommands() {
       }
     }
 
-    logger.info(`[Deploy] Loaded ${validCommands.length} valid commands`);
+    logger.debug(`[Deploy] Loaded ${validCommands.length} valid commands`);
 
     // Deploy global commands to Discord
-    logger.info("[Deploy] Deploying global commands...");
+    logger.debug("[Deploy] Deploying global commands...");
     const deployedCommands = await deployGlobalCommands(validCommands);
 
     // Register commands in database
-    logger.info("[Deploy] Registering commands in database...");
+    logger.debug("[Deploy] Registering commands in database...");
     await registerCommandsInDatabase(validCommands, deployedCommands);
 
     logger.info("[Deploy] ✅ Commands deployed and registered successfully!");
-    logger.info(
+    logger.debug(
       "[Deploy] Note: It may take up to 1 hour for global commands to appear in all servers"
     );
   } catch (error) {

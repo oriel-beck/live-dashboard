@@ -68,10 +68,10 @@ export class CommandManager {
       });
 
       await this.client.application.commands.set(commandsData);
-      logger.info(
+      logger.debug(
         `[CommandManager] Deployed ${commandsData.length} global commands`
       );
-      logger.info("[CommandManager] Commands now use Discord's application command permissions system.");
+      logger.debug("[CommandManager] Commands now use Discord's application command permissions system.");
     } catch (error) {
       logger.error(
         `[CommandManager] Failed to deploy global commands:`,
@@ -193,7 +193,7 @@ export class CommandManager {
       await command.execute(interaction);
 
       // Log command usage
-      logger.info(
+      logger.debug(
         `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name}`
       );
     } catch (error) {

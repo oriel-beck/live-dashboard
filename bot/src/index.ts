@@ -72,7 +72,7 @@ export { commandManager };
 // Load and register all commands automatically
 async function initializeCommands() {
   try {
-    logger.info('[Bot] Loading commands...');
+    logger.debug('[Bot] Loading commands...');
     const commands = await CommandLoader.loadAllCommands();
     
     // Validate and register each command
@@ -84,7 +84,7 @@ async function initializeCommands() {
       }
     }
     
-    logger.info(`[Bot] Registered ${commandManager.getCommands().size} commands`);
+    logger.debug(`[Bot] Registered ${commandManager.getCommands().size} commands`);
     return true;
   } catch (error) {
     logger.error('[Bot] Error loading commands:', error);
@@ -106,8 +106,8 @@ client.once('ready', async () => {
     process.exit(1);
   }
 
-  logger.info('Command framework initialized successfully!');
-  logger.info('Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script');
+  logger.debug('Command framework initialized successfully!');
+  logger.debug('Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script');
 });
 
 client.login(process.env.BOT_TOKEN!);

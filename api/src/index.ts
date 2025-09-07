@@ -36,6 +36,17 @@ async function startServer() {
 
     process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+    
+    // Handle uncaught exceptions and unhandled rejections
+    process.on("uncaughtException", (error) => {
+      logger.error("[API] Uncaught Exception:", error);
+      gracefulShutdown("UNCAUGHT_EXCEPTION");
+    });
+
+    process.on("unhandledRejection", (reason, promise) => {
+      logger.error("[API] Unhandled Rejection at:", promise, "reason:", reason);
+      gracefulShutdown("UNHANDLED_REJECTION");
+    });
 
     return server;
   } catch (error) {

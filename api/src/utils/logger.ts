@@ -71,7 +71,7 @@ const logger = winston.createLogger({
 // Create a stream object with a 'write' function that will be used by `morgan`
 export const stream = {
   write: (message: string) => {
-    logger.info(message.trim());
+    logger.debug(message.trim());
   },
 };
 

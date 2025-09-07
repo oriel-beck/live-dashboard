@@ -64,7 +64,7 @@ export class CommandLoader {
         }
       }
       
-      logger.info(`[CommandLoader] Successfully loaded ${commands.length} commands`);
+      logger.debug(`[CommandLoader] Successfully loaded ${commands.length} commands`);
       return commands;
       
     } catch (error) {

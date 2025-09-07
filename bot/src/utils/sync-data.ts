@@ -24,7 +24,7 @@ export function startDataSync(client: Client) {
 
   // ---- On ready: only seed guild set, not guild data ----
   client.once(Events.ClientReady, async () => {
-    logger.info(`Ready as ${client.user?.tag}`);
+    logger.debug(`Ready as ${client.user?.tag}`);
 
     // Only add guild IDs to the set for O(1) lookups
     // Don't load guild data - it will be loaded on-demand when dashboard requests it
@@ -32,7 +32,7 @@ export function startDataSync(client: Client) {
       await redis.sadd(REDIS_KEYS.GUILD_SET, guild.id);
     }
 
-    logger.info(
+    logger.debug(
       `[SyncData] Guild set initialized with ${client.guilds.cache.size} guilds`
     );
   });
@@ -41,7 +41,7 @@ export function startDataSync(client: Client) {
   client.on(Events.GuildCreate, async (guild) => {
     // Add to guild set for O(1) lookups
     await redis.sadd(REDIS_KEYS.GUILD_SET, guild.id);
-    logger.info(
+    logger.debug(
       `[SyncData] Added new guild ${guild.id} (${guild.name}) to guild set`
     );
   });
@@ -49,7 +49,7 @@ export function startDataSync(client: Client) {
   client.on(Events.GuildDelete, async (guild) => {
     // Remove from guild set
     await redis.srem(REDIS_KEYS.GUILD_SET, guild.id);
-    logger.info(
+    logger.debug(
       `[SyncData] Removed guild ${guild.id} (${guild.name}) from guild set`
     );
 
@@ -210,7 +210,7 @@ export function startDataSync(client: Client) {
 
       const guildPermissions = await redis.get(cacheKey);
       if (!guildPermissions) {
-        logger.info(
+        logger.debug(
           `[SyncData] Command permissions cache for guild ${data.guildId} does not exist, will be re-fetched from Discord API when needed`
         );
         return;
@@ -232,7 +232,7 @@ export function startDataSync(client: Client) {
         JSON.stringify(updatedPermissions)
       );
 
-      logger.info(
+      logger.debug(
         `[SyncData] Updated command permissions cache for guild ${data.guildId}`
       );
 

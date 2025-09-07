@@ -82,7 +82,7 @@ export class SessionService {
     }
 
     try {
-      logger.info('Refreshing expired access token for user:', sessionData.user.id);
+      logger.debug('Refreshing expired access token for user:', sessionData.user.id);
       
       // Refresh the access token
       const newTokenData = await DiscordService.refreshAccessToken(sessionData.refreshToken);

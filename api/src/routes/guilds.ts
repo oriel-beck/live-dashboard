@@ -307,7 +307,7 @@ router.get(
   async (req: Request, res: Response) => {
     const { guildId } = req.params;
 
-    logger.info("SSE started for guild:", guildId);
+    logger.debug(`SSE started for guild: ${guildId}`);
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -360,7 +360,7 @@ router.get(
     });
 
     req.on("close", async () => {
-      logger.info("SSE closed for guild:", guildId);
+      logger.debug(`SSE closed for guild: ${guildId}`);
       await RedisService.unsubscribeFromGuildEvents(guildId);
       res.end();
     });

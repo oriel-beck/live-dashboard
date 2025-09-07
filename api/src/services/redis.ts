@@ -32,7 +32,7 @@ export class RedisService {
     const exists = await redis.exists(key);
     if (exists === 0) {
       // Data doesn't exist, try to fetch it
-      logger.info(`[RedisService] Guild roles not found for guild ${guildId}, attempting to fetch...`);
+      logger.debug(`[RedisService] Guild roles not found for guild ${guildId}, attempting to fetch...`);
       try {
         const rolesData = await makeRequestWithRetry<GuildRole[]>(
           `${config.discord.apiUrl}/guilds/${guildId}/roles`,
@@ -72,7 +72,7 @@ export class RedisService {
         // Add guild to guild set
         await redis.sadd(REDIS_KEYS.GUILD_SET, guildId);
         
-        logger.info(`[RedisService] Successfully fetched and cached guild roles for ${guildId}`);
+        logger.debug(`[RedisService] Successfully fetched and cached guild roles for ${guildId}`);
         return roles;
       } catch (error) {
         logger.error(`[RedisService] Failed to fetch guild roles for ${guildId}:`, error);
@@ -93,7 +93,7 @@ export class RedisService {
     const exists = await redis.exists(key);
     if (exists === 0) {
       // Data doesn't exist, try to fetch it
-      logger.info(`[RedisService] Guild channels not found for guild ${guildId}, attempting to fetch...`);
+      logger.debug(`[RedisService] Guild channels not found for guild ${guildId}, attempting to fetch...`);
       try {
         const channelsData = await makeRequestWithRetry<GuildChannel[]>(
           `${config.discord.apiUrl}/guilds/${guildId}/channels`,
@@ -133,7 +133,7 @@ export class RedisService {
         // Add guild to guild set
         await redis.sadd(REDIS_KEYS.GUILD_SET, guildId);
         
-        logger.info(`[RedisService] Successfully fetched and cached guild channels for ${guildId}`);
+        logger.debug(`[RedisService] Successfully fetched and cached guild channels for ${guildId}`);
         return channels;
       } catch (error) {
         logger.error(`[RedisService] Failed to fetch guild channels for ${guildId}:`, error);
@@ -154,7 +154,7 @@ export class RedisService {
     const exists = await redis.exists(key);
     if (exists === 0) {
       // Data doesn't exist, try to fetch it
-      logger.info(`[RedisService] Guild info not found for guild ${guildId}, attempting to fetch...`);
+      logger.debug(`[RedisService] Guild info not found for guild ${guildId}, attempting to fetch...`);
       try {
         const guildData = await makeRequestWithRetry<UserGuild>(
           `${config.discord.apiUrl}/guilds/${guildId}`,
@@ -184,7 +184,7 @@ export class RedisService {
         // Add guild to guild set
         await redis.sadd(REDIS_KEYS.GUILD_SET, guildId);
         
-        logger.info(`[RedisService] Successfully fetched and cached guild info for ${guildId}`);
+        logger.debug(`[RedisService] Successfully fetched and cached guild info for ${guildId}`);
         return guildInfo;
       } catch (error) {
         logger.error(`[RedisService] Failed to fetch guild info for ${guildId}:`, error);
@@ -226,13 +226,13 @@ export class RedisService {
     }
 
     // Data missing -> try to fetch data
-    logger.info(`[RedisService] Guild data missing for ${guildId}, attempting to fetch...`);
+    logger.debug(`[RedisService] Guild data missing for ${guildId}, attempting to fetch...`);
     try {
       const fetchedData = await this.fetchGuildDataFromBot(guildId);
       
       // Data fetch works -> cache the new data with TTL -> return the data
       await this.cacheGuildData(guildId, fetchedData);
-      logger.info(`[RedisService] Successfully fetched and cached guild data for ${guildId}`);
+      logger.debug(`[RedisService] Successfully fetched and cached guild data for ${guildId}`);
       
       return {
         guildInfo: fetchedData.guildInfo,
