@@ -14,7 +14,68 @@ const router = Router();
 // Apply authentication middleware to all guild routes
 router.use(requireAuth);
 
-// Get guild information with lazy loading
+/**
+ * @swagger
+ * /guilds/{guildId}:
+ *   get:
+ *     summary: Get guild information
+ *     description: Retrieve detailed information about a Discord guild including roles, channels, and metadata
+ *     tags: [Guilds]
+ *     parameters:
+ *       - in: path
+ *         name: guildId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Discord guild ID
+ *     responses:
+ *       200:
+ *         description: Guild information retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/GuildData'
+ *       401:
+ *         description: Unauthorized - user not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - user doesn't have access to this guild
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Guild not found or bot no longer has access
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Guild not found or bot no longer has access"
+ *                 redirectToGuilds:
+ *                   type: boolean
+ *                   example: true
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 router.get(
   "/:guildId",
   requireGuildAccess,
@@ -61,7 +122,54 @@ router.get(
   }
 );
 
-// Get guild commands (basic info only)
+/**
+ * @swagger
+ * /guilds/{guildId}/commands:
+ *   get:
+ *     summary: Get guild commands
+ *     description: Retrieve all available commands for a guild
+ *     tags: [Guilds, Commands]
+ *     parameters:
+ *       - in: path
+ *         name: guildId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Discord guild ID
+ *     responses:
+ *       200:
+ *         description: Commands retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   additionalProperties:
+ *                     $ref: '#/components/schemas/Command'
+ *       401:
+ *         description: Unauthorized - user not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - user doesn't have access to this guild
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 router.get(
   "/:guildId/commands",
   requireGuildAccess,
@@ -89,7 +197,64 @@ router.get(
   }
 );
 
-// Get command config by ID
+/**
+ * @swagger
+ * /guilds/{guildId}/commands/{commandId}:
+ *   get:
+ *     summary: Get command configuration
+ *     description: Retrieve configuration details for a specific command
+ *     tags: [Guilds, Commands]
+ *     parameters:
+ *       - in: path
+ *         name: guildId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Discord guild ID
+ *       - in: path
+ *         name: commandId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Command ID
+ *     responses:
+ *       200:
+ *         description: Command configuration retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Command'
+ *       401:
+ *         description: Unauthorized - user not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - user doesn't have access to this guild
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Command not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 router.get(
   "/:guildId/commands/:commandId",
   requireGuildAccess,
@@ -97,7 +262,7 @@ router.get(
     try {
       const { commandId } = req.params;
 
-      const command = await DefaultCommandService.getCommandById(+commandId);
+      const command = await DefaultCommandService.getCommandByDiscordId(BigInt(commandId));
 
       if (!command) {
         return res.status(404).json({
@@ -129,7 +294,85 @@ router.get(
   }
 );
 
-// Update command permissions
+/**
+ * @swagger
+ * /guilds/{guildId}/commands/{commandId}/permissions:
+ *   put:
+ *     summary: Update command permissions
+ *     description: Update permissions for a specific command in a guild
+ *     tags: [Guilds, Commands]
+ *     parameters:
+ *       - in: path
+ *         name: guildId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Discord guild ID
+ *       - in: path
+ *         name: commandId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Command ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               permissions:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/CommandPermission'
+ *                 description: Array of permission objects
+ *             required:
+ *               - permissions
+ *     responses:
+ *       200:
+ *         description: Command permissions updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   description: Updated permission data
+ *       400:
+ *         description: Bad request - invalid permissions format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - user not authenticated or Discord session expired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Command not found or not registered with Discord
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 router.put(
   "/:guildId/commands/:commandId/permissions",
   requireGuildAccess,
@@ -220,7 +463,65 @@ router.put(
   }
 );
 
-// Delete command permissions (sync with application-level permissions)
+/**
+ * @swagger
+ * /guilds/{guildId}/commands/{commandId}/permissions:
+ *   delete:
+ *     summary: Delete command permissions
+ *     description: Remove command-specific permissions and sync with application-level permissions
+ *     tags: [Guilds, Commands]
+ *     parameters:
+ *       - in: path
+ *         name: guildId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Discord guild ID
+ *       - in: path
+ *         name: commandId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Command ID
+ *     responses:
+ *       200:
+ *         description: Command permissions deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Command synced with application permissions"
+ *       401:
+ *         description: Unauthorized - user not authenticated or Discord session expired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Command not found or not registered with Discord
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 router.delete(
   "/:guildId/commands/:commandId/permissions",
   requireGuildAccess,
@@ -300,7 +601,53 @@ router.delete(
   }
 );
 
-// Server-Sent Events for real-time updates
+/**
+ * @swagger
+ * /guilds/{guildId}/events:
+ *   get:
+ *     summary: Server-Sent Events for real-time updates
+ *     description: Establish a Server-Sent Events connection for real-time guild updates
+ *     tags: [Guilds, Real-time]
+ *     parameters:
+ *       - in: path
+ *         name: guildId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Discord guild ID
+ *     responses:
+ *       200:
+ *         description: SSE connection established successfully
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ *               description: Server-Sent Events stream
+ *             example: |
+ *               event: update
+ *               data: {"type":"initial","guildId":"123456789","guildInfo":{...}}
+ *               
+ *               event: update
+ *               data: {"type":"command.permissions.sync","command":{"id":"123","synced":true}}
+ *       401:
+ *         description: Unauthorized - user not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - user doesn't have access to this guild
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 router.get(
   "/:guildId/events",
   requireGuildAccess,

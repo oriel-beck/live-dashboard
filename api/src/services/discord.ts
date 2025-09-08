@@ -3,28 +3,28 @@ import {
   CACHE_TTL,
   DiscordApplicationCommand,
   GuildApplicationCommandPermissions,
-  REDIS_KEYS
+  REDIS_KEYS,
 } from "@discord-bot/shared-types";
 import { config } from "../config";
 import { User, UserGuild } from "../types";
-import { redis } from "./redis";
+import { RedisService } from "./redis";
 import { SessionService } from "./session";
 
 export class DiscordService {
   private static readonly API_BASE = config.discord.apiUrl;
   private static readonly BOT_TOKEN = config.discord.botToken;
 
-
   static async getUserGuilds(sessionId: string): Promise<UserGuild[]> {
     // Get session data with automatic refresh if needed
     const sessionData = await SessionService.refreshTokenIfNeeded(sessionId);
+    
     if (!sessionData || !sessionData.accessToken) {
       throw new Error("Invalid session - please re-authenticate");
     }
 
     // Check cache first
     const cacheKey = REDIS_KEYS.USER_GUILDS(sessionData.user.id);
-    const cachedGuilds = await redis.get(cacheKey);
+    const cachedGuilds = await RedisService.withRedisConnection((redis) => redis.get(cacheKey));
 
     if (cachedGuilds) {
       // Returning cached guilds
@@ -45,10 +45,10 @@ export class DiscordService {
     const userGuilds = (await response.json()) as UserGuild[];
     const userGuildIds = userGuilds.map((guild) => guild.id);
 
-    const sharedGuildsExists = await redis.smismember(
+    const sharedGuildsExists = await RedisService.withRedisConnection((redis) => redis.smismember(
       REDIS_KEYS.GUILD_SET,
       userGuildIds
-    );
+    ));
     const sharedGuildIdSet = new Set(
       userGuildIds.filter((_guildId, i) => sharedGuildsExists[i] === 1)
     );
@@ -66,14 +66,13 @@ export class DiscordService {
         botHasAccess: true, // All filtered guilds have bot access
       }));
 
-
-
     // Cache the filtered guilds for 5 minutes
-    await redis.setex(
+    await RedisService.withRedisConnection((redis) => redis.setex(
       cacheKey,
       CACHE_TTL.USER_GUILDS,
       JSON.stringify(accessibleGuilds)
-    );
+    ));
+
 
     return accessibleGuilds;
   }
@@ -85,9 +84,13 @@ export class DiscordService {
       throw new Error("Invalid session - please re-authenticate");
     }
 
+    return this.getUserInfoWithToken(sessionData.accessToken);
+  }
+
+  static async getUserInfoWithToken(accessToken: string): Promise<User> {
     const response = await fetch(`${this.API_BASE}/users/@me`, {
       headers: {
-        Authorization: `Bearer ${sessionData.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
 
@@ -130,23 +133,28 @@ export class DiscordService {
 
   // New method to check if a guild exists in the bot's guild set
   static async isGuildAccessible(guildId: string): Promise<boolean> {
-    const result = await redis.sismember(REDIS_KEYS.GUILD_SET, guildId);
+    const result = await RedisService.withRedisConnection((redis) => redis.sismember(
+      REDIS_KEYS.GUILD_SET,
+      guildId
+    ));
     return result === 1;
   }
 
   // New method to get guild last update time
   static async getGuildLastUpdate(guildId: string): Promise<number | null> {
-    const lastUpdated = await redis.hget(
+    const lastUpdated = await RedisService.withRedisConnection((redis) => redis.hget(
       REDIS_KEYS.GUILD_INFO(guildId),
       "lastUpdated"
-    );
+    ));
     return lastUpdated ? parseInt(lastUpdated) : null;
   }
 
   // Get application command permissions for a guild
-  static async getGuildApplicationCommandPermissions(guildId: string): Promise<GuildApplicationCommandPermissions[]> {
+  static async getGuildApplicationCommandPermissions(
+    guildId: string
+  ): Promise<GuildApplicationCommandPermissions[]> {
     const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(guildId);
-    const cached = await redis.get(cacheKey);
+    const cached = await RedisService.withRedisConnection((redis) => redis.get(cacheKey));
 
     if (cached) {
       return JSON.parse(cached);
@@ -162,21 +170,29 @@ export class DiscordService {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch command permissions: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch command permissions: ${response.status} ${response.statusText}`
+      );
     }
 
-    const permissions = await response.json() as GuildApplicationCommandPermissions[];
+    const permissions =
+      (await response.json()) as GuildApplicationCommandPermissions[];
 
     // Cache for 5 minutes
-    await redis.setex(cacheKey, 300, JSON.stringify(permissions));
+    await RedisService.withRedisConnection((redis) => redis.setex(cacheKey, 300, JSON.stringify(permissions)));
 
     return permissions;
   }
 
   // Get application command permissions for a specific command
-  static async getCommandPermissions(guildId: string, commandId: string): Promise<GuildApplicationCommandPermissions | null> {
-    const allPermissions = await this.getGuildApplicationCommandPermissions(guildId);
-    return allPermissions.find(p => p.id === commandId) || null;
+  static async getCommandPermissions(
+    guildId: string,
+    commandId: string
+  ): Promise<GuildApplicationCommandPermissions | null> {
+    const allPermissions = await this.getGuildApplicationCommandPermissions(
+      guildId
+    );
+    return allPermissions.find((p) => p.id === commandId) || null;
   }
 
   // Update application command permissions
@@ -187,8 +203,8 @@ export class DiscordService {
   // - Ability to run the command being edited
   // - Permission to manage the resources that will be affected
   static async updateCommandPermissions(
-    guildId: string, 
-    commandId: string, 
+    guildId: string,
+    commandId: string,
     permissions: ApplicationCommandPermission[],
     sessionId: string
   ): Promise<GuildApplicationCommandPermissions> {
@@ -212,14 +228,17 @@ export class DiscordService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to update command permissions: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Failed to update command permissions: ${response.status} ${response.statusText} - ${errorText}`
+      );
     }
 
-    const result = await response.json() as GuildApplicationCommandPermissions;
+    const result =
+      (await response.json()) as GuildApplicationCommandPermissions;
 
     // Invalidate cache
     const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(guildId);
-    await redis.del(cacheKey);
+    await RedisService.withRedisConnection((redis) => redis.del(cacheKey));
 
     return result;
   }
@@ -248,16 +267,20 @@ export class DiscordService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to delete command permissions: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Failed to delete command permissions: ${response.status} ${response.statusText} - ${errorText}`
+      );
     }
 
     // Invalidate cache
     const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(guildId);
-    await redis.del(cacheKey);
+    await RedisService.withRedisConnection((redis) => redis.del(cacheKey));
   }
 
   // Get guild application commands (to get command IDs)
-  static async getGuildApplicationCommands(guildId: string): Promise<DiscordApplicationCommand[]> {
+  static async getGuildApplicationCommands(
+    guildId: string
+  ): Promise<DiscordApplicationCommand[]> {
     const response = await fetch(
       `${this.API_BASE}/applications/${config.discord.clientId}/guilds/${guildId}/commands`,
       {
@@ -268,9 +291,11 @@ export class DiscordService {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch guild commands: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch guild commands: ${response.status} ${response.statusText}`
+      );
     }
 
-    return await response.json() as DiscordApplicationCommand[];
+    return (await response.json()) as DiscordApplicationCommand[];
   }
 }

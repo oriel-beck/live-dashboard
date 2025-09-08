@@ -16,6 +16,7 @@ interface CommandInfo {
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
 import logger from "./logger";
+import { commandsExecuted, commandExecutionDuration, commandErrors } from "./metrics";
 
 export class CommandManager {
   private client: Client;
@@ -189,13 +190,36 @@ export class CommandManager {
         }
       }
 
-      // Execute the command
-      await command.execute(interaction);
-
-      // Log command usage
-      logger.debug(
-        `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name}`
-      );
+      // Execute the command with metrics tracking
+      const startTime = Date.now();
+      const guildId = interaction.guild?.id || 'dm';
+      
+      try {
+        await command.execute(interaction);
+        
+        // Record successful command execution
+        commandsExecuted.inc({ command_name: commandName, guild_id: guildId });
+        
+        // Log command usage
+        logger.debug(
+          `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name}`
+        );
+      } catch (error) {
+        // Record command error
+        const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
+        commandErrors.inc({ 
+          command_name: commandName, 
+          guild_id: guildId, 
+          error_type: errorType 
+        });
+        
+        logger.error(`[CommandManager] Error executing ${commandName}:`, error);
+        throw error; // Re-throw to be handled by outer catch
+      } finally {
+        // Record execution duration
+        const duration = (Date.now() - startTime) / 1000;
+        commandExecutionDuration.observe({ command_name: commandName, guild_id: guildId }, duration);
+      }
     } catch (error) {
       logger.error(`[CommandManager] Error executing ${commandName}:`, error);
 

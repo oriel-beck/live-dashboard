@@ -1,17 +1,20 @@
-import { NextFunction, Response } from 'express';
-import { AuthenticatedRequest, User } from '../types';
-import logger from '../utils/logger';
-import { DiscordService } from './discord';
-import { redis } from './redis';
+import { NextFunction, Response } from "express";
+import { AuthenticatedRequest, User } from "../types";
+import logger from "../utils/logger";
+import { DiscordService } from "./discord";
+import { redis, RedisService } from "./redis";
 
 export class SessionService {
   // Store user session data with partial data only
-  static async storeUserSession(sessionId: string, userData: {
-    user: User;
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-  }): Promise<void> {
+  static async storeUserSession(
+    sessionId: string,
+    userData: {
+      user: User;
+      accessToken: string;
+      refreshToken: string;
+      expiresIn: number;
+    }
+  ): Promise<void> {
     // Save only essential user data (remove sensitive/unnecessary fields)
     const partialUser = {
       id: userData.user.id,
@@ -25,16 +28,16 @@ export class SessionService {
       user: partialUser,
       accessToken: userData.accessToken,
       refreshToken: userData.refreshToken,
-      expiresAt: Date.now() + (userData.expiresIn * 1000), // Convert seconds to milliseconds
+      expiresAt: Date.now() + userData.expiresIn * 1000, // Convert seconds to milliseconds
       createdAt: new Date().toISOString(),
     };
 
     // Store session data in Redis with 7 day expiration
-    await redis.setex(
-      `session:${sessionId}`, 
+    await RedisService.withRedisConnection((redis) => redis.setex(
+      `session:${sessionId}`,
       7 * 24 * 60 * 60, // 7 days
       JSON.stringify(sessionData)
-    );
+    ));
   }
 
   // Retrieve user session data
@@ -46,14 +49,14 @@ export class SessionService {
     createdAt: string;
   } | null> {
     try {
-      const sessionData = await redis.get(`session:${sessionId}`);
+      const sessionData = await RedisService.withRedisConnection((redis) => redis.get(`session:${sessionId}`));
       if (!sessionData) {
         return null;
       }
 
       return JSON.parse(sessionData);
     } catch (error) {
-      logger.error('Error retrieving session data:', error);
+      logger.error("Error retrieving session data:", error);
       return null;
     }
   }
@@ -67,7 +70,7 @@ export class SessionService {
     createdAt: string;
   } | null> {
     const sessionData = await this.getUserSession(sessionId);
-    
+
     if (!sessionData) {
       return null;
     }
@@ -75,37 +78,42 @@ export class SessionService {
     // Check if token is expired (with 5 minute buffer)
     const now = Date.now();
     const bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
-    
+
     if (sessionData.expiresAt - now > bufferTime) {
       // Token is still valid, return current session
       return sessionData;
     }
 
     try {
-      logger.debug('Refreshing expired access token for user:', sessionData.user.id);
-      
+      logger.debug(
+        "Refreshing expired access token for user:",
+        sessionData.user.id
+      );
+
       // Refresh the access token
-      const newTokenData = await DiscordService.refreshAccessToken(sessionData.refreshToken);
-      
+      const newTokenData = await DiscordService.refreshAccessToken(
+        sessionData.refreshToken
+      );
+
       // Update session with new token data (guilds are stored separately in Redis cache)
       const updatedSessionData = {
         user: sessionData.user, // Keep existing partial user data
         accessToken: newTokenData.access_token,
         refreshToken: newTokenData.refresh_token,
-        expiresAt: Date.now() + (newTokenData.expires_in * 1000),
+        expiresAt: Date.now() + newTokenData.expires_in * 1000,
         createdAt: sessionData.createdAt,
       };
 
       // Update the session in Redis
-      await redis.setex(
+      await RedisService.withRedisConnection((redis) => redis.setex(
         `session:${sessionId}`,
         7 * 24 * 60 * 60, // 7 days
         JSON.stringify(updatedSessionData)
-      );
+      ));
 
       return updatedSessionData;
     } catch (error) {
-      logger.error('Failed to refresh token:', error);
+      logger.error("Failed to refresh token:", error);
       // If refresh fails, clear the session
       await this.clearUserSession(sessionId);
       return null;
@@ -114,7 +122,7 @@ export class SessionService {
 
   // Clear user session
   static async clearUserSession(sessionId: string): Promise<void> {
-    await redis.del(`session:${sessionId}`);
+    await RedisService.withRedisConnection((redis) => redis.del(`session:${sessionId}`));
   }
 
   // Generate a unique session ID
@@ -123,25 +131,40 @@ export class SessionService {
   }
 
   // Attach user to request from session
-  static async attachUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  static async attachUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    // Skip auth callback route - session doesn't exist yet during OAuth flow
+    if (req.path === "/auth/discord/callback") {
+      return next();
+    }
+
     const sessionId = req.cookies?.sessionId;
-    
+
     if (!sessionId) {
       return next();
     }
 
     try {
+      logger.debug("AttachUser middleware called", { 
+        path: req.path, 
+        sessionId: sessionId.substring(0, 20) + "..." 
+      });
+
       // Try to get session data, refreshing token if needed
       const sessionData = await this.refreshTokenIfNeeded(sessionId);
-      
+
       if (sessionData) {
+        logger.debug("Session data found, getting user guilds");
         // Get fresh guilds from Redis cache (will handle TTL automatically)
         const userGuilds = await DiscordService.getUserGuilds(sessionId);
-        
+
         // Attach user data with fresh guilds to the request
         req.user = {
           ...sessionData.user,
-          guilds: userGuilds
+          guilds: userGuilds,
         };
         req.sessionId = sessionId;
         req.sessionData = {
@@ -150,30 +173,38 @@ export class SessionService {
           refreshToken: sessionData.refreshToken,
           expiresAt: sessionData.expiresAt,
         };
+        logger.debug("User attached to request", { userId: sessionData.user.id });
+      } else {
+        logger.debug("No session data found");
       }
     } catch (error) {
-      logger.error('Error attaching user to request:', error);
-      // Clear invalid session
-      await this.clearUserSession(sessionId);
+      logger.error("Error attaching user to request:", error);
+      // Clear invalid session only if it exists
+      if (sessionId) {
+        await this.clearUserSession(sessionId);
+      }
     }
 
     next();
   }
 
   // Check if user has access to a guild
-  static async hasGuildAccess(guildId: string, sessionId: string): Promise<boolean> {
+  static async hasGuildAccess(
+    guildId: string,
+    sessionId: string
+  ): Promise<boolean> {
     const sessionData = await SessionService.refreshTokenIfNeeded(sessionId);
-    
+
     if (!sessionData) {
       return false;
     }
 
     // Get fresh guilds from Redis cache
     const userGuilds = await DiscordService.getUserGuilds(sessionId);
-    
+
     // Check if user has manage permissions for this guild
-    const userGuild = userGuilds.find(guild => guild.id === guildId);
-    
+    const userGuild = userGuilds.find((guild) => guild.id === guildId);
+
     if (!userGuild) {
       return false;
     }
@@ -185,13 +216,15 @@ export class SessionService {
 
     // Check for required permissions
     const permissions = BigInt(userGuild.permissions);
-    
+
     // Permission bits according to Discord API
-    const ADMINISTRATOR = BigInt(1 << 3);     // Admin permission (overrides all)
-    const MANAGE_GUILD = BigInt(1 << 5);      // Manage Server permission
-    
+    const ADMINISTRATOR = BigInt(1 << 3); // Admin permission (overrides all)
+    const MANAGE_GUILD = BigInt(1 << 5); // Manage Server permission
+
     // User must have either Administrator or Manage Server permission
-    return (permissions & ADMINISTRATOR) === ADMINISTRATOR || 
-           (permissions & MANAGE_GUILD) === MANAGE_GUILD;
+    return (
+      (permissions & ADMINISTRATOR) === ADMINISTRATOR ||
+      (permissions & MANAGE_GUILD) === MANAGE_GUILD
+    );
   }
 }

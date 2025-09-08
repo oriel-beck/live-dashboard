@@ -17,7 +17,7 @@ services:
     # Override the environment variables from the .env file
     environment:
       - NODE_ENV=production
-      - CORS_ORIGIN=http://dashboard:4200
+      - CORS_ORIGIN=http://localhost:4200
     env_file:
       - .env
     ports:

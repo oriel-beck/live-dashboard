@@ -1,0 +1,71 @@
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@discordbotplatform.com'
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+
+receivers:
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://localhost:5001/'
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'admin@discordbotplatform.com'
+        headers:
+          Subject: '[CRITICAL] Discord Bot Platform Alert'
+        html: |
+          <h2>Critical Alert: {{ .GroupLabels.alertname }}</h2>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          
+          <h3>Alert Details:</h3>
+          {{ range .Alerts }}
+          <ul>
+          {{ range .Labels.SortedPairs }}
+            <li><strong>{{ .Name }}:</strong> {{ .Value }}</li>
+          {{ end }}
+          </ul>
+          {{ end }}
+    webhook_configs:
+      - url: 'http://localhost:5001/critical'
+
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'devops@discordbotplatform.com'
+        headers:
+          Subject: '[WARNING] Discord Bot Platform Alert'
+        html: |
+          <h2>Warning Alert: {{ .GroupLabels.alertname }}</h2>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          
+          <h3>Alert Details:</h3>
+          {{ range .Alerts }}
+          <ul>
+          {{ range .Labels.SortedPairs }}
+            <li><strong>{{ .Name }}:</strong> {{ .Value }}</li>
+          {{ end }}
+          </ul>
+          {{ end }}
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance']

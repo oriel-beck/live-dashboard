@@ -32,6 +32,8 @@ router.get("/discord/callback", async (req: Request, res: Response) => {
   }
 
   try {
+    logger.info("OAuth callback started", { code: code.toString().substring(0, 10) + "..." });
+
     // Exchange code for access token
     const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
       method: "POST",
@@ -57,8 +59,11 @@ router.get("/discord/callback", async (req: Request, res: Response) => {
       expires_in: number;
     };
 
+    logger.info("Token exchange successful");
+
     // Get user info
-    const userInfo = await DiscordService.getUserInfo(tokenData.access_token);
+    const userInfo = await DiscordService.getUserInfoWithToken(tokenData.access_token);
+    logger.info("User info retrieved", { userId: userInfo.id, username: userInfo.username });
 
     // Store user session (guilds are cached separately in Redis)
     const sessionId = SessionService.generateSessionId();
@@ -69,6 +74,8 @@ router.get("/discord/callback", async (req: Request, res: Response) => {
       expiresIn: tokenData.expires_in,
     });
 
+    logger.info("Session stored", { sessionId: sessionId.substring(0, 20) + "..." });
+
     // Set session cookie
     setCookie(res, "sessionId", sessionId, {
       httpOnly: true,
@@ -78,6 +85,7 @@ router.get("/discord/callback", async (req: Request, res: Response) => {
       path: "/",
     });
 
+    logger.info("Redirecting to dashboard", { redirectUrl: `${config.corsOrigin}/servers?auth=success` });
     res.redirect(`${config.corsOrigin}/servers?auth=success`);
   } catch (error) {
     logger.error("OAuth callback error:", error);

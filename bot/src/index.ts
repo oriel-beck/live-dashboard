@@ -18,6 +18,8 @@ import { startDataSync } from "./utils/sync-data";
 import { CommandManager } from "./utils/command-manager";
 import { CommandLoader } from "./utils/command-loader";
 import logger from "./utils/logger";
+import { register, updateDiscordMetrics } from "./utils/metrics";
+import express from "express";
 
 // Limit collections so process RAM stays low. We rely on Redis as the real cache.
 const client = new Client({
@@ -92,12 +94,43 @@ async function initializeCommands() {
   }
 }
 
+// Setup metrics server
+function setupMetricsServer() {
+  const app = express();
+  const port = process.env.METRICS_PORT || 3001;
+  
+  app.get('/metrics', async (req: express.Request, res: express.Response) => {
+    try {
+      res.set('Content-Type', register.contentType);
+      res.end(await register.metrics());
+    } catch (error) {
+      res.status(500).end(String(error));
+    }
+  });
+  
+  app.get('/health', (req: express.Request, res: express.Response) => {
+    res.status(200).json({ status: 'healthy' });
+  });
+  
+  app.listen(port, () => {
+    logger.info(`[Metrics] Server running on port ${port}`);
+  });
+}
+
 // Start data sync and command system
 startDataSync(client);
 
 // Setup command system when bot is ready
 client.once('ready', async () => {
   logger.info(`Bot ready as ${client.user?.tag}`);
+  
+  // Update Discord metrics
+  updateDiscordMetrics(client);
+  
+  // Update Discord metrics periodically (every 5 minutes)
+  setInterval(() => {
+    updateDiscordMetrics(client);
+  }, 5 * 60 * 1000);
   
   // Load and register commands
   const commandsLoaded = await initializeCommands();
@@ -109,5 +142,8 @@ client.once('ready', async () => {
   logger.debug('Command framework initialized successfully!');
   logger.debug('Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script');
 });
+
+// Start metrics server
+setupMetricsServer();
 
 client.login(process.env.BOT_TOKEN!);
