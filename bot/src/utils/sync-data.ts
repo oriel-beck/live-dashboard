@@ -46,6 +46,26 @@ export function startDataSync(client: Client) {
     );
   });
 
+  client.on(Events.GuildUpdate, async (_oldGuild, newGuild) => {
+    // Update cached guild info
+    const key = REDIS_KEYS.GUILD_INFO(newGuild.id);
+    const guildInfo = {
+      id: newGuild.id,
+      name: newGuild.name,
+      icon: newGuild.icon,
+      owner_id: newGuild.ownerId,
+    };
+    
+    await redis.hset(key, guildInfo);
+    await redis.expire(key, CACHE_TTL.GUILD_BASICS);
+    
+    await publishGuildEvent(newGuild.id, {
+      type: "guild.update",
+      guildId: newGuild.id,
+      data: guildInfo,
+    });
+  });
+
   client.on(Events.GuildDelete, async (guild) => {
     // Remove from guild set
     await redis.srem(REDIS_KEYS.GUILD_SET, guild.id);

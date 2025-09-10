@@ -12,7 +12,7 @@ import { resolve } from "path";
 config({ path: resolve(__dirname, "../../.env") });
 
 // @ts-expect-error Add BigInt JSON serialization support
-BigInt.prototype.toJSON = function() {
+BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
@@ -36,12 +36,12 @@ async function deployGlobalCommands(
   // Get command data for Discord API with default permissions
   const commandData = commands.map((command) => {
     const baseData = command.data.toJSON();
-    
+
     // Set default member permissions based on command requirements
     // If no permissions required, allow all members (0)
     // If permissions required, use the permission bits
     const defaultMemberPermissions = command.defaultPermissions || 0n;
-    
+
     return {
       ...baseData,
       default_member_permissions: defaultMemberPermissions.toString(),
@@ -63,9 +63,13 @@ async function deployGlobalCommands(
   logger.debug(
     `[Deploy] Successfully deployed ${deployedCommands.length} commands globally!`
   );
-  logger.debug("[Deploy] Commands now use Discord's application command permissions system.");
-  logger.debug("[Deploy] Server admins can manage permissions via Discord's interface.");
-  
+  logger.debug(
+    "[Deploy] Commands now use Discord's application command permissions system."
+  );
+  logger.debug(
+    "[Deploy] Server admins can manage permissions via Discord's interface."
+  );
+
   return deployedCommands;
 }
 
@@ -73,7 +77,7 @@ async function registerCommandsInDatabase(
   localCommands: BaseCommand[],
   deployedCommands: ApplicationCommand[]
 ) {
-  const apiClient = new ApiClient('http://localhost:3000');
+  const apiClient = new ApiClient("http://localhost:3000");
   for (const deployedCmd of deployedCommands) {
     const localCommand = localCommands.find(
       (cmd) => cmd.name === deployedCmd.name
@@ -89,19 +93,18 @@ async function registerCommandsInDatabase(
     // Register main command (upsert - creates or updates)
     const mainCommandResponse = await apiClient.registerDefaultCommand({
       discordId: BigInt(deployedCmd.id),
-      name: deployedCmd.name,
-      description: deployedCmd.description,
-      cooldown: 0, // Default cooldown in seconds
-      permissions: localCommand.defaultPermissions.toString(),
+      name: localCommand.name,
+      description: localCommand.description,
+      cooldown: localCommand.cooldown,
+      permissions: localCommand.defaultPermissions,
       enabled: true,
       parentId: null,
+      categoryId: null,
     });
 
     const mainCommandId = Number(mainCommandResponse.data?.id);
     if (!mainCommandId) {
-      logger.error(
-        `[Deploy] Failed to register command: ${deployedCmd.name}`
-      );
+      logger.error(`[Deploy] Failed to register command: ${deployedCmd.name}`);
       continue;
     }
 
@@ -137,11 +140,12 @@ async function registerSubcommands(
       const groupResponse = await apiClient.registerDefaultCommand({
         name: option.name,
         description: option.description || "Subcommand group",
-        cooldown: 0, // Groups don't have cooldowns
-        permissions: parentCommand.defaultPermissions?.toString() || "0",
+        cooldown: parentCommand.cooldown, // Groups don't have cooldowns
+        permissions: parentCommand.defaultPermissions || 0n,
         enabled: true,
         parentId: parentId,
         discordId: null,
+        categoryId: null,
       });
 
       const groupId = groupResponse.data!.id;
@@ -157,11 +161,12 @@ async function registerSubcommands(
             await apiClient.registerDefaultCommand({
               name: subOption.name,
               description: subOption.description || "Subcommand",
-              cooldown: 0, // Default subcommand cooldown
-              permissions: parentCommand.defaultPermissions?.toString() || "0",
+              cooldown: parentCommand.cooldown, // Default subcommand cooldown
+              permissions: parentCommand.defaultPermissions || 0n,
               enabled: true,
               parentId: groupId,
               discordId: null,
+              categoryId: null,
             });
             logger.debug(
               `[Deploy] Registered nested subcommand: ${subOption.name}`
@@ -176,11 +181,12 @@ async function registerSubcommands(
       await apiClient.registerDefaultCommand({
         name: option.name,
         description: option.description || "Subcommand",
-        cooldown: 0, // Default subcommand cooldown
-        permissions: parentCommand.defaultPermissions?.toString() || "0",
+        cooldown: parentCommand.cooldown, // Default subcommand cooldown
+        permissions: parentCommand.defaultPermissions || 0n,
         enabled: true,
         parentId: parentId,
         discordId: null,
+        categoryId: null,
       });
       logger.debug(`[Deploy] Registered subcommand: ${option.name}`);
     }
@@ -233,4 +239,3 @@ if (require.main === module) {
 }
 
 export { deployCommands };
-

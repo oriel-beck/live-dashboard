@@ -12,12 +12,13 @@ if not exist ".env" (
     exit /b 1
 )
 
-REM Build shared types first (with proper package.json)
-echo Building shared types...
-cd shared-types
-call npm install
-call npm run build
-cd ..
+REM Check if sharding is disabled
+if "%USE_SHARDING%"=="false" (
+    echo Starting in SINGLE INSTANCE mode (sharding disabled)
+    echo To enable sharding (default), set USE_SHARDING=true or remove the variable
+) else (
+    echo Starting with SHARDING enabled (auto-scaling)
+)
 
 REM Start the development environment with Docker Compose watch
 echo Starting Docker Compose services with file watching...

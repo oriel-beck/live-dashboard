@@ -14,6 +14,7 @@ export abstract class BaseCommand {
   // Default Discord permission requirements for this command and all subcommands
   // These will be sent to the backend and used to set default_member_permissions
   defaultPermissions: bigint = 0n; // Discord permission bits (e.g., PermissionFlagsBits.ManageGuild)
+  cooldown: number = 0;
 
   // Main execution method that routes to appropriate handler
   async execute(interaction: ChatInputCommandInteraction): Promise<void> {

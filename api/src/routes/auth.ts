@@ -1,146 +1,280 @@
-import { Request, Response, Router } from "express";
-import { config } from "../config";
-import { DiscordService } from "../services/discord";
-import { SessionService } from "../services/session";
-import { AuthenticatedRequest, User } from "../types";
-import { clearCookie, setCookie } from "../utils/cookies";
-import logger from "../utils/logger";
+import {
+  DiscordLoginRequestSchema,
+  UserGuildSchema,
+  UserSchema
+} from '@discord-bot/shared-types';
+import { Elysia } from 'elysia';
+import { config } from '../config';
+import { authMetrics } from '../middleware/elysia-metrics';
+import { sessionMiddleware } from '../middleware/session';
+import { DiscordService } from '../services/discord';
+import { SessionService } from '../services/session';
+import { logger } from '../utils/logger';
 
-const router = Router();
+export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
+  .use(sessionMiddleware)
+  // POST /auth/login - Exchange Discord OAuth code for token
+  .post('/login', async ({ body, set }) => {
+    try {
+      const validatedBody = DiscordLoginRequestSchema.parse(body);
 
-// Redirect to Discord OAuth2
-router.get("/discord", (req: Request, res: Response) => {
-  const discordAuthUrl = new URL("https://discord.com/api/oauth2/authorize");
+      // Exchange code for token
+      const tokenData = await DiscordService.exchangeCodeForToken(validatedBody.code);
 
-  discordAuthUrl.searchParams.set("client_id", config.discord.clientId || "");
-  discordAuthUrl.searchParams.set("redirect_uri", config.discord.redirectUri);
-  discordAuthUrl.searchParams.set("response_type", "code");
-  discordAuthUrl.searchParams.set("scope", "identify guilds applications.commands.permissions.update");
+      // Get user info
+      const userData = await DiscordService.getUserInfo(tokenData.access_token);
 
-  res.redirect(discordAuthUrl.toString());
-});
+      // Record successful authentication
+      authMetrics.recordAttempt('discord', 'success');
 
-// Handle Discord OAuth2 callback
-router.get("/discord/callback", async (req: Request, res: Response) => {
-  const { code } = req.query;
+      return {
+        success: true,
+        data: {
+          user: userData,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token,
+          expiresIn: tokenData.expires_in,
+        },
+      };
+    } catch (error) {
+      logger.error('[Auth] Login error:', error);
 
-  if (!code) {
-    return res.status(400).json({
-      success: false,
-      error: "No authorization code provided",
-    });
-  }
+      // Record failed authentication
+      authMetrics.recordAttempt('discord', 'failure');
 
-  try {
-    logger.info("OAuth callback started", { code: code.toString().substring(0, 10) + "..." });
+      if (error instanceof Error && error.name === 'ZodError') {
+        set.status = 400;
+        return {
+          success: false,
+          error: 'Validation failed',
+          details: error.message,
+        };
+      }
 
-    // Exchange code for access token
-    const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        client_id: config.discord.clientId || "",
-        client_secret: config.discord.clientSecret || "",
-        grant_type: "authorization_code",
-        code: code as string,
-        redirect_uri: config.discord.redirectUri,
-      }),
-    });
-
-    if (!tokenResponse.ok) {
-      throw new Error("Failed to exchange code for token");
+      set.status = 401;
+      return {
+        success: false,
+        error: 'Authentication failed',
+      };
+    }
+  })
+  
+  // GET /auth/discord - OAuth redirect endpoint
+  .get('/discord', async ({ set }) => {
+    try {
+      const discordAuthUrl = DiscordService.getDiscordAuthUrl();
+      set.status = 302;
+      set.headers['Location'] = discordAuthUrl;
+      return {};
+    } catch (error) {
+      logger.error('[Auth] Discord redirect error:', error);
+      set.status = 500;
+      return {
+        success: false,
+        error: 'Failed to generate Discord auth URL',
+      };
+    }
+  })
+  
+  // GET /auth/discord/callback - OAuth callback endpoint
+  .get('/discord/callback', async ({ query, set, cookie }) => {
+    try {
+      const { code, error, state } = query;
+      
+      if (error) {
+        logger.error('[Auth] Discord OAuth error:', error);
+        set.status = 302;
+        set.headers['Location'] = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/auth/error?error=${encodeURIComponent(error)}`;
+        return {};
+      }
+      
+      if (!code) {
+        set.status = 302;
+        set.headers['Location'] = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/auth/error?error=no_code`;
+        return {};
+      }
+      
+      // Exchange code for token
+      const tokenData = await DiscordService.exchangeCodeForToken(code);
+      
+      // Get user info
+      const userData = await DiscordService.getUserInfo(tokenData.access_token);
+      
+      // Create session data
+      const sessionData = {
+        user: {
+          id: userData.id,
+          username: userData.username,
+          discriminator: userData.discriminator,
+          avatar: userData.avatar,
+          email: userData.email || undefined,
+        },
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresIn: tokenData.expires_in, // Use Discord token expiry
+        expiresAt: Date.now() + (tokenData.expires_in * 1000), // Convert seconds to milliseconds
+      };
+      
+      // Save session to Redis
+      const sessionId = await SessionService.storeUserSession(sessionData);
+      
+      // Set session cookie
+      cookie.session.set({
+        value: sessionId,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: config.session.maxAge / 1000, // Convert to seconds
+        path: '/',
+      });
+      
+      // Record successful authentication
+      authMetrics.recordAttempt('discord', 'success');
+      
+      // Redirect to dashboard
+      const redirectUrl = state ? decodeURIComponent(state) : `${process.env.FRONTEND_URL || 'http://localhost:4200'}/dashboard`;
+      set.status = 302;
+      set.headers['Location'] = redirectUrl;
+      return {};
+    } catch (error) {
+      logger.error('[Auth] Discord callback error:', error);
+      
+      // Record failed authentication
+      authMetrics.recordAttempt('discord', 'failure');
+      
+      set.status = 302;
+      set.headers['Location'] = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/auth/error?error=callback_failed`;
+      return {};
+    }
+  })
+  
+  // POST /auth/logout - Logout endpoint (Dashboard needs this)
+  .post('/logout', async () => {
+    try {
+      // Clear any session data if needed
+      // For now, just return success
+      return {
+        success: true,
+        message: 'Logged out successfully',
+      };
+    } catch (error) {
+      logger.error('[Auth] Logout error:', error);
+      return {
+        success: false,
+        error: 'Failed to logout',
+      };
+    }
+  })
+  
+  // GET /auth/user - Get current user info (Dashboard expects this)
+  .get('/user', async ({ cookie, set }) => {
+    const sessionId = cookie.session?.value;
+    
+    if (!sessionId) {
+      set.status = 401;
+      return {
+        success: false,
+        error: 'Session required',
+      };
     }
 
-    const tokenData = (await tokenResponse.json()) as {
-      access_token: string;
-      refresh_token: string;
-      expires_in: number;
-    };
+    try {
+      // Get a valid access token (refreshes if needed)
+      const accessToken = await SessionService.getValidAccessToken(sessionId);
+      
+      if (!accessToken) {
+        set.status = 401;
+        return {
+          success: false,
+          error: 'Invalid or expired session',
+        };
+      }
 
-    logger.info("Token exchange successful");
+      // Get fresh user data from Discord
+      const userData = await DiscordService.getUserInfo(accessToken);
+      const userGuilds = await DiscordService.getUserGuilds(accessToken);
 
-    // Get user info
-    const userInfo = await DiscordService.getUserInfoWithToken(tokenData.access_token);
-    logger.info("User info retrieved", { userId: userInfo.id, username: userInfo.username });
+      // Format user data according to UserSchema
+      const formattedUser = UserSchema.parse({
+        id: userData.id,
+        username: userData.username,
+        discriminator: userData.discriminator,
+        avatar: userData.avatar,
+        email: userData.email,
+        guilds: userGuilds.map((guild) => UserGuildSchema.parse(guild)),
+      });
 
-    // Store user session (guilds are cached separately in Redis)
-    const sessionId = SessionService.generateSessionId();
-    await SessionService.storeUserSession(sessionId, {
-      user: userInfo as User,
-      accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token,
-      expiresIn: tokenData.expires_in,
-    });
+      return {
+        success: true,
+        data: formattedUser,
+      };
+    } catch (error) {
+      logger.error('[Auth] User error:', error);
 
-    logger.info("Session stored", { sessionId: sessionId.substring(0, 20) + "..." });
+      if (error instanceof Error && error.name === 'ZodError') {
+        set.status = 400;
+        return {
+          success: false,
+          error: 'Validation failed',
+          details: error.message,
+        };
+      }
 
-    // Set session cookie
-    setCookie(res, "sessionId", sessionId, {
-      httpOnly: true,
-      secure: config.nodeEnv === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: "lax",
-      path: "/",
-    });
+      set.status = 401;
+      return {
+        success: false,
+        error: 'Failed to get user info',
+      };
+    }
+  })
+  
+  // GET /auth/user/guilds - Get user guilds endpoint (Dashboard needs this)
+  .get('/user/guilds', async ({ cookie, set }) => {
+    const sessionId = cookie.session?.value;
+    
+    if (!sessionId) {
+      set.status = 401;
+      return {
+        success: false,
+        error: 'Session required',
+      };
+    }
 
-    logger.info("Redirecting to dashboard", { redirectUrl: `${config.corsOrigin}/servers?auth=success` });
-    res.redirect(`${config.corsOrigin}/servers?auth=success`);
-  } catch (error) {
-    logger.error("OAuth callback error:", error);
-    res.redirect(`${config.corsOrigin}?auth=error`);
-  }
-});
+    try {
+      // Get a valid access token (refreshes if needed)
+      const accessToken = await SessionService.getValidAccessToken(sessionId);
+      
+      if (!accessToken) {
+        set.status = 401;
+        return {
+          success: false,
+          error: 'Invalid or expired session',
+        };
+      }
 
-// Get current user info
-router.get("/user", (req: Request, res: Response) => {
-  const authReq = req as AuthenticatedRequest;
-  if (!authReq.user) {
-    return res.status(401).json({
-      success: false,
-      error: "Not authenticated",
-    });
-  }
+      const userGuilds = await DiscordService.getUserGuilds(accessToken);
+      const guilds = userGuilds.map((guild) => UserGuildSchema.parse(guild));
 
-  res.json({
-    success: true,
-    data: authReq.user,
+      return {
+        success: true,
+        data: guilds,
+      };
+    } catch (error) {
+      logger.error('[Auth] User guilds error:', error);
+
+      if (error instanceof Error && error.name === 'ZodError') {
+        set.status = 400;
+        return {
+          success: false,
+          error: 'Validation failed',
+          details: error.message,
+        };
+      }
+
+      set.status = 401;
+      return {
+        success: false,
+        error: 'Failed to get user guilds',
+      };
+    }
   });
-});
-
-// Get user's accessible guilds
-router.get("/user/guilds", (req: Request, res: Response) => {
-  const authReq = req as AuthenticatedRequest;
-  if (!authReq.user) {
-    return res.status(401).json({
-      success: false,
-      error: "Not authenticated",
-    });
-  }
-
-  // Guilds are already filtered in attachUser middleware
-  res.json({
-    success: true,
-    data: authReq.user.guilds || [],
-  });
-});
-
-// Logout
-router.post("/logout", async (req: Request, res: Response) => {
-  const sessionId = req.cookies?.sessionId;
-
-  if (sessionId) {
-    await SessionService.clearUserSession(sessionId);
-  }
-
-  // Clear session cookie
-  clearCookie(res, "sessionId", "/");
-
-  res.json({
-    success: true,
-    message: "Logged out successfully",
-  });
-});
-
-export default router;

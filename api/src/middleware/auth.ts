@@ -1,112 +1,179 @@
-import { Request, Response, NextFunction } from "express";
-import { AuthenticatedRequest } from "../types";
-import { SessionService } from "../services/session";
+import { Elysia } from 'elysia';
+import { DiscordService } from '../services/discord';
+import { logger } from '../utils/logger';
 
-// Middleware to check if user is authenticated OR if it's a bot request
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const authReq = req as AuthenticatedRequest;
-  
-  // Check if it's a bot request first
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    const expectedToken = process.env.BOT_TOKEN;
+// Auth middleware for user authentication
+export const userAuth = new Elysia({ name: 'userAuth' })
+  .derive(async ({ headers, set }) => {
+    const authHeader = headers.authorization;
     
-    if (expectedToken && token === expectedToken) {
-      // Mark request as bot-authenticated
-      authReq.isBotRequest = true;
-      return next();
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401;
+      return {
+        error: 'Authorization header required',
+        user: null as any,
+        token: null as string | null
+      };
     }
-  }
-  
-  // If not a bot request, check for user authentication
-  if (!authReq.user) {
-    return res.status(401).json({
-      success: false,
-      error: "Authentication required",
-    });
-  }
-  
-  next();
-}
 
-// Middleware to check if user has access to a specific guild
-export async function requireGuildAccess(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  const authReq = req as AuthenticatedRequest;
-  
-  // Allow bot requests to bypass user authentication
-  if (authReq.isBotRequest) {
-    return next();
-  }
-  
-  if (!authReq.user) {
-    return res.status(401).json({
-      success: false,
-      error: "Authentication required",
-    });
-  }
+    try {
+      const token = authHeader.substring(7);
+      const userData = await DiscordService.getUserInfo(token);
+      
+      return {
+        user: userData,
+        token,
+        error: null
+      };
+    } catch (error) {
+      logger.error('[Auth] User authentication failed:', error);
+      set.status = 401;
+      return {
+        error: 'Invalid or expired token',
+        user: null as any,
+        token: null as string | null
+      };
+    }
+  });
 
-  const guildId = req.params.guildId || req.params.serverId;
-  if (!guildId) {
-    return res.status(400).json({
-      success: false,
-      error: "Guild ID is required",
-    });
-  }
+// Auth middleware for bot authentication
+export const botAuth = new Elysia({ name: 'botAuth' })
+  .derive(async ({ headers, set }) => {
+    const authHeader = headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401;
+      return {
+        error: 'Authorization header required',
+        isBot: false,
+        token: null
+      };
+    }
 
-  const hasAccess = await SessionService.hasGuildAccess(
-    guildId,
-    authReq.sessionId || ""
-  );
+    try {
+      const token = authHeader.substring(7);
+      
+      // Check if token is the bot token
+      if (token === process.env.BOT_TOKEN) {
+        return {
+          isBot: true,
+          token,
+          error: null
+        };
+      }
+      
+      set.status = 401;
+      return {
+        error: 'Invalid bot token',
+        isBot: false,
+        token: null
+      };
+    } catch (error) {
+      logger.error('[Auth] Bot authentication failed:', error);
+      set.status = 401;
+      return {
+        error: 'Invalid bot token',
+        isBot: false,
+        token: null
+      };
+    }
+  });
 
-  if (!hasAccess) {
-    return res.status(403).json({
-      success: false,
-      error: "You do not have access to this server",
-    });
-  }
+// Guild access middleware - checks if user has access to a specific guild
+export const guildAccess = new Elysia({ name: 'guildAccess' })
+  .derive(async ({ headers, params, set }) => {
+    const authHeader = headers.authorization;
+    const guildId = (params as any).guildId;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401;
+      return {
+        error: 'Authorization header required',
+        hasAccess: false
+      };
+    }
 
-  next();
-}
+    try {
+      const token = authHeader.substring(7);
+      
+      // Check if it's bot token (bot bypasses guild access checks)
+      if (token === process.env.BOT_TOKEN) {
+        return {
+          hasAccess: true,
+          error: null
+        };
+      }
+      
+      // For user tokens, check guild access
+      const userGuilds = await DiscordService.getUserGuilds(token);
+      const hasAccess = await DiscordService.checkGuildAccess(guildId, userGuilds);
+      
+      if (!hasAccess) {
+        set.status = 403;
+        return {
+          error: 'Access denied to this guild',
+          hasAccess: false
+        };
+      }
+      
+      return {
+        hasAccess: true,
+        error: null
+      };
+    } catch (error) {
+      logger.error(`[Auth] Guild access check failed for guild ${guildId}:`, error);
+      set.status = 403;
+      return {
+        error: 'Failed to verify guild access',
+        hasAccess: false
+      };
+    }
+  });
 
-// Middleware to check if request is from the bot (internal API call)
-export function requireBotAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      error: "Bot token required",
-    });
-  }
-  
-  const token = authHeader.substring(7);
-  const expectedToken = process.env.BOT_TOKEN;
-  
-  if (!expectedToken || token !== expectedToken) {
-    return res.status(401).json({
-      success: false,
-      error: "Invalid bot token",
-    });
-  }
-  
-  // Mark request as bot-authenticated
-  const authReq = req as AuthenticatedRequest;
-  authReq.isBotRequest = true;
-  next();
-}
+// Combined auth middleware - accepts either user or bot auth
+export const anyAuth = new Elysia({ name: 'anyAuth' })
+  .derive(async ({ headers, set }) => {
+    const authHeader = headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401;
+      return {
+        error: 'Authorization header required',
+        user: null,
+        isBot: false,
+        token: null
+      };
+    }
 
-// Middleware to attach user to request from session
-export async function attachUser(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  const authReq = req as AuthenticatedRequest;
-  const { SessionService } = await import("../services/session");
-  await SessionService.attachUser(authReq, res, next);
-}
+    try {
+      const token = authHeader.substring(7);
+      
+      // Check if it's bot token first
+      if (token === process.env.BOT_TOKEN) {
+        return {
+          isBot: true,
+          user: null,
+          token,
+          error: null
+        };
+      }
+      
+      // Otherwise, try user authentication
+      const userData = await DiscordService.getUserInfo(token);
+      return {
+        user: userData,
+        isBot: false,
+        token,
+        error: null
+      };
+    } catch (error) {
+      logger.error('[Auth] Authentication failed:', error);
+      set.status = 401;
+      return {
+        error: 'Invalid or expired token',
+        user: null,
+        isBot: false,
+        token: null
+      };
+    }
+  });

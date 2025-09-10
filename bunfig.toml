@@ -1,0 +1,15 @@
+[install]
+# Use npm registry for packages
+registry = "https://registry.npmjs.org/"
+
+[install.cache]
+# Disable cache for development to ensure fresh installs
+disable = false
+
+[run]
+# Enable hot reload for development
+bun = "--watch"
+
+[test]
+# Test configuration
+preload = ["./test/setup.ts"]

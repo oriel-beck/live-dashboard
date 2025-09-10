@@ -12,7 +12,7 @@ services:
         - path: ./api/package.json
           target: /app/package.json
           action: sync
-    command: ["sh", "./startup.sh"]
+    command: ["bun", "run", "dev"]
     depends_on: 
       - redis
       - postgres
@@ -38,12 +38,17 @@ services:
         - path: ./bot/src
           target: /app/src
           action: sync
-    command: ["npm", "run", "dev"]
+    command: ["bun", "run", "dev"]
     depends_on: 
       - redis
       - api
+    environment:
+      - METRICS_PORT=30000  # Base port for shard 0
+      - USE_SHARDING=${USE_SHARDING:-true}
     env_file:
       - .env
+    ports:
+      - "30000:30000"  # Shard manager metrics API
     restart: unless-stopped
 
   dashboard:

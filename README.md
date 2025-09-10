@@ -2,7 +2,22 @@
 
 A comprehensive Discord bot management platform consisting of three containerized services: a Discord bot, REST API, and Angular dashboard. The system uses Redis for real-time data synchronization and PostgreSQL for persistent storage.
 
+## ⚡ Powered by Bun
+
+This project uses [Bun](https://bun.sh) as the JavaScript runtime instead of Node.js, providing:
+- **Faster startup times** - Up to 3x faster than Node.js
+- **Native TypeScript support** - No compilation step required
+- **Built-in hot reload** - Automatic file watching and restart
+- **Faster package installation** - Bun's package manager is significantly faster
+- **Better memory usage** - More efficient resource utilization
+
 ## 🚀 Quick Start
+
+### Prerequisites
+
+- **Docker & Docker Compose** - For containerized development
+- **Bun** - JavaScript runtime (install from [bun.sh](https://bun.sh))
+- **Git** - For cloning the repository
 
 ### Development Mode (Recommended for development)
 
@@ -18,11 +33,11 @@ start-dev.bat           # Windows
 ```
 
 **Features:**
-- 🔄 Live reloading for all services
+- 🔄 Live reloading for all services with Bun's built-in watch mode
 - 📦 Shared types built locally and mounted as volumes
-- 🐳 Docker Compose development environment
-- 🎯 Hot reload for API, Bot, and Dashboard
-- ⚡ Fast builds (no Docker duplication)
+- 🐳 Docker Compose development environment with Bun runtime
+- 🎯 Hot reload for API, Bot, and Dashboard (TypeScript runs directly)
+- ⚡ Fast builds and startup (Bun's performance optimizations)
 
 **Optional:** Run `watch-shared-types.sh` (Linux/Mac) or `watch-shared-types.bat` (Windows) in another terminal to automatically rebuild shared types when they change.
 

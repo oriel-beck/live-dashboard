@@ -54,6 +54,7 @@ export const redisConnectionStatus = new Gauge({
 export const guildCount = new Gauge({
   name: 'guild_count',
   help: 'Number of guilds the bot is in',
+  labelNames: ['shard_id'],
 });
 
 // Removed user count - not useful with limited caching
@@ -80,7 +81,8 @@ setInterval(() => {
 
 // Update Discord client metrics
 export const updateDiscordMetrics = (client: Client) => {
-  guildCount.set(client.guilds.cache.size);
+  const shardId = client.shard?.ids?.[0] ?? 0;
+  guildCount.set({ shard_id: shardId.toString() }, client.guilds.cache.size);
 };
 
 // Export the register for use in metrics endpoint

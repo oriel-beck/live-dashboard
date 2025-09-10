@@ -35,12 +35,41 @@ docker-compose -f docker-compose.dev-with-monitoring.yml up -d
 - **Alertmanager**: http://localhost:9093
 - **Loki**: http://localhost:3100
 
+## Centralized Metrics Architecture
+
+The bot uses **centralized metrics** for efficient monitoring:
+
+1. **Shard Manager** runs on port `30000` and exposes the metrics API
+2. **Individual shards** send their metrics to the manager via HTTP POST
+3. **Shard Manager** stores and aggregates metrics from all shards
+4. **Prometheus** scrapes only the shard manager's `/metrics` endpoint
+
+This means:
+- **Single endpoint** for all bot metrics (`http://bot:30000/metrics`)
+- **No port conflicts** - only the manager exposes ports
+- **Automatic shard labeling** - each metric includes `shard_id` label
+- **Efficient resource usage** - no multiple HTTP servers
+- **Reliable communication** - shards push metrics every 10 seconds
+
+## Debugging Metrics Aggregation
+
+If metrics aren't being aggregated properly, check:
+
+1. **View aggregated metrics**: `http://localhost:30000/metrics`
+2. **Check bot logs** for shard communication errors
+3. **Verify shard manager** is receiving metrics from shards
+
+The system will show you:
+- Which shards are sending metrics to the manager
+- Any communication errors between shards and manager
+- Metrics aggregation status in the logs
+
 ## Metrics Endpoints
 
 The following services expose metrics:
 
 - **API**: `http://api:3000/metrics`
-- **Bot**: `http://bot:3001/metrics`
+- **Bot (All Shards)**: `http://bot:30000/metrics` (aggregated)
 - **Node Exporter**: `http://node-exporter:9100/metrics`
 - **cAdvisor**: `http://cadvisor:8080/metrics`
 - **Redis Exporter**: `http://redis-exporter:9121/metrics`
@@ -133,8 +162,8 @@ The main dashboard includes:
    # Test API metrics
    curl http://localhost:3000/metrics
    
-   # Test bot metrics (if running)
-   curl http://localhost:3001/metrics
+   # Test aggregated bot metrics (all shards)
+   curl http://localhost:30000/metrics
    ```
 
 4. **Check logs**:

@@ -1,99 +1,44 @@
-import { Request, Response, Router } from 'express';
-import { DefaultCommandService } from '../database';
-import { requireAuth, requireBotAuth } from '../middleware/auth';
-import logger from '../utils/logger';
+import { Elysia } from 'elysia';
+import { DatabaseService } from '../services/database';
+import { botAuth } from '../middleware/auth';
+import { 
+  DefaultCommandRegistrationSchema
+} from '@discord-bot/shared-types';
+import { logger } from '../utils/logger';
 
-const router = Router();
+export const commandPlugin = new Elysia({ name: 'command' })
+  // Bot-only command registration routes
+  .group('/commands', (app) => app
+    .use(botAuth)
+    // POST /commands/register - Register a default command (Bot only)
+    .post('/register', async ({ body, set }) => {
+      try {
+        const validatedCommand = DefaultCommandRegistrationSchema.parse(body);
+        
+        // Register the command in the database
+        const result = await DatabaseService.upsertDefaultCommand(validatedCommand);
+        
+        return {
+          success: true,
+          data: result,
+        };
+      } catch (error) {
+        logger.error('[Commands] Registration error:', error);
 
-// Register a default command (called by deploy script)
-router.post('/register', requireBotAuth, async (req: Request, res: Response) => {
-  try {
-    const {
-      discordId,
-      name,
-      description,
-      cooldown,
-      permissions,
-      enabled,
-      parentId,
-    } = req.body;
+        if (error instanceof Error && error.name === 'ZodError') {
+          set.status = 400;
+          return {
+            success: false,
+            error: 'Validation failed',
+            details: error.message,
+          };
+        }
 
-    const command = await DefaultCommandService.upsertDefaultCommand({
-      discordId: discordId ? BigInt(discordId) : null,
-      name,
-      description,
-      cooldown: cooldown || 0,
-      permissions: BigInt(permissions || 0),
-      enabled: enabled ?? true,
-      parentId: parentId ? +parentId : null,
-    });
-
-    res.json({
-      success: true,
-      message: 'Command registered successfully',
-      data: {
-        id: command.id.toString(),
-        discordId: command.discordId?.toString(),
-        name: command.name,
-        description: command.description,
-        cooldown: command.cooldown,
-        permissions: command.permissions.toString(),
-        enabled: command.enabled,
-        parentId: command.parentId?.toString(),
-        createdAt: command.createdAt,
-        updatedAt: command.updatedAt,
-      },
-    });
-  } catch (error) {
-    logger.error('Error registering default command:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to register command'
-    });
-  }
-});
-
-// Get all default commands (for dashboard)
-router.get('/', requireAuth, async (req: Request, res: Response) => {
-  try {
-    const commands = await DefaultCommandService.getAllMainCommands();
-    
-    res.json({
-      success: true,
-      data: commands
-    });
-  } catch (error) {
-    logger.error('Error fetching commands:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch commands'
-    });
-  }
-});
-
-// Get command by ID
-router.get('/:commandId', requireAuth, async (req: Request, res: Response) => {
-  try {
-    const command = await DefaultCommandService.getCommandByDiscordId(BigInt(req.params.commandId));
-    
-    if (!command) {
-      return res.status(404).json({
-        success: false,
-        error: 'Command not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: command
-    });
-  } catch (error) {
-    logger.error('Error fetching command:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch command'
-    });
-  }
-});
-
-export default router;
+        set.status = 500;
+        return {
+          success: false,
+          error: 'Failed to register command',
+        };
+      }
+    })
+  );

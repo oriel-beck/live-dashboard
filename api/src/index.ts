@@ -3,57 +3,14 @@ BigInt.prototype.toJSON = function() {
   return this.toString();
 };
 
-import { createApp } from './app';
-import { config } from './config';
-import logger from './utils/logger';
-import { prisma } from './database';
+// Import reflect-metadata for TypeORM decorators
+import 'reflect-metadata';
 
-// Start server
-async function startServer() {
-  try {
-    logger.info("[API] Starting server...");
+import { validateConfig } from './config';
+import { startServer } from './app';
 
-    // Create Express app
-    const app = createApp();
-
-    // Start server
-    const server = app.listen(config.port, () => {
-      logger.info(`[API] Server listening on port ${config.port}`);
-      logger.info(`[API] Environment: ${config.nodeEnv}`);
-      logger.debug(`[API] CORS Origin: ${config.corsOrigin}`);
-    });
-
-    // Graceful shutdown handlers
-    const gracefulShutdown = async (signal: string) => {
-      logger.info(`[API] Received ${signal}, shutting down gracefully...`);
-      server.close(async () => {
-        logger.info("[API] HTTP server closed");
-        await prisma.$disconnect();
-        logger.info("[API] Database connections closed");
-        process.exit(0);
-      });
-    };
-
-    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-    
-    // Handle uncaught exceptions and unhandled rejections
-    process.on("uncaughtException", (error) => {
-      logger.error("[API] Uncaught Exception:", error);
-      gracefulShutdown("UNCAUGHT_EXCEPTION");
-    });
-
-    process.on("unhandledRejection", (reason, promise) => {
-      logger.error("[API] Unhandled Rejection at:", promise, "reason:", reason);
-      gracefulShutdown("UNHANDLED_REJECTION");
-    });
-
-    return server;
-  } catch (error) {
-    logger.error("[API] Failed to start server:", error);
-    process.exit(1);
-  }
-}
+// Validate configuration
+validateConfig();
 
 // Start the server
 startServer();

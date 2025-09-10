@@ -6,7 +6,7 @@ export const UserGuildSchema = z.object({
   name: z.string(),
   icon: z.string().nullable(),
   owner: z.boolean(),
-  permissions: z.string(),
+  permissions: z.union([z.string(), z.number()]).transform(val => val.toString()),
   features: z.array(z.string()).optional(),
   botHasAccess: z.boolean().optional(),
 });
@@ -21,14 +21,6 @@ export const UserSchema = z.object({
   guilds: z.array(UserGuildSchema).optional(),
 });
 
-// Session Data Schema
-export const SessionDataSchema = z.object({
-  userId: z.string().optional(),
-  accessToken: z.string().optional(),
-  refreshToken: z.string().optional(),
-  expiresAt: z.number().optional(),
-});
-
 // Auth State Schema
 export const AuthStateSchema = z.object({
   user: UserSchema.nullable(),
@@ -40,5 +32,4 @@ export const AuthStateSchema = z.object({
 // Export types
 export type UserGuild = z.infer<typeof UserGuildSchema>;
 export type User = z.infer<typeof UserSchema>;
-export type SessionData = z.infer<typeof SessionDataSchema>;
 export type AuthState = z.infer<typeof AuthStateSchema>;

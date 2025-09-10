@@ -22,7 +22,7 @@ export const GuildChannelSchema = z.object({
   permission_overwrites: z.array(z.unknown()),
 });
 
-// Guild Info Schema
+// Guild Info Schema (simplified for our use)
 export const GuildInfoSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -30,40 +30,18 @@ export const GuildInfoSchema = z.object({
   owner_id: z.string(),
 });
 
-// Cached Guild Role Schema
-export const CachedGuildRoleSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  position: z.number(),
-  color: z.number(),
-  permissions: z.string(),
-  managed: z.boolean(),
-  lastUpdated: z.number(),
-});
-
-// Cached Guild Channel Schema
-export const CachedGuildChannelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  type: z.number(),
-  parentId: z.string().nullable(),
-  position: z.number(),
-  lastUpdated: z.number(),
-});
-
-// Cached Guild Info Schema
-export const CachedGuildInfoSchema = z.object({
+// Minimal Guild Schema (only fields we actually use)
+export const GuildSchema = z.object({
   id: z.string(),
   name: z.string(),
   icon: z.string().nullable(),
-  owner: z.boolean(),
-  lastUpdated: z.number(),
+  owner_id: z.string(),
+  owner: z.boolean().optional(),
+  permissions: z.string().optional(),
 });
 
 // Export types
 export type GuildRole = z.infer<typeof GuildRoleSchema>;
 export type GuildChannel = z.infer<typeof GuildChannelSchema>;
 export type GuildInfo = z.infer<typeof GuildInfoSchema>;
-export type CachedGuildRole = z.infer<typeof CachedGuildRoleSchema>;
-export type CachedGuildChannel = z.infer<typeof CachedGuildChannelSchema>;
-export type CachedGuildInfo = z.infer<typeof CachedGuildInfoSchema>;
+export type Guild = z.infer<typeof GuildSchema>;

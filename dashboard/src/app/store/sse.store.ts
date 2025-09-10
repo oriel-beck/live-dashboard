@@ -11,7 +11,6 @@ import { tapResponse } from '@ngrx/operators';
 import { injectParams } from 'ngxtension/inject-params';
 import { environment } from '../../environments/environment';
 import { computed, inject } from '@angular/core';
-import { GuildService } from '../core/services/guild.service';
 import { pipe, switchMap } from 'rxjs';
 import { Router } from '@angular/router';
 import {
@@ -88,6 +87,37 @@ export const CacheStore = signalStore(
           });
         });
 
+        source.addEventListener('initial', (evt: MessageEvent) => {
+          try {
+            patchState(store, {
+              lastEvent: 'initial',
+            });
+            const event = JSON.parse(evt.data);
+            
+            console.log('[DEBUG] Initial event data:', event);
+            
+            patchState(store, {
+              guildInfo: event.guildInfo,
+              roles: event.roles,
+              channels: event.channels,
+              commands: (
+                event.commands as CommandConfigResultWithCategory[]
+              ).reduce((acc, command) => {
+                acc.set(command.id, command);
+                return acc;
+              }, new Map<number, CommandConfigResultWithCategory>()),
+              commandPermissions: (
+                event.commandPermissions as GuildApplicationCommandPermissions[]
+              ).reduce((acc, permission) => {
+                acc.set(permission.id, permission);
+                return acc;
+              }, new Map<string, GuildApplicationCommandPermissions>()),
+            });
+          } catch (error) {
+            console.error('[Dashboard] Error processing initial event:', error);
+          }
+        });
+
         source.addEventListener('update', (evt: MessageEvent) => {
           try {
             patchState(store, {
@@ -96,51 +126,6 @@ export const CacheStore = signalStore(
             const event = JSON.parse(evt.data);
 
             switch (event.type) {
-              case 'command.config.update':
-                const copy = new Map(store.commands());
-                const command = copy.get(event.command.id);
-                if (!command) {
-                  console.error(
-                    `[Dashboard] Command ${event.command.id} not found in cache`
-                  );
-                  break;
-                }
-
-                const { command: evCommand, subcommand } = event;
-                const newCommand = {
-                  ...command,
-                  ...evCommand,
-                };
-
-                if (subcommand) {
-                  newCommand.subcommands[subcommand.name] = subcommand;
-                }
-
-                copy.set(event.command.id, newCommand);
-
-                patchState(store, {
-                  commands: copy,
-                });
-                break;
-              case 'initial':
-                patchState(store, {
-                  guildInfo: event.guildInfo,
-                  roles: event.roles,
-                  channels: event.channels,
-                  commands: (
-                    event.commands as CommandConfigResultWithCategory[]
-                  ).reduce((acc, command) => {
-                    acc.set(command.id, command);
-                    return acc;
-                  }, new Map<number, CommandConfigResultWithCategory>()),
-                  commandPermissions: (
-                    event.commandPermissions as GuildApplicationCommandPermissions[]
-                  ).reduce((acc, permission) => {
-                    acc.set(permission.id, permission);
-                    return acc;
-                  }, new Map<string, GuildApplicationCommandPermissions>()),
-                });
-                break;
               case 'guild_fetch_failed':
                 console.error(
                   `[Dashboard] Guild fetch failed for ${event.guildId}:`,
@@ -194,6 +179,11 @@ export const CacheStore = signalStore(
                     .filter((role) => role.id !== event.roleId),
                 });
                 break;
+              case 'guild.update':
+                patchState(store, {
+                  guildInfo: event.data,
+                });
+                break;
               case 'command.permissions.update':
                 const copyPermissions = new Map(store.commandPermissions());
                 const data = copyPermissions.get(event.commandId);
@@ -225,8 +215,6 @@ export const CacheStore = signalStore(
     return obj;
   }),
   withMethods((store) => {
-    const guildService = inject(GuildService);
-
     const obj = {};
     return obj;
   }),
@@ -236,7 +224,7 @@ export const CacheStore = signalStore(
         return Array.from(store.commands().values()).reduce(
           (acc, command: CommandConfigResultWithCategory) => {
             // Check if command has category information
-            if (command.category && command.categoryId) {
+            if (command.categoryId && command.category) {
               let data = acc.get(command.categoryId) ?? command.category;
               data.commands ??= [];
               const existingCommand = data.commands.find(

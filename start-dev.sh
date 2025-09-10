@@ -12,13 +12,6 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# Build shared types first
-echo "Building shared types..."
-cd shared-types
-npm install
-npm run build
-cd ..
-
 # Start the development environment with Docker Compose watch
 echo "Starting Docker Compose services with file watching..."
 echo "Note: API service will automatically set up the database with Prisma"
