@@ -58,21 +58,38 @@ export const CacheStore = signalStore(
     const obj = {
       retryConnection: () => {
         if (store.retryCount() === 5) {
+          console.error('[SSE] Max retry attempts reached, giving up');
           store.source()?.close();
+          patchState(store, {
+            error: 'Max retry attempts reached',
+          });
           return;
         }
 
+        console.log(`[SSE] Retrying connection (attempt ${store.retryCount() + 1}/5)`);
+        
         if (store.source()) {
           store.source()?.close();
         }
 
-        obj.createSource();
+        // Add delay between retries to prevent overwhelming the server
+        const delay = Math.min(1000 * Math.pow(2, store.retryCount()), 10000); // Exponential backoff, max 10s
+        setTimeout(() => {
+          obj.createSource();
+        }, delay);
 
         patchState(store, {
           retryCount: store.retryCount() + 1,
         });
       },
       createSource: () => {
+        // Close existing connection if any
+        if (store.source()) {
+          console.log('[SSE] Closing existing connection before creating new one');
+          store.source()?.close();
+        }
+
+        console.log(`[SSE] Creating new connection to ${environment.apiUrl}/guilds/${store.guildId()}/events`);
         const source = new EventSource(
           `${environment.apiUrl}/guilds/${store.guildId()}/events`,
           {
@@ -200,11 +217,28 @@ export const CacheStore = signalStore(
           }
         });
 
-        source.addEventListener('error', () => {
+        source.addEventListener('error', (event) => {
+          console.error('[SSE] Connection error:', event);
+          
+          // Check if the connection was closed by the server or client
+          const readyState = source.readyState;
+          let errorMessage = 'SSE connection failed';
+          
+          if (readyState === EventSource.CLOSED) {
+            errorMessage = 'SSE connection closed by server';
+          } else if (readyState === EventSource.CONNECTING) {
+            errorMessage = 'SSE connection failed to establish';
+          }
+          
           patchState(store, {
             lastEvent: 'Error',
+            error: errorMessage,
           });
-          obj.retryConnection();
+          
+          // Only retry if we haven't exceeded max retries
+          if (store.retryCount() < 5) {
+            obj.retryConnection();
+          }
         });
 
         patchState(store, {
