@@ -1,7 +1,6 @@
 import { CommandPermissionsUpdateSchema } from "@discord-bot/shared-types";
 import { Elysia } from "elysia";
 import { guildAccess } from "../middleware/auth";
-import { commandPermissionMetrics } from "../middleware/elysia-metrics";
 import { sessionMiddleware } from "../middleware/session";
 import { DatabaseService } from "../services/database";
 import { DiscordService } from "../services/discord";
@@ -89,18 +88,12 @@ export const guildPlugin = new Elysia({ name: "guild", prefix: "/guilds" })
         const client = RedisService.getClient();
         await client.del(`guild:${guildId}:command_permissions`);
 
-        // Record successful permission update
-        commandPermissionMetrics.recordUpdate(guildId, commandId, "success");
-
         return updatedPermissions;
       } catch (error) {
         logger.error(
           `[Guilds] Error updating permissions for command ${commandId}:`,
           error
         );
-
-        // Record failed permission update
-        commandPermissionMetrics.recordUpdate(guildId, commandId, "failure");
 
         if (error instanceof Error && error.name === "ZodError") {
           set.status = 400;

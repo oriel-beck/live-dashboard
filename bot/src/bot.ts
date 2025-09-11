@@ -10,6 +10,7 @@ BigInt.prototype.toJSON = function() {
 
 import {
   Client,
+  Events,
   GatewayIntentBits,
   Options,
   Partials,
@@ -18,7 +19,7 @@ import { startDataSync } from "./utils/sync-data.js";
 import { CommandManager } from "./utils/command-manager";
 import { CommandLoader } from "./utils/command-loader";
 import logger from "./utils/logger";
-import { register, updateDiscordMetrics } from "./utils/metrics";
+import { register, updateShardMetrics } from "./utils/metrics";
 import { createRedisClient } from "./redis";
 
 // Limit collections so process RAM stays low. We rely on Redis as the real cache.
@@ -201,16 +202,16 @@ function setupMetricsReporting() {
 startDataSync(client);
 
 // Setup command system when bot is ready
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
   const shardId = client.shard?.ids?.[0] ?? 0;
   logger.info(`[Shard ${shardId}] Bot ready as ${client.user?.tag}`);
   
-  // Update Discord metrics
-  updateDiscordMetrics(client);
+  // Update shard metrics
+  updateShardMetrics(client);
   
-  // Update Discord metrics periodically (every 5 minutes)
+  // Update shard metrics periodically (every 5 minutes)
   setInterval(() => {
-    updateDiscordMetrics(client);
+    updateShardMetrics(client);
   }, 5 * 60 * 1000);
   
   // Send metrics to Redis periodically (every 30 seconds)

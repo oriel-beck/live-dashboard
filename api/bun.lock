@@ -10,6 +10,7 @@
         "@elysiajs/swagger": "^1.1.0",
         "bun": "^1.2.21",
         "elysia": "^1.1.0",
+        "elysia-prometheus": "^1.0.0",
         "jsonwebtoken": "^9.0.2",
         "pg": "^8.16.3",
         "postgres": "^3.4.4",
@@ -209,6 +210,8 @@
     "effect": ["effect@3.16.12", "", { "dependencies": { "@standard-schema/spec": "^1.0.0", "fast-check": "^3.23.1" } }, "sha512-N39iBk0K71F9nb442TLbTkjl24FLUzuvx2i1I2RsEAQsdAdUTuUoW0vlfUXgkMTUOnYqKnWcFfqw4hK4Pw27hg=="],
 
     "elysia": ["elysia@1.3.21", "", { "dependencies": { "cookie": "^1.0.2", "exact-mirror": "0.1.6", "fast-decode-uri-component": "^1.0.1" }, "optionalDependencies": { "@sinclair/typebox": "^0.34.33", "openapi-types": "^12.1.3" }, "peerDependencies": { "file-type": ">= 20.0.0", "typescript": ">= 5.0.0" } }, "sha512-LLfDSoVA5fBoqKQfMJyzmHLkya8zMbEYwd7DS7v2iQB706mgzWg0gufXl58cFALErcvSayplrkDvjkmlYTkIZQ=="],
+
+    "elysia-prometheus": ["elysia-prometheus@1.0.0", "", { "dependencies": { "prom-client": "^15.1.3" }, "peerDependencies": { "elysia": ">= 1.2.0" } }, "sha512-imyEWHOXfkhBBTedSp1uM6W7BylkkUE0g7hCWBgpCDE99z7Y3l5MIOPFkqcAloIC2tCgx4dKRkkEfvCL4nhlYg=="],
 
     "emoji-regex": ["emoji-regex@8.0.0", "", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
 

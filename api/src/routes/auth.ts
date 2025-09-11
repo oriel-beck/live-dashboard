@@ -5,7 +5,6 @@ import {
 } from '@discord-bot/shared-types';
 import { Elysia } from 'elysia';
 import { config } from '../config';
-import { authMetrics } from '../middleware/elysia-metrics';
 import { sessionMiddleware } from '../middleware/session';
 import { DiscordService } from '../services/discord';
 import { SessionService } from '../services/session';
@@ -24,8 +23,6 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
       // Get user info
       const userData = await DiscordService.getUserInfo(tokenData.access_token);
 
-      // Record successful authentication
-      authMetrics.recordAttempt('discord', 'success');
 
       return {
         success: true,
@@ -39,8 +36,6 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
     } catch (error) {
       logger.error('[Auth] Login error:', error);
 
-      // Record failed authentication
-      authMetrics.recordAttempt('discord', 'failure');
 
       if (error instanceof Error && error.name === 'ZodError') {
         set.status = 400;
@@ -128,8 +123,6 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
         path: '/',
       });
       
-      // Record successful authentication
-      authMetrics.recordAttempt('discord', 'success');
       
       // Redirect to dashboard
       const redirectUrl = state ? decodeURIComponent(state) : `${process.env.FRONTEND_URL || 'http://localhost:4200'}/dashboard`;
@@ -139,8 +132,6 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
     } catch (error) {
       logger.error('[Auth] Discord callback error:', error);
       
-      // Record failed authentication
-      authMetrics.recordAttempt('discord', 'failure');
       
       set.status = 302;
       set.headers['Location'] = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/auth/error?error=callback_failed`;

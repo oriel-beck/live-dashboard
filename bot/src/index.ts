@@ -63,36 +63,25 @@ if (useSharding) {
 
       for (const [shardId, shardMetricsData] of shardMetrics) {
         try {
-          // Add shard_id label to metric lines, but only for metrics that don't already have it
+          // Process shard metrics and add shard_id labels where appropriate
           const labeledMetrics = shardMetricsData
             .split("\n")
             .map((line) => {
               if (line.startsWith("#") || line.trim() === "") return line;
               
-              // Skip if line already has shard_id label (check for both patterns)
-              if (line.includes('shard_id=') || line.includes('{shard_id=')) return line;
+              // Skip if line already has shard_id label
+              if (line.includes('shard_id=')) return line;
               
-              // Skip specific metrics that should not get shard_id labels
+              // Add shard_id to bot metrics that don't already have it
               const metricName = line.split(' ')[0];
-              if (metricName === 'guild_count' || metricName === 'commands_executed_total' || 
-                  metricName === 'command_errors_total' || metricName === 'bot_errors_total' ||
-                  metricName === 'discord_api_requests_total' || metricName === 'redis_connection_status') {
-                // These metrics are already properly labeled by the shard, don't add shard_id
-                return line;
-              }
-              
-              // Only add shard_id to metrics that don't have any labels yet
-              // This prevents duplicate labels on metrics that already have them
-              if (line.includes("{")) {
-                // Metric already has labels, don't add shard_id
-                return line;
-              } else if (line.includes(" ") && !line.includes("{")) {
-                // Metric has no labels, add shard_id
+              if (metricName.startsWith('bot_') && !line.includes('{')) {
+                // Add shard_id to unlabeled bot metrics
                 const parts = line.split(" ");
                 if (parts.length >= 2) {
                   return `${parts[0]}{shard_id="${shardId}"} ${parts.slice(1).join(" ")}`;
                 }
               }
+              
               return line;
             })
             .join("\n");

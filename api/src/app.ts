@@ -1,18 +1,17 @@
-import { Elysia } from 'elysia';
-import { cors } from '@elysiajs/cors';
 import { cookie } from '@elysiajs/cookie';
+import { cors } from '@elysiajs/cors';
+import { Elysia } from 'elysia';
+import prometheusPlugin from 'elysia-prometheus';
 import { config } from './config';
-import { logger } from './utils/logger';
-import { RedisService } from './services/redis';
 import { DatabaseService } from './services/database';
-import { register } from './utils/metrics';
-import { httpMetrics } from './middleware/elysia-metrics';
+import { RedisService } from './services/redis';
+import { logger } from './utils/logger';
 
 // Import route plugins
 import { authPlugin } from './routes/auth';
-import { guildPlugin } from './routes/guilds';
 import { commandPlugin } from './routes/commands';
 import { eventRoutes } from './routes/events';
+import { guildPlugin } from './routes/guilds';
 
 // Create the main Elysia app
 export const app = new Elysia()
@@ -34,8 +33,15 @@ export const app = new Elysia()
     path: '/',
   }))
   
-  // Add HTTP metrics middleware
-  .use(httpMetrics)
+  // Add Prometheus metrics plugin
+  .use(
+    prometheusPlugin({
+      metricsPath: '/metrics',
+      staticLabels: { service: 'discord-bot-api' },
+      durationBuckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+    })
+  )
+  
   
   // Add request logging middleware
   .onRequest(({ request, set }) => {
@@ -50,11 +56,6 @@ export const app = new Elysia()
     return '';
   })
   
-  // Metrics endpoint for Prometheus
-  .get('/metrics', async ({ set }) => {
-    set.headers['Content-Type'] = 'text/plain; version=0.0.4; charset=utf-8';
-    return await register.metrics();
-  })
   
   // Register all route plugins
   .use(authPlugin)

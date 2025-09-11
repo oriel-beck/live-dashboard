@@ -16,7 +16,7 @@ interface CommandInfo {
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
 import logger from "./logger";
-import { commandsExecuted, commandExecutionDuration, commandErrors } from "./metrics";
+import { recordCommandExecution, updateShardMetrics } from "./metrics";
 
 export class CommandManager {
   private client: Client;
@@ -191,34 +191,26 @@ export class CommandManager {
       }
 
       // Execute the command with metrics tracking
-      const startTime = Date.now();
-      const guildId = interaction.guild?.id || 'dm';
+      const shardId = this.client.shard?.ids?.[0] ?? 0;
+      const guildId = interaction.guild?.id;
       
       try {
         await command.execute(interaction);
         
-        // Record successful command execution
-        commandsExecuted.inc({ command_name: commandName, guild_id: guildId });
+        // Record successful command execution with subcommand support
+        const subcommandName = interaction.options.getSubcommand(false);
+        recordCommandExecution(commandName, subcommandName || undefined, shardId, guildId);
+        
+        // Update shard metrics
+        updateShardMetrics(this.client);
         
         // Log command usage
         logger.debug(
-          `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name}`
+          `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name || 'DM'}`
         );
       } catch (error) {
-        // Record command error
-        const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
-        commandErrors.inc({ 
-          command_name: commandName, 
-          guild_id: guildId, 
-          error_type: errorType 
-        });
-        
         logger.error(`[CommandManager] Error executing ${commandName}:`, error);
         throw error; // Re-throw to be handled by outer catch
-      } finally {
-        // Record execution duration
-        const duration = (Date.now() - startTime) / 1000;
-        commandExecutionDuration.observe({ command_name: commandName, guild_id: guildId }, duration);
       }
     } catch (error) {
       logger.error(`[CommandManager] Error executing ${commandName}:`, error);

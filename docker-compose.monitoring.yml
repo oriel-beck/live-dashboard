@@ -75,21 +75,21 @@ services:
     depends_on:
       - loki
 
-  # Node Exporter - System metrics
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node-exporter
+  # cAdvisor - Container metrics (RAM and CPU per container)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
     ports:
-      - "9100:9100"
+      - "8080:8080"
     volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
       - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
     restart: unless-stopped
     networks:
       - monitoring
@@ -114,47 +114,6 @@ services:
       - "9187:9187"
     environment:
       - DATA_SOURCE_NAME=postgresql://postgres:password1234@postgres:5432/public?sslmode=disable
-    restart: unless-stopped
-    networks:
-      - monitoring
-
-  # cAdvisor - Container metrics
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor
-    ports:
-      - "8080:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    privileged: true
-    devices:
-      - /dev/kmsg
-    restart: unless-stopped
-    networks:
-      - monitoring
-
-  # Docker Exporter - Docker daemon metrics
-  docker-exporter:
-    image: prom/node-exporter:latest
-    container_name: docker-exporter
-    ports:
-      - "9101:9100"
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-      - '--collector.docker'
-      - '--collector.docker.cgroup'
     restart: unless-stopped
     networks:
       - monitoring
