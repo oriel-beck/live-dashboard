@@ -86,9 +86,10 @@ export class CommandManager {
    */
   private checkCooldown(
     userId: string,
-    commandKey: string,
+    command: BaseCommand,
     cooldownSeconds: number
   ): { allowed: boolean; remainingTime?: number } {
+    const commandKey = command.name;
     if (!this.cooldowns.has(commandKey)) {
       this.cooldowns.set(commandKey, new Collection());
     }
@@ -168,13 +169,13 @@ export class CommandManager {
         return;
       }
 
-      // Get cooldown from the command config
-      const cooldownTime = commandConfig.cooldown || 0;
+      // Get cooldown from the command class itself (fallback to API config for compatibility)
+      const cooldownTime = command.cooldown || commandConfig.cooldown || 0;
 
       if (cooldownTime > 0) {
         const cooldownResult = this.checkCooldown(
           interaction.user.id,
-          commandName,
+          command,
           cooldownTime
         );
 

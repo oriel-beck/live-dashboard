@@ -199,14 +199,8 @@ export function startDataSync(client: Client) {
   // TODO: track on a different event stream as this is unique for each connecting user
   client.on(Events.GuildMemberUpdate, async (_oldM, newM) => {
     const perms = newM.permissions?.bitfield?.toString() ?? "0";
-    await redis.set(
-      REDIS_KEYS.MEMBER_PERMS(newM.guild.id, newM.id),
-      perms,
-      "EX",
-      CACHE_TTL.MEMBER_PERMS
-    );
     await publishUserEvent(newM.id, {
-      type: "member.perms",
+      type: "member.perms.update",
       guildId: newM.guild.id,
       perms,
     });

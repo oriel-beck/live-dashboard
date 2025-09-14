@@ -8,6 +8,9 @@ export class PingCommand extends BaseCommand {
   data = new SlashCommandBuilder()
     .setName("ping")
     .setDescription("Replies with Pong!");
+  
+  // Set a 5-second cooldown for this command
+  cooldown = 5;
 
   async run(interaction: ChatInputCommandInteraction) {
     const sent = await interaction.reply({
