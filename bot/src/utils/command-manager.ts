@@ -16,7 +16,7 @@ interface CommandInfo {
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
 import logger from "./logger";
-import { recordCommandExecution, updateShardMetrics } from "./metrics";
+import { recordCommandExecution, recordCommandExecutionWithTiming, updateShardMetrics } from "./metrics";
 
 export class CommandManager {
   private client: Client;
@@ -193,20 +193,25 @@ export class CommandManager {
       // Execute the command with metrics tracking
       const shardId = this.client.shard?.ids?.[0] ?? 0;
       const guildId = interaction.guild?.id;
+      const startTime = Date.now();
       
       try {
         await command.execute(interaction);
         
+        // Calculate execution duration
+        const duration = (Date.now() - startTime) / 1000; // Convert to seconds
+        
         // Record successful command execution with subcommand support
         const subcommandName = interaction.options.getSubcommand(false);
         recordCommandExecution(commandName, subcommandName || undefined, shardId, guildId);
+        recordCommandExecutionWithTiming(commandName, duration, shardId, guildId);
         
         // Update shard metrics
         updateShardMetrics(this.client);
         
         // Log command usage
         logger.debug(
-          `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name || 'DM'}`
+          `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name || 'DM'} (${duration.toFixed(3)}s)`
         );
       } catch (error) {
         logger.error(`[CommandManager] Error executing ${commandName}:`, error);

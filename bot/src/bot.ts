@@ -15,12 +15,12 @@ import {
   Options,
   Partials,
 } from "discord.js";
-import { startDataSync } from "./utils/sync-data.js";
-import { CommandManager } from "./utils/command-manager";
+import { createRedisClient } from "./redis";
 import { CommandLoader } from "./utils/command-loader";
+import { CommandManager } from "./utils/command-manager";
 import logger from "./utils/logger";
 import { register, updateShardMetrics } from "./utils/metrics";
-import { createRedisClient } from "./redis";
+import { startDataSync } from "./utils/sync-data.js";
 
 // Limit collections so process RAM stays low. We rely on Redis as the real cache.
 const client = new Client({

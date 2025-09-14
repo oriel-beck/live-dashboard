@@ -73,7 +73,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 0
       },
@@ -90,16 +90,22 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"discord-bot-api\"}[5m]))",
+          "expr": "histogram_quantile(0.50, sum by (le, path) (rate(http_request_duration_seconds_bucket{service=\"discord-bot-api\",path!~\"/events\"}[5m])))",
           "interval": "",
-          "legendFormat": "95th percentile - {{method}} {{path}}",
+          "legendFormat": "50th - {{path}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{service=\"discord-bot-api\"}[5m]))",
+          "expr": "histogram_quantile(0.95, sum by (le, path) (rate(http_request_duration_seconds_bucket{service=\"discord-bot-api\",path!~\"/events\"}[5m])))",
           "interval": "",
-          "legendFormat": "50th percentile - {{method}} {{path}}",
+          "legendFormat": "95th - {{path}}",
           "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, path) (rate(http_request_duration_seconds_bucket{service=\"discord-bot-api\",path!~\"/events\"}[5m])))",
+          "interval": "",
+          "legendFormat": "99th - {{path}}",
+          "refId": "C"
         }
       ],
       "title": "API Response Time (excluding /events)",
@@ -149,7 +155,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (rate(http_requests_total{service=\"discord-bot-api\",status=~\"4..|5..\"}[5m]))",
+          "expr": "sum by (status) (increase(http_requests_total{service=\"discord-bot-api\",status=~\"4..|5..\"}[5m])) > 0",
           "interval": "",
           "legendFormat": "{{status}}",
           "refId": "A"
@@ -230,7 +236,7 @@
       },
       "targets": [
         {
-          "expr": "increase(bot_commands_executed_total{guild_id=~\"$guild_id\"}[5m])",
+          "expr": "round(sum by (command_name, shard_id, guild_id) (increase(bot_commands_executed_total{guild_id=~\"$guild_id\"}[5m]))) > 0",
           "interval": "",
           "legendFormat": "{{command_name}} (Shard {{shard_id}}, Guild {{guild_id}})",
           "refId": "A"
@@ -560,15 +566,15 @@
       },
       "targets": [
         {
-          "expr": "pg_stat_database_numbackends",
+          "expr": "pg_stat_database_numbackends{datname=\"public\"}",
           "interval": "",
-          "legendFormat": "Active Connections",
+          "legendFormat": "Active Connections (public)",
           "refId": "A"
         },
         {
-          "expr": "pg_database_size_bytes",
+          "expr": "pg_database_size_bytes{datname=\"public\"}",
           "interval": "",
-          "legendFormat": "Database Size (bytes)",
+          "legendFormat": "Database Size (public)",
           "refId": "B"
         }
       ],
@@ -647,13 +653,100 @@
       },
       "targets": [
         {
-          "expr": "sum by (guild_id) (increase(bot_commands_executed_total{guild_id=~\"$guild_id\"}[5m]))",
+          "expr": "round(sum by (guild_id) (increase(bot_commands_executed_total{guild_id=~\"$guild_id\"}[5m]))) > 0",
           "interval": "",
           "legendFormat": "Guild {{guild_id}}",
           "refId": "A"
         }
       ],
       "title": "Commands Executed by Guild (5m intervals)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (shard_id) (bot_shard_guild_count)",
+          "interval": "",
+          "legendFormat": "Shard {{shard_id}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(bot_shard_guild_count)",
+          "interval": "",
+          "legendFormat": "Total Guilds (All Shards)",
+          "refId": "B"
+        }
+      ],
+      "title": "Total Guilds per Shard",
       "type": "timeseries"
     }
   ],

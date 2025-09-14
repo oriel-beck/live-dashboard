@@ -333,7 +333,7 @@
       },
       "targets": [
         {
-          "expr": "increase(bot_commands_executed_total{guild_id=~\"$guild_id\"}[5m])",
+          "expr": "round(sum by (command_name, shard_id, guild_id) (increase(bot_commands_executed_total{guild_id=~\"$guild_id\"}[5m]))) > 0",
           "interval": "",
           "legendFormat": "{{command_name}} (Shard {{shard_id}}, Guild {{guild_id}})",
           "refId": "A"
