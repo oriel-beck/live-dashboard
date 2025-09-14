@@ -12,7 +12,7 @@ export default class ExampleCommand extends BaseCommand {
   async run(interaction: any) {
     await interaction.reply({
       content: 'This is an example command that requires Manage Server permission!',
-      ephemeral: true,
+      flags: ['Ephemeral'],
     });
   }
 }
