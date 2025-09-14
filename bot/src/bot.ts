@@ -15,6 +15,15 @@ import {
   Options,
   Partials,
 } from "discord.js";
+import { ClusterClient } from "discord-hybrid-sharding";
+
+// Extend Client type to include cluster property
+declare module "discord.js" {
+  interface Client {
+    cluster: ClusterClient;
+  }
+}
+
 import { createRedisClient } from "./redis";
 import { CommandLoader } from "./utils/command-loader";
 import { CommandManager } from "./utils/command-manager";
@@ -66,47 +75,82 @@ const client = new Client({
   },
 });
 
+// Add cluster client support
+client.cluster = new ClusterClient(client);
+
 // Initialize command manager
 const commandManager = new CommandManager(client);
 
 // Export command manager for API access
 export { commandManager };
 
-// Sharding utilities for commands
-export const shardingUtils = {
-  // Get total guild count across all shards
+// Clustering utilities for commands (enhanced for hybrid sharding)
+export const clusterUtils = {
+  // Get total guild count across all clusters
   async getTotalGuilds() {
-    if (!client.shard) return client.guilds.cache.size;
-    
-    const results = await client.shard.fetchClientValues('guilds.cache.size');
-    return results.reduce((acc: number, guildCount: unknown) => acc + (guildCount as number), 0);
+    try {
+      const results = await client.cluster.fetchClientValues('guilds.cache.size');
+      return results.reduce((acc: number, guildCount: unknown) => acc + (guildCount as number), 0);
+    } catch (error) {
+      logger.warn('[ClusterUtils] Failed to fetch total guilds, falling back to local:', error);
+      return client.guilds.cache.size;
+    }
   },
 
-  // Get total member count across all shards
+  // Get total member count across all clusters
   async getTotalMembers() {
-    if (!client.shard) {
+    try {
+      const results = await client.cluster.broadcastEval((c: any) => 
+        c.guilds.cache.reduce((acc: number, guild: any) => acc + guild.memberCount, 0)
+      );
+      return results.reduce((acc: number, memberCount: unknown) => acc + (memberCount as number), 0);
+    } catch (error) {
+      logger.warn('[ClusterUtils] Failed to fetch total members, falling back to local:', error);
       return client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0);
     }
-    
-    const results = await client.shard.broadcastEval((c) => 
-      c.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0)
-    );
-    return results.reduce((acc: number, memberCount: unknown) => acc + (memberCount as number), 0);
   },
 
-  // Get total user count across all shards
+  // Get total user count across all clusters
   async getTotalUsers() {
-    if (!client.shard) return client.users.cache.size;
-    
-    const results = await client.shard.fetchClientValues('users.cache.size');
-    return results.reduce((acc: number, userCount: unknown) => acc + (userCount as number), 0);
+    try {
+      const results = await client.cluster.fetchClientValues('users.cache.size');
+      return results.reduce((acc: number, userCount: unknown) => acc + (userCount as number), 0);
+    } catch (error) {
+      logger.warn('[ClusterUtils] Failed to fetch total users, falling back to local:', error);
+      return client.users.cache.size;
+    }
   },
 
-  // Get shard info
-  getShardInfo() {
+  // Broadcast evaluation across all clusters
+  async broadcastEval(script: string) {
+    try {
+      return await client.cluster.broadcastEval(script);
+    } catch (error) {
+      logger.error('[ClusterUtils] Failed to broadcast eval:', error);
+      return [];
+    }
+  },
+
+  // Get cluster and shard info
+  getClusterInfo() {
     return {
-      id: client.shard?.ids?.[0] ?? 0,
-      totalShards: client.shard?.count ?? 1,
+      clusterId: client.cluster.id,
+      clusterCount: client.cluster.count,
+      shardList: client.cluster.shardList,
+      totalShards: client.cluster.shardList.length,
+      guildCount: client.guilds.cache.size,
+      userCount: client.users.cache.size,
+      latency: client.ws.ping,
+      uptime: client.uptime
+    };
+  },
+
+  // Get shard info (for backward compatibility)
+  getShardInfo() {
+    const shardId = client.cluster.shardList[0] || 0;
+    return {
+      id: shardId,
+      totalShards: client.cluster.shardList.length,
       guildCount: client.guilds.cache.size,
       userCount: client.users.cache.size,
       latency: client.ws.ping,
@@ -115,14 +159,18 @@ export const shardingUtils = {
   }
 };
 
+// Legacy sharding utilities (for backward compatibility)
+export const shardingUtils = clusterUtils;
+
 // Redis client for inter-shard communication
 const redis = createRedisClient();
 
 // Load and register all commands automatically
 async function initializeCommands() {
   try {
-    const shardId = client.shard?.ids?.[0] ?? 0;
-    logger.debug(`[Shard ${shardId}] Loading commands...`);
+    const clusterId = client.cluster.id;
+    const shardId = client.cluster.shardList[0] || 0;
+    logger.debug(`[Cluster ${clusterId}, Shard ${shardId}] Loading commands...`);
     const commands = await CommandLoader.loadAllCommands();
     
     // Validate and register each command
@@ -130,23 +178,26 @@ async function initializeCommands() {
       if (CommandLoader.validateCommand(command)) {
         commandManager.registerCommand(command);
       } else {
-        logger.error(`[Shard ${shardId}] Failed to validate command: ${command.name || 'unknown'}`);
+        logger.error(`[Cluster ${clusterId}, Shard ${shardId}] Failed to validate command: ${command.name || 'unknown'}`);
       }
     }
     
-    logger.debug(`[Shard ${shardId}] Registered ${commandManager.getCommands().size} commands`);
+    logger.debug(`[Cluster ${clusterId}, Shard ${shardId}] Registered ${commandManager.getCommands().size} commands`);
     return true;
   } catch (error) {
-    const shardId = client.shard?.ids?.[0] ?? 0;
-    logger.error(`[Shard ${shardId}] Error loading commands:`, error);
+    const clusterId = client.cluster.id;
+    const shardId = client.cluster.shardList[0] || 0;
+    logger.error(`[Cluster ${clusterId}, Shard ${shardId}] Error loading commands:`, error);
     return false;
   }
 }
 
 // Send metrics to Redis for aggregation
 function sendMetricsToRedis() {
-  const shardId = client.shard?.ids?.[0] ?? 0;
+  const clusterId = client.cluster.id;
+  const shardId = client.cluster.shardList[0] || 0;
   const metrics = {
+    clusterId: clusterId,
     shardId: shardId,
     metrics: {
       guildCount: client.guilds.cache.size,
@@ -157,45 +208,44 @@ function sendMetricsToRedis() {
     }
   };
 
-  redis.publish('shard:metrics', JSON.stringify(metrics));
+  redis.publish('cluster:metrics', JSON.stringify(metrics));
 }
 
-// Send metrics to shard manager
+// Send metrics to cluster manager
 async function sendMetricsToManager() {
-  const shardId = client.shard?.ids?.[0] ?? 0;
-  const managerPort = process.env.METRICS_PORT || '30000';
+  const clusterId = client.cluster.id;
+  const managerPort = process.env.METRICS_PORT || '3001';
   
   try {
     const metrics = await register.metrics();
-    const response = await fetch(`http://localhost:${managerPort}/shard-metrics`, {
+    const response = await fetch(`http://localhost:${managerPort}/cluster-metrics`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        shardId: shardId,
+        clusterId: clusterId,
         metrics: metrics
       })
     });
     
     if (response.ok) {
-      logger.debug(`[Shard ${shardId}] Successfully sent metrics to manager`);
+      logger.debug(`[Cluster ${clusterId}] Successfully sent metrics to manager`);
     } else {
-      logger.warn(`[Shard ${shardId}] Failed to send metrics to manager: HTTP ${response.status}`);
+      logger.warn(`[Cluster ${clusterId}] Failed to send metrics to manager: HTTP ${response.status}`);
     }
   } catch (error) {
-    logger.warn(`[Shard ${shardId}] Failed to send metrics to manager:`, error);
+    logger.warn(`[Cluster ${clusterId}] Failed to send metrics to manager:`, error);
   }
 }
 
-// Setup metrics reporting to shard manager
+// Setup metrics reporting to cluster manager
 function setupMetricsReporting() {
-  const shardId = client.shard?.ids?.[0] ?? 0;
+  const clusterId = client.cluster.id;
   
-  // Send metrics every 10 seconds
   setInterval(sendMetricsToManager, 10000);
   
-  logger.info(`[Shard ${shardId}] Metrics reporting to manager enabled`);
+  logger.info(`[Cluster ${clusterId}] Metrics reporting to manager enabled`);
 }
 
 // Start data sync and command system
@@ -203,8 +253,9 @@ startDataSync(client);
 
 // Setup command system when bot is ready
 client.once(Events.ClientReady, async () => {
-  const shardId = client.shard?.ids?.[0] ?? 0;
-  logger.info(`[Shard ${shardId}] Bot ready as ${client.user?.tag}`);
+  const clusterId = client.cluster.id;
+  const shardIds = client.cluster.shardList;
+  logger.info(`[Cluster ${clusterId}] Bot ready as ${client.user?.tag} (Shards: ${shardIds.join(', ')})`);
   
   // Update shard metrics
   updateShardMetrics(client);
@@ -222,18 +273,18 @@ client.once(Events.ClientReady, async () => {
   // Load and register commands
   const commandsLoaded = await initializeCommands();
   if (!commandsLoaded) {
-    logger.error(`[Shard ${shardId}] Failed to load commands, exiting...`);
+    logger.error(`[Cluster ${clusterId}] Failed to load commands, exiting...`);
     process.exit(1);
   }
 
-  logger.debug(`[Shard ${shardId}] Command framework initialized successfully!`);
-  logger.debug(`[Shard ${shardId}] Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script`);
+  logger.debug(`[Cluster ${clusterId}] Command framework initialized successfully!`);
+  logger.debug(`[Cluster ${clusterId}] Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script`);
 });
 
-// Handle shard errors
+// Handle client errors
 client.on('error', (error) => {
-  const shardId = client.shard?.ids?.[0] ?? 0;
-  logger.error(`[Shard ${shardId}] Client error:`, error);
+  const clusterId = client.cluster.id;
+  logger.error(`[Cluster ${clusterId}] Client error:`, error);
 });
 
 // Start metrics server
