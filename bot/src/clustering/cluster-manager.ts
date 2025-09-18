@@ -1,7 +1,6 @@
 import { ClusterManager as HybridClusterManager } from "discord-hybrid-sharding";
 import express from "express";
 import logger from "../utils/logger";
-import type { ClusterInfo, ClusterMetrics } from "./types";
 
 export class ClusterManager {
   private manager: HybridClusterManager;
@@ -13,7 +12,6 @@ export class ClusterManager {
     const botFile = process.env.NODE_ENV === 'production' ? './dist/bot.js' : './src/bot.ts';
     
     this.manager = new HybridClusterManager(botFile, {
-      totalShards: "auto",
       shardsPerClusters: 16,
       mode: "process",
       token: process.env.BOT_TOKEN!,
@@ -28,7 +26,8 @@ export class ClusterManager {
 
   private setupEvents() {
     this.manager.on("clusterCreate", (cluster) => {
-      logger.info(`[ClusterManager] Launched cluster ${cluster.id}`);
+      const shardRange = `${cluster.id * 16}-${(cluster.id * 16) + 15}`;
+      logger.info(`[ClusterManager] Launched cluster ${cluster.id} (shards ${shardRange})`);
     });
 
     this.manager.on("clusterReady", (cluster) => {
@@ -45,6 +44,15 @@ export class ClusterManager {
 
     this.manager.on("clusterSpawn", (cluster) => {
       logger.info(`[ClusterManager] Spawning cluster ${cluster.id}`);
+    });
+
+    // Add error handling for large-scale deployments
+    this.manager.on("debug", (message) => {
+      logger.debug(`[ClusterManager] ${message}`);
+    });
+
+    this.manager.on("error", (error) => {
+      logger.error(`[ClusterManager] Error:`, error);
     });
   }
 
@@ -72,23 +80,65 @@ export class ClusterManager {
     app.get("/metrics", async (req, res) => {
       try {
         const { register } = await import("../utils/metrics");
+        
+        // Start with manager-level metrics only (no cluster duplication)
         let aggregatedMetrics = await register.metrics();
-
-        // Aggregate cluster metrics
+        
+        // Aggregate cluster metrics without duplication
         logger.debug(
           `[ClusterManager] Aggregating metrics from ${this.clusterMetrics.size} clusters`
         );
 
+        // Let Prometheus aggregate metrics with sum() queries
+
+        // Deduplicate and aggregate cluster metrics properly
+        const metricsByName = new Map<string, string[]>();
+        
         for (const [clusterId, metrics] of this.clusterMetrics) {
           try {
-            const labeledMetrics = this.addClusterLabels(metrics, clusterId);
-            aggregatedMetrics += "\n" + labeledMetrics;
+            const lines = metrics.split("\n");
+            for (const line of lines) {
+              if (line.startsWith("#") || line.trim() === "") continue;
+              
+              const metricName = line.split(/[{\s]/)[0];
+              // Include all bot metrics (cluster, command, etc.)
+              if (metricName.startsWith("bot_")) {
+                // Add cluster_id label if not already present for cluster metrics
+                let processedLine = line;
+                if (metricName.startsWith("bot_cluster_") && !line.includes("cluster_id=")) {
+                  const spaceIndex = line.indexOf(" ");
+                  if (spaceIndex > 0) {
+                    const metric = line.substring(0, spaceIndex);
+                    const value = line.substring(spaceIndex);
+                    
+                    if (metric.includes("{")) {
+                      processedLine = metric.replace("}", `,cluster_id="${clusterId}"}`) + value;
+                    } else {
+                      processedLine = `${metric}{cluster_id="${clusterId}"}${value}`;
+                    }
+                  }
+                } else {
+                  // For command metrics and others, use as-is (they already have cluster_id)
+                  processedLine = line;
+                }
+                
+                if (!metricsByName.has(metricName)) {
+                  metricsByName.set(metricName, []);
+                }
+                metricsByName.get(metricName)!.push(processedLine);
+              }
+            }
           } catch (error) {
             logger.warn(
               `[ClusterManager] Failed to process metrics from cluster ${clusterId}:`,
               error
             );
           }
+        }
+
+        // Add all unique cluster metrics
+        for (const [metricName, lines] of metricsByName) {
+          aggregatedMetrics += "\n" + lines.join("\n");
         }
 
         res.set("Content-Type", register.contentType);
@@ -104,39 +154,14 @@ export class ClusterManager {
     });
   }
 
-  private addClusterLabels(metrics: string, clusterId: number): string {
-    return metrics
-      .split("\n")
-      .map((line) => {
-        if (line.startsWith("#") || line.trim() === "") return line;
-
-        // Skip if line already has cluster_id label
-        if (line.includes("cluster_id=")) return line;
-
-        // Add cluster_id to bot metrics that don't already have it
-        const metricName = line.split(" ")[0];
-        if (metricName.startsWith("bot_") && !line.includes("{")) {
-          // Add cluster_id to unlabeled bot metrics
-          const parts = line.split(" ");
-          if (parts.length >= 2) {
-            return `${parts[0]}{cluster_id="${clusterId}"} ${parts
-              .slice(1)
-              .join(" ")}`;
-          }
-        }
-
-        return line;
-      })
-      .join("\n");
-  }
 
   async start() {
     logger.info("[ClusterManager] Starting cluster manager...");
 
     this.metricsServer = await this.setupMetricsServer();
     
-    // Start clusters
-    await this.manager.spawn({ timeout: -1 });
+    logger.info(`[ClusterManager] Using 300ms delay between cluster spawns for ${this.manager.totalShards} shards`);
+    await this.manager.spawn({ timeout: -1, delay: 300 });
 
     logger.info(
       `[ClusterManager] Started ${this.manager.totalClusters} clusters managing ${this.manager.totalShards} shards`

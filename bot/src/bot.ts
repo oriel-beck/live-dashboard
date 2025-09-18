@@ -1,10 +1,10 @@
 // Load environment variables first
-import { config } from 'dotenv';
-import { resolve } from 'path';
-config({ path: resolve(__dirname, '../../.env') });
+import { config } from "dotenv";
+import { resolve } from "path";
+config({ path: resolve(__dirname, "../../.env") });
 
 // @ts-expect-error Add BigInt JSON serialization support
-BigInt.prototype.toJSON = function() {
+BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
@@ -15,7 +15,7 @@ import {
   Options,
   Partials,
 } from "discord.js";
-import { ClusterClient } from "discord-hybrid-sharding";
+import { ClusterClient, getInfo } from "discord-hybrid-sharding";
 
 // Extend Client type to include cluster property
 declare module "discord.js" {
@@ -31,15 +31,36 @@ import logger from "./utils/logger";
 import { register, updateShardMetrics } from "./utils/metrics";
 import { startDataSync } from "./utils/sync-data.js";
 
+// Initialize logger with cluster info
+const clusterInfo = getInfo();
+logger.info(
+  `[Cluster ${Math.floor(
+    clusterInfo.FIRST_SHARD_ID / 16
+  )}] Starting cluster with shards ${clusterInfo.SHARD_LIST.join(", ")} (${
+    clusterInfo.SHARD_LIST.length
+  }/${clusterInfo.TOTAL_SHARDS})`
+);
+
+const clientId = process.env.CLIENT_ID!;
+
 // Limit collections so process RAM stays low. We rely on Redis as the real cache.
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-  ],
-  partials: [Partials.GuildMember], // only if needed
+  shards: getInfo().SHARD_LIST,
+  shardCount: getInfo().TOTAL_SHARDS,
+  intents: [GatewayIntentBits.Guilds],
+  // Remove partials for memory optimization
   makeCache: Options.cacheWithLimits({
-    UserManager: 1, // The bot
-    GuildMemberManager: 1, // The bot
+    // Essential managers - only keep the bot user/member
+    UserManager: {
+      maxSize: 0,
+      keepOverLimit: (user) => user.id === clientId,
+      
+    }, // Keep minimal users
+    GuildMemberManager: {
+      maxSize: 0,
+      keepOverLimit: (member) => member.id === clientId,
+    }, // Keep minimal members
+
     ApplicationCommandManager: 0,
     ApplicationEmojiManager: 0,
     AutoModerationRuleManager: 0,
@@ -63,16 +84,6 @@ const client = new Client({
     ThreadMemberManager: 0,
     VoiceStateManager: 0,
   }),
-  sweepers: {
-    users: {
-      interval: 1000,
-      filter: () => (user) => user.id === "",
-    },
-    guildMembers: {
-      interval: 1000,
-      filter: () => (member) => member.id === "",
-    },
-  },
 });
 
 // Add cluster client support
@@ -89,10 +100,18 @@ export const clusterUtils = {
   // Get total guild count across all clusters
   async getTotalGuilds() {
     try {
-      const results = await client.cluster.fetchClientValues('guilds.cache.size');
-      return results.reduce((acc: number, guildCount: unknown) => acc + (guildCount as number), 0);
+      const results = await client.cluster.fetchClientValues(
+        "guilds.cache.size"
+      );
+      return results.reduce(
+        (acc: number, guildCount: unknown) => acc + (guildCount as number),
+        0
+      );
     } catch (error) {
-      logger.warn('[ClusterUtils] Failed to fetch total guilds, falling back to local:', error);
+      logger.warn(
+        "[ClusterUtils] Failed to fetch total guilds, falling back to local:",
+        error
+      );
       return client.guilds.cache.size;
     }
   },
@@ -100,23 +119,43 @@ export const clusterUtils = {
   // Get total member count across all clusters
   async getTotalMembers() {
     try {
-      const results = await client.cluster.broadcastEval((c: any) => 
-        c.guilds.cache.reduce((acc: number, guild: any) => acc + guild.memberCount, 0)
+      const results = await client.cluster.broadcastEval((c: any) =>
+        c.guilds.cache.reduce(
+          (acc: number, guild: any) => acc + guild.memberCount,
+          0
+        )
       );
-      return results.reduce((acc: number, memberCount: unknown) => acc + (memberCount as number), 0);
+      return results.reduce(
+        (acc: number, memberCount: unknown) => acc + (memberCount as number),
+        0
+      );
     } catch (error) {
-      logger.warn('[ClusterUtils] Failed to fetch total members, falling back to local:', error);
-      return client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0);
+      logger.warn(
+        "[ClusterUtils] Failed to fetch total members, falling back to local:",
+        error
+      );
+      return client.guilds.cache.reduce(
+        (acc, guild) => acc + guild.memberCount,
+        0
+      );
     }
   },
 
   // Get total user count across all clusters
   async getTotalUsers() {
     try {
-      const results = await client.cluster.fetchClientValues('users.cache.size');
-      return results.reduce((acc: number, userCount: unknown) => acc + (userCount as number), 0);
+      const results = await client.cluster.fetchClientValues(
+        "users.cache.size"
+      );
+      return results.reduce(
+        (acc: number, userCount: unknown) => acc + (userCount as number),
+        0
+      );
     } catch (error) {
-      logger.warn('[ClusterUtils] Failed to fetch total users, falling back to local:', error);
+      logger.warn(
+        "[ClusterUtils] Failed to fetch total users, falling back to local:",
+        error
+      );
       return client.users.cache.size;
     }
   },
@@ -126,7 +165,7 @@ export const clusterUtils = {
     try {
       return await client.cluster.broadcastEval(script);
     } catch (error) {
-      logger.error('[ClusterUtils] Failed to broadcast eval:', error);
+      logger.error("[ClusterUtils] Failed to broadcast eval:", error);
       return [];
     }
   },
@@ -141,7 +180,7 @@ export const clusterUtils = {
       guildCount: client.guilds.cache.size,
       userCount: client.users.cache.size,
       latency: client.ws.ping,
-      uptime: client.uptime
+      uptime: client.uptime,
     };
   },
 
@@ -154,9 +193,9 @@ export const clusterUtils = {
       guildCount: client.guilds.cache.size,
       userCount: client.users.cache.size,
       latency: client.ws.ping,
-      uptime: client.uptime
+      uptime: client.uptime,
     };
-  }
+  },
 };
 
 // Legacy sharding utilities (for backward compatibility)
@@ -168,26 +207,39 @@ const redis = createRedisClient();
 // Load and register all commands automatically
 async function initializeCommands() {
   try {
-    const clusterId = client.cluster.id;
+    const clusterId = Math.floor(clusterInfo.FIRST_SHARD_ID / 16);
     const shardId = client.cluster.shardList[0] || 0;
-    logger.debug(`[Cluster ${clusterId}, Shard ${shardId}] Loading commands...`);
+    logger.debug(
+      `[Cluster ${clusterId}, Shard ${shardId}] Loading commands...`
+    );
     const commands = await CommandLoader.loadAllCommands();
-    
+
     // Validate and register each command
     for (const command of commands) {
       if (CommandLoader.validateCommand(command)) {
         commandManager.registerCommand(command);
       } else {
-        logger.error(`[Cluster ${clusterId}, Shard ${shardId}] Failed to validate command: ${command.name || 'unknown'}`);
+        logger.error(
+          `[Cluster ${clusterId}, Shard ${shardId}] Failed to validate command: ${
+            command.name || "unknown"
+          }`
+        );
       }
     }
-    
-    logger.debug(`[Cluster ${clusterId}, Shard ${shardId}] Registered ${commandManager.getCommands().size} commands`);
+
+    logger.debug(
+      `[Cluster ${clusterId}, Shard ${shardId}] Registered ${
+        commandManager.getCommands().size
+      } commands`
+    );
     return true;
   } catch (error) {
-    const clusterId = client.cluster.id;
+    const clusterId = Math.floor(clusterInfo.FIRST_SHARD_ID / 16);
     const shardId = client.cluster.shardList[0] || 0;
-    logger.error(`[Cluster ${clusterId}, Shard ${shardId}] Error loading commands:`, error);
+    logger.error(
+      `[Cluster ${clusterId}, Shard ${shardId}] Error loading commands:`,
+      error
+    );
     return false;
   }
 }
@@ -205,47 +257,60 @@ function sendMetricsToRedis() {
       latency: client.ws.ping,
       memoryUsage: process.memoryUsage(),
       uptime: process.uptime(),
-    }
+    },
   };
 
-  redis.publish('cluster:metrics', JSON.stringify(metrics));
+  redis.publish("cluster:metrics", JSON.stringify(metrics));
 }
 
 // Send metrics to cluster manager
 async function sendMetricsToManager() {
   const clusterId = client.cluster.id;
-  const managerPort = process.env.METRICS_PORT || '3001';
-  
+  const managerPort = process.env.METRICS_PORT || "3001";
+
   try {
     const metrics = await register.metrics();
-    const response = await fetch(`http://localhost:${managerPort}/cluster-metrics`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        clusterId: clusterId,
-        metrics: metrics
-      })
-    });
-    
+    const response = await fetch(
+      `http://localhost:${managerPort}/cluster-metrics`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clusterId: clusterId,
+          metrics: metrics,
+        }),
+      }
+    );
+
     if (response.ok) {
-      logger.debug(`[Cluster ${clusterId}] Successfully sent metrics to manager`);
+      logger.debug(
+        `[Cluster ${clusterId}] Successfully sent metrics to manager`
+      );
     } else {
-      logger.warn(`[Cluster ${clusterId}] Failed to send metrics to manager: HTTP ${response.status}`);
+      logger.warn(
+        `[Cluster ${clusterId}] Failed to send metrics to manager: HTTP ${response.status}`
+      );
     }
   } catch (error) {
-    logger.warn(`[Cluster ${clusterId}] Failed to send metrics to manager:`, error);
+    logger.warn(
+      `[Cluster ${clusterId}] Failed to send metrics to manager:`,
+      error
+    );
   }
 }
 
 // Setup metrics reporting to cluster manager
 function setupMetricsReporting() {
   const clusterId = client.cluster.id;
-  
-  setInterval(sendMetricsToManager, 10000);
-  
-  logger.info(`[Cluster ${clusterId}] Metrics reporting to manager enabled`);
+
+  // Add small delay based on cluster ID to prevent timestamp conflicts
+  const delay = clusterId * 500; // 500ms delay per cluster for manager reports
+  setTimeout(() => {
+    setInterval(sendMetricsToManager, 10000);
+    logger.info(`[Cluster ${clusterId}] Metrics reporting to manager enabled (delayed ${delay}ms)`);
+  }, delay);
 }
 
 // Start data sync and command system
@@ -255,21 +320,29 @@ startDataSync(client);
 client.once(Events.ClientReady, async () => {
   const clusterId = client.cluster.id;
   const shardIds = client.cluster.shardList;
-  logger.info(`[Cluster ${clusterId}] Bot ready as ${client.user?.tag} (Shards: ${shardIds.join(', ')})`);
-  
+  logger.info(
+    `[Cluster ${clusterId}] Bot ready as ${
+      client.user?.tag
+    } (Shards: ${shardIds.join(", ")})`
+  );
+
   // Update shard metrics
   updateShardMetrics(client);
-  
+
   // Update shard metrics periodically (every 5 minutes)
   setInterval(() => {
     updateShardMetrics(client);
   }, 5 * 60 * 1000);
-  
+
   // Send metrics to Redis periodically (every 30 seconds)
-  setInterval(() => {
-    sendMetricsToRedis();
-  }, 30000);
-  
+  // Add small delay based on cluster ID to prevent timestamp conflicts
+  const redisDelay = clusterId * 1000; // 1 second delay per cluster
+  setTimeout(() => {
+    setInterval(() => {
+      sendMetricsToRedis();
+    }, 30000);
+  }, redisDelay);
+
   // Load and register commands
   const commandsLoaded = await initializeCommands();
   if (!commandsLoaded) {
@@ -277,12 +350,16 @@ client.once(Events.ClientReady, async () => {
     process.exit(1);
   }
 
-  logger.debug(`[Cluster ${clusterId}] Command framework initialized successfully!`);
-  logger.debug(`[Cluster ${clusterId}] Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script`);
+  logger.debug(
+    `[Cluster ${clusterId}] Command framework initialized successfully!`
+  );
+  logger.debug(
+    `[Cluster ${clusterId}] Note: Global commands need to be deployed manually via Discord Developer Portal or a deployment script`
+  );
 });
 
 // Handle client errors
-client.on('error', (error) => {
+client.on("error", (error) => {
   const clusterId = client.cluster.id;
   logger.error(`[Cluster ${clusterId}] Client error:`, error);
 });

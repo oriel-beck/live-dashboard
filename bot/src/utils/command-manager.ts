@@ -16,7 +16,7 @@ interface CommandInfo {
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
 import logger from "./logger";
-import { recordCommandExecution, recordCommandExecutionWithTiming, updateShardMetrics } from "./metrics";
+import { recordCommandExecution, recordCommandError, updateShardMetrics } from "./metrics";
 
 export class CommandManager {
   private client: Client;
@@ -135,6 +135,13 @@ export class CommandManager {
 
     if (!command) return;
 
+    // Record command attempt immediately (lightweight)
+    const clusterId = (this.client as any).cluster?.id ?? 0;
+    const shardId = (this.client as any).cluster?.shardList?.[0] ?? 0;
+    const guildId = interaction.guild?.id;
+    const subcommandName = interaction.options.getSubcommand(false);
+    const startTime = Date.now();
+
     try {
       // Check if command is enabled via API
       const commandConfig = await this.apiClient.getCommandConfig(
@@ -191,24 +198,17 @@ export class CommandManager {
         }
       }
 
-      // Execute the command with metrics tracking
-      const shardId = this.client.shard?.ids?.[0] ?? 0;
-      const guildId = interaction.guild?.id;
-      const startTime = Date.now();
-      
       try {
         await command.execute(interaction);
         
         // Calculate execution duration
         const duration = (Date.now() - startTime) / 1000; // Convert to seconds
         
-        // Record successful command execution with subcommand support
-        const subcommandName = interaction.options.getSubcommand(false);
-        recordCommandExecution(commandName, subcommandName || undefined, shardId, guildId);
-        recordCommandExecutionWithTiming(commandName, duration, shardId, guildId);
-        
-        // Update shard metrics
-        updateShardMetrics(this.client);
+        // Record successful command execution with subcommand support (async - don't wait)
+        setImmediate(() => {
+          recordCommandExecution(commandName, subcommandName || undefined, clusterId, shardId, guildId, duration);
+          updateShardMetrics(this.client);
+        });
         
         // Log command usage
         logger.debug(
@@ -216,10 +216,19 @@ export class CommandManager {
         );
       } catch (error) {
         logger.error(`[CommandManager] Error executing ${commandName}:`, error);
+        
+        // Record command error (async - don't wait)
+        const errorType = error instanceof Error ? error.name : 'UnknownError';
+        setImmediate(() => recordCommandError(commandName, subcommandName || undefined, clusterId, shardId, guildId, errorType));
+        
         throw error; // Re-throw to be handled by outer catch
       }
     } catch (error) {
       logger.error(`[CommandManager] Error executing ${commandName}:`, error);
+
+      // Record the outer catch error too (for cases where the command execution itself fails) (async - don't wait)
+      const errorType = error instanceof Error ? error.name : 'CommandExecutionError';
+      setImmediate(() => recordCommandError(commandName, subcommandName || undefined, clusterId, shardId, guildId, errorType));
 
       const errorContent = "There was an error while executing this command!";
       if (interaction.replied || interaction.deferred) {

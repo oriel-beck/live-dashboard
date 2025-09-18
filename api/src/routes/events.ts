@@ -52,6 +52,13 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
       `[Events] SSE connection started for guild ${guildId}`
     );
 
+    // Record SSE connection in metrics
+    import('../middleware/metrics').then(({ recordSseConnection }) => {
+      recordSseConnection(guildId, 'connect');
+    }).catch(() => {
+      // Ignore metrics errors
+    });
+
     // Use a simpler SSE approach with manual chunking
     const encoder = new TextEncoder();
     let isActive = true;
@@ -110,6 +117,14 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
       cancel() {
         console.log(`[Events] SSE connection cancelled for guild ${guildId}`);
         isActive = false;
+        
+        // Record SSE disconnection in metrics
+        import('../middleware/metrics').then(({ recordSseConnection }) => {
+          recordSseConnection(guildId, 'disconnect');
+        }).catch(() => {
+          // Ignore metrics errors
+        });
+        
         RedisService.unsubscribeFromGuildEvents(guildId).catch((error) => {
           logger.error(`[Events] Error unsubscribing:`, error);
         });

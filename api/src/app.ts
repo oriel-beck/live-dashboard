@@ -43,11 +43,31 @@ export const app = new Elysia()
   )
   
   
-  // Add request logging middleware
+  // Add request logging and metrics middleware
   .onRequest(({ request, set }) => {
     const requestId = crypto.randomUUID();
     logger.info(`[API] ${request.method} ${request.url} - Request ID: ${requestId}`);
     set.headers['X-Request-ID'] = requestId;
+    
+    // Store start time for metrics
+    (request as any).startTime = Date.now();
+  })
+  
+  // Add response metrics middleware
+  .onAfterResponse(({ request, set }) => {
+    const startTime = (request as any).startTime;
+    if (startTime) {
+      const duration = (Date.now() - startTime) / 1000; // Convert to seconds
+      const url = new URL(request.url);
+      const statusCode = typeof set.status === 'number' ? set.status : 200;
+      
+      // Import metrics function dynamically to avoid circular deps
+      import('./middleware/metrics').then(({ recordApiRequest }) => {
+        recordApiRequest(request.method, url.pathname, statusCode, duration);
+      }).catch((error) => {
+        logger.warn('[API] Failed to record metrics:', error);
+      });
+    }
   })
   
   // Health check endpoint - returns empty 204 for monitoring
@@ -64,8 +84,23 @@ export const app = new Elysia()
   .use(eventRoutes)
   
   // Global error handler
-  .onError(({ error, set }) => {
+  .onError(({ error, set, request }) => {
     logger.error('[API] Unhandled error:', error);
+    
+    // Record error in metrics
+    const startTime = (request as any).startTime;
+    if (startTime) {
+      const duration = (Date.now() - startTime) / 1000;
+      const url = new URL(request.url);
+      const statusCode = typeof set.status === 'number' ? set.status : 500;
+      
+      import('./middleware/metrics').then(({ recordApiRequest }) => {
+        const standardError = error instanceof Error ? error : new Error(String(error));
+        recordApiRequest(request.method, url.pathname, statusCode, duration, standardError);
+      }).catch(() => {
+        // Ignore metrics errors in error handler
+      });
+    }
     
     if (error instanceof Error && error.name === 'ZodError') {
       set.status = 400;

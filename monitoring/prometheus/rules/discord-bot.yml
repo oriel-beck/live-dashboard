@@ -33,13 +33,13 @@ groups:
 
       # High memory usage
       - alert: HighMemoryUsage
-        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "High memory usage"
-          description: "Memory usage is {{ $value | humanizePercentage }}"
+          description: "Memory usage is {{ printf \"%.1f%%\" $value }}"
 
       # High CPU usage
       - alert: HighCPUUsage
@@ -53,13 +53,13 @@ groups:
 
       # Disk space low
       - alert: DiskSpaceLow
-        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
         for: 5m
         labels:
           severity: critical
         annotations:
           summary: "Disk space low"
-          description: "Disk space is {{ $value | humanizePercentage }} available"
+          description: "Disk space is {{ printf \"%.1f%%\" $value }} available"
 
       # Redis connection issues
       - alert: RedisConnectionIssues
@@ -83,13 +83,13 @@ groups:
 
       # High Redis memory usage
       - alert: HighRedisMemoryUsage
-        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "High Redis memory usage"
-          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+          description: "Redis memory usage is {{ printf \"%.1f%%\" $value }}"
 
       # SSE connection issues
       - alert: SSEConnectionIssues
@@ -100,3 +100,53 @@ groups:
         annotations:
           summary: "SSE connection issues"
           description: "SSE connections are failing"
+
+      # Cluster down
+      - alert: ClusterDown
+        expr: absent(bot_cluster_guilds_total) or bot_cluster_uptime_seconds < 60
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Discord bot cluster is down"
+          description: "Cluster {{ $labels.cluster_id }} is down or has low uptime"
+
+      # High cluster memory usage
+      - alert: HighClusterMemoryUsage
+        expr: bot_cluster_memory_usage_bytes{type="rss"} > 2000000000  # 2GB
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High cluster memory usage"
+          description: "Cluster {{ $labels.cluster_id }} memory usage is {{ $value }} bytes ({{ $value | humanize1024 }}B)"
+
+      # High shard latency
+      - alert: HighShardLatency
+        expr: bot_shard_latency_ms > 1000
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High shard latency"
+          description: "Shard {{ $labels.shard_id }} in cluster {{ $labels.cluster_id }} has latency of {{ $value }}ms"
+
+      # No guild distribution to shard
+      - alert: ShardNoGuilds
+        expr: bot_shard_guild_count == 0 and bot_shard_uptime_seconds > 600  # 10 minutes
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Shard has no guilds"
+          description: "Shard {{ $labels.shard_id }} in cluster {{ $labels.cluster_id }} has no guilds after 10+ minutes"
+
+      # Low command rate (possible issue)
+      - alert: LowCommandRate
+        expr: sum(rate(bot_commands_executed_total[10m])) < 0.001  # Less than 1 command per 1000 seconds
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low command execution rate"
+          description: "Command execution rate is very low: {{ $value }} commands/second"

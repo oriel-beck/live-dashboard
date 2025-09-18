@@ -130,11 +130,24 @@ export class MiscCommand extends BaseCommand {
     }
 
     const targetChannel = interaction.options.getChannel("channel") as GuildChannel || interaction.channel as GuildChannel;
-    const botMember = interaction.guild.members.me;
+    
+    // Fetch bot member if not cached
+    let botMember = interaction.guild.members.me;
+    if (!botMember) {
+      try {
+        botMember = await interaction.guild.members.fetchMe();
+      } catch (error) {
+        await interaction.reply({
+          content: "Could not fetch bot member information!",
+          flags: ['Ephemeral'],
+        });
+        return;
+      }
+    }
 
-    if (!targetChannel || !botMember) {
+    if (!targetChannel) {
       await interaction.reply({
-        content: "Could not find the specified channel or bot member!",
+        content: "Could not find the specified channel!",
         flags: ['Ephemeral'],
       });
       return;
