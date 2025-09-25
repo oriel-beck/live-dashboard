@@ -27,6 +27,5 @@ export const DiscordTokenResponseSchema = z.object({
 });
 
 // Export types
-export type DiscordLoginRequest = z.infer<typeof DiscordLoginRequestSchema>;
 export type DiscordUser = z.infer<typeof DiscordUserSchema>;
 export type DiscordTokenResponse = z.infer<typeof DiscordTokenResponseSchema>;

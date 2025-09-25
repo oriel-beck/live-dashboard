@@ -1,0 +1,35 @@
+<nav class="sidebar-navigation">
+  <div class="sidebar-header">
+    <h3>Dashboard</h3>
+    <p class="sidebar-subtitle">Server Configuration</p>
+  </div>
+
+  <div class="navigation-items">
+    @for (item of navigationItems; track item.route) {
+      <button
+        class="nav-item"
+        [class.active]="item.active"
+        [class.disabled]="isItemDisabled(item)"
+        [disabled]="isItemDisabled(item)"
+        (click)="navigateToItem(item)"
+        type="button"
+      >
+        <i [class]="item.icon" class="nav-icon"></i>
+        <span class="nav-label">{{ item.label }}</span>
+        
+        <!-- Loading indicator for commands -->
+        @if (item.route === 'commands' && store.isCommandsLoading()) {
+          <div class="loading-spinner-nav"></div>
+        }
+        
+        @if (item.active) {
+          <div class="active-indicator"></div>
+        }
+      </button>
+    }
+  </div>
+
+  <div class="sidebar-footer">
+    <small class="footer-text">More sections coming soon...</small>
+  </div>
+</nav>

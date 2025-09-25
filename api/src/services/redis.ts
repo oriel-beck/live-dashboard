@@ -161,6 +161,8 @@ export class RedisService {
               color: role.color,
               permissions: role.permissions,
               managed: role.managed,
+              hoist: role.hoist,
+              mentionable: role.mentionable,
               lastUpdated: now,
             }));
 
@@ -233,8 +235,9 @@ export class RedisService {
               id: channel.id,
               name: channel.name,
               type: channel.type,
-              parentId: channel.parent_id,
+              parent_id: channel.parent_id,
               position: channel.position,
+              permission_overwrites: channel.permission_overwrites,
               lastUpdated: now,
             }));
 
@@ -366,231 +369,6 @@ export class RedisService {
     await subscriber.unsubscribe(REDIS_KEYS.GUILD_EVENTS(guildId));
   }
 
-  static async getAllGuildIds(): Promise<string[]> {
-    const client = this.getClient();
-    return await client.sMembers(REDIS_KEYS.GUILD_SET);
-  }
-
-  static async getGuildDataWithLazyLoad(guildId: string) {
-    // First check if guild is accessible (exists in bot's guild set)
-    const isAccessible = await this.isGuildAccessible(guildId);
-    if (!isAccessible) {
-      throw new Error("GUILD_NOT_ACCESSIBLE");
-    }
-
-    // Check if guild data exists
-    const guildInfo = await this.getGuildInfo(guildId);
-    const hasData = Object.keys(guildInfo).length > 0;
-
-    if (hasData) {
-      // Data exists -> return data
-      return {
-        guildInfo,
-        roles: await this.getGuildRoles(guildId),
-        channels: await this.getGuildChannels(guildId),
-      };
-    }
-
-    // Data missing -> try to fetch data
-    logger.debug(
-      `[RedisService] Guild data missing for ${guildId}, attempting to fetch...`
-    );
-    try {
-      const fetchedData = await this.fetchGuildDataFromBot(guildId);
-
-      // Data fetch works -> cache the new data with TTL -> return the data
-      await this.cacheGuildData(guildId, fetchedData);
-      logger.debug(
-        `[RedisService] Successfully fetched and cached guild data for ${guildId}`
-      );
-
-      return {
-        guildInfo: fetchedData.guildInfo,
-        roles: fetchedData.roles,
-        channels: fetchedData.channels,
-      };
-    } catch (error) {
-      // Data fetch fails -> remove the guild from the set
-      logger.error(
-        `[RedisService] Failed to fetch guild data for ${guildId}:`,
-        error
-      );
-      await this.removeGuildFromSet(guildId);
-      throw new Error("GUILD_FETCH_FAILED");
-    }
-  }
-
-  // Helper method to fetch guild data from bot
-  private static async fetchGuildDataFromBot(guildId: string): Promise<{
-    guildInfo: CachedGuildInfo;
-    roles: CachedGuildRole[];
-    channels: CachedGuildChannel[];
-  }> {
-    try {
-      // Make all requests concurrently, but each has its own retry logic
-      const [guildData, rolesData, channelsData] = await Promise.all([
-        makeRequestWithRetry<UserGuild>(
-          `${config.discord.apiUrl}/guilds/${guildId}`,
-          {
-            headers: {
-              Authorization: `Bot ${config.discord.botToken}`,
-              "Content-Type": "application/json",
-            },
-          },
-          `guild data (guild ${guildId})`
-        ),
-        makeRequestWithRetry<GuildRole[]>(
-          `${config.discord.apiUrl}/guilds/${guildId}/roles`,
-          {
-            headers: {
-              Authorization: `Bot ${config.discord.botToken}`,
-              "Content-Type": "application/json",
-            },
-          },
-          `guild roles (guild ${guildId})`
-        ),
-        makeRequestWithRetry<GuildChannel[]>(
-          `${config.discord.apiUrl}/guilds/${guildId}/channels`,
-          {
-            headers: {
-              Authorization: `Bot ${config.discord.botToken}`,
-              "Content-Type": "application/json",
-            },
-          },
-          `guild channels (guild ${guildId})`
-        ),
-      ]);
-
-      // Transform the data to match our expected format
-      const guildInfo = {
-        id: guildData.id,
-        name: guildData.name,
-        icon: guildData.icon,
-        owner: guildData.owner,
-        permissions: guildData.permissions,
-        lastUpdated: Date.now(),
-      };
-
-      const roles = rolesData
-        .filter((role) => !role.managed) // Filter out managed roles
-        .map((role) => ({
-          id: role.id,
-          name: role.name,
-          position: role.position,
-          color: role.color,
-          permissions: role.permissions,
-          managed: role.managed,
-          lastUpdated: Date.now(),
-        }));
-
-      const channels = channelsData
-        .filter((channel) => channel.type !== 1) // Filter out DM channels
-        .filter((channel) => [0, 2, 5].includes(channel.type)) // Filter to text, voice, and announcement channels
-        .map((channel) => ({
-          id: channel.id,
-          name: channel.name,
-          type: channel.type,
-          parentId: channel.parent_id,
-          position: channel.position,
-          lastUpdated: Date.now(),
-        }));
-
-      return {
-        guildInfo,
-        roles,
-        channels,
-      };
-    } catch (error: unknown) {
-      logger.error(
-        `[RedisService] Error fetching guild data for ${guildId}:`,
-        error
-      );
-      throw new Error(
-        `Failed to fetch guild data from Discord API: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  }
-
-  // Helper method to cache guild data with TTL
-  private static async cacheGuildData(
-    guildId: string,
-    data: {
-      guildInfo: CachedGuildInfo;
-      roles: CachedGuildRole[];
-      channels: CachedGuildChannel[];
-    }
-  ) {
-    const now = Date.now();
-    const client = this.getClient();
-
-    // Cache guild basics with TTL
-    const guildInfo = {
-      ...data.guildInfo,
-      lastUpdated: now,
-      icon: data.guildInfo.icon || '', // Convert null to empty string for Redis
-      owner: data.guildInfo.owner ? 'true' : 'false', // Convert boolean to string for Redis
-    };
-    await client.hSet(REDIS_KEYS.GUILD_INFO(guildId), {
-      id: guildInfo.id,
-      name: guildInfo.name,
-      icon: guildInfo.icon || '',
-      owner_id: guildInfo.owner_id,
-    });
-    await client.expire(REDIS_KEYS.GUILD_INFO(guildId), CACHE_TTL.GUILD_BASICS);
-
-    // Cache roles with TTL
-    if (data.roles && data.roles.length > 0) {
-      const rolesKey = REDIS_KEYS.GUILD_ROLES(guildId);
-      await client.del(rolesKey);
-      const pipeline = client.multi();
-
-      data.roles.forEach((role) => {
-        pipeline.hSet(
-          rolesKey,
-          role.id,
-          JSON.stringify({
-            ...role,
-            lastUpdated: now,
-          })
-        );
-      });
-
-      await pipeline.exec();
-      await client.expire(rolesKey, CACHE_TTL.GUILD_ROLES);
-    }
-
-    // Cache channels with TTL
-    if (data.channels && data.channels.length > 0) {
-      const channelsKey = REDIS_KEYS.GUILD_CHANNELS(guildId);
-      await client.del(channelsKey);
-      const pipeline = client.multi();
-
-      data.channels.forEach((channel) => {
-        pipeline.hSet(
-          channelsKey,
-          channel.id,
-          JSON.stringify({
-            ...channel,
-            lastUpdated: now,
-          })
-        );
-      });
-
-      await pipeline.exec();
-      await client.expire(channelsKey, CACHE_TTL.GUILD_CHANNELS);
-    }
-  }
-
-  // Helper method to remove guild from set
-  private static async removeGuildFromSet(guildId: string) {
-    const client = this.getClient();
-    await client.sRem(REDIS_KEYS.GUILD_SET, guildId);
-    logger.warn(
-      `[RedisService] Removed guild ${guildId} from guild set due to fetch failure`
-    );
-  }
 
   // Helper method to check if a guild is accessible
   static async isGuildAccessible(guildId: string): Promise<boolean> {

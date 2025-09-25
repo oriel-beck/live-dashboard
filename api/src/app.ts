@@ -9,6 +9,7 @@ import { logger } from './utils/logger';
 
 // Import route plugins
 import { authPlugin } from './routes/auth';
+import { botConfigPlugin } from './routes/bot-config';
 import { commandPlugin } from './routes/commands';
 import { eventRoutes } from './routes/events';
 import { guildPlugin } from './routes/guilds';
@@ -79,6 +80,7 @@ export const app = new Elysia()
   
   // Register all route plugins
   .use(authPlugin)
+  .use(botConfigPlugin)
   .use(guildPlugin)
   .use(commandPlugin)
   .use(eventRoutes)

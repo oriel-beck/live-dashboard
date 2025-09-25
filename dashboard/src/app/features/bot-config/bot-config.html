@@ -1,0 +1,151 @@
+<div class="bot-config-container">
+  <p-toast></p-toast>
+  
+  @if (store.isLoading() || isLoading()) {
+    <div class="loading-state">
+      <p-progressSpinner class="w-4rem h-4rem" strokeWidth="4"></p-progressSpinner>
+      <p>Loading bot configuration...</p>
+    </div>
+  } @else {
+    <div class="config-content">
+      <div class="config-header">
+        <h2>Bot Configuration</h2>
+        <p class="config-subtitle">Customize your bot's appearance and presence for this server</p>
+      </div>
+
+      <div class="config-sections">
+        <!-- Avatar Section -->
+        <p-card header="Bot Avatar" subheader="Upload a custom avatar for your bot in this server" class="config-card">
+          <div class="avatar-config">
+            <div class="current-avatar">
+              <img 
+                [src]="getCurrentAvatarUrl()" 
+                [alt]="store.guildInfo()?.name + ' bot avatar'"
+                class="avatar-preview"
+              />
+              <div class="avatar-info">
+                <span class="avatar-label">Current Avatar</span>
+                <small class="avatar-size">Recommended: 512x512px</small>
+              </div>
+            </div>
+            
+            <div class="avatar-actions">
+              <p-fileUpload 
+                mode="basic" 
+                accept="image/*" 
+                [maxFileSize]="8388608"
+                (onSelect)="onAvatarSelect($event)"
+                chooseLabel="Upload New Avatar"
+                chooseIcon="pi pi-upload"
+                [auto]="true"
+                class="p-button-outlined"
+              ></p-fileUpload>
+              
+              @if (botConfig().avatar) {
+                <p-button 
+                  label="Reset" 
+                  icon="pi pi-refresh" 
+                  severity="secondary"
+                  (onClick)="resetAvatar()"
+                  [outlined]="true"
+                ></p-button>
+              }
+            </div>
+          </div>
+        </p-card>
+
+        <p-divider></p-divider>
+
+        <!-- Banner Section -->
+        <p-card header="Bot Banner" subheader="Set a custom banner for your bot's profile" class="config-card">
+          <div class="banner-config">
+            <div class="current-banner">
+              @if (botConfig().banner) {
+                <img 
+                  [src]="botConfig().banner" 
+                  alt="Bot banner"
+                  class="banner-preview"
+                />
+              } @else {
+                <div class="banner-placeholder">
+                  <i class="pi pi-image" style="font-size: 3rem; color: var(--text-color-secondary)"></i>
+                  <span>No banner set</span>
+                </div>
+              }
+              <div class="banner-info">
+                <span class="banner-label">Current Banner</span>
+                <small class="banner-size">Recommended: 1920x480px</small>
+              </div>
+            </div>
+            
+            <div class="banner-actions">
+              <p-fileUpload 
+                mode="basic" 
+                accept="image/*" 
+                [maxFileSize]="8388608"
+                (onSelect)="onBannerSelect($event)"
+                chooseLabel="Upload Banner"
+                chooseIcon="pi pi-upload"
+                [auto]="true"
+                class="p-button-outlined"
+              ></p-fileUpload>
+              
+              @if (botConfig().banner) {
+                <p-button 
+                  label="Remove" 
+                  icon="pi pi-trash" 
+                  severity="secondary"
+                  (onClick)="resetBanner()"
+                  [outlined]="true"
+                ></p-button>
+              }
+            </div>
+          </div>
+        </p-card>
+
+        <p-divider></p-divider>
+
+        <!-- Nickname Section -->
+        <p-card header="Bot Nickname" subheader="Set a custom nickname for your bot in this server" class="config-card">
+          <div class="nickname-config">
+            <div class="p-field">
+              <label for="nickname">Server Nickname</label>
+              <input 
+                pInputText 
+                id="nickname"
+                [(ngModel)]="botConfig().nickname"
+                placeholder="Enter custom nickname..."
+                maxlength="32"
+                class="w-full"
+              />
+              <small class="p-text-secondary">Leave empty to use the default bot name</small>
+            </div>
+          </div>
+        </p-card>
+
+        <p-divider></p-divider>
+
+        <!-- Actions -->
+        <div class="config-actions">
+          <p-button 
+            label="Save Configuration" 
+            icon="pi pi-save"
+            (onClick)="saveConfiguration()"
+            [loading]="isSaving()"
+            loadingIcon="pi pi-spin pi-spinner"
+            severity="success"
+          ></p-button>
+          
+          <p-button 
+            label="Reset to Defaults" 
+            icon="pi pi-refresh"
+            (onClick)="resetConfiguration()"
+            [disabled]="isSaving()"
+            severity="secondary"
+            [outlined]="true"
+          ></p-button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

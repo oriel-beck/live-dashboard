@@ -1,35 +1,46 @@
-// API Types and Interfaces - Now using shared types
+// API Types and Interfaces - Using shared types where available
 import { Request } from "express";
 import {
   User,
   UserGuild,
-  SessionData,
   GuildRole,
   GuildChannel,
   ApiResponse,
-  CachedGuildRole,
-  CachedGuildChannel,
-  CachedGuildInfo,
-  CommandConfigUpdate,
 } from '@discord-bot/shared-types';
 
-export interface AuthenticatedRequest extends Request {
-  user?: User;
-  sessionId?: string;
-  sessionData?: SessionData;
-  isBotRequest?: boolean;
+// Cached types for Redis storage
+export interface CachedGuildRole {
+  id: string;
+  name: string;
+  color: number;
+  hoist: boolean;
+  position: number;
+  permissions: string;
+  managed: boolean;
+  mentionable: boolean;
+}
+
+export interface CachedGuildChannel {
+  id: string;
+  name: string;
+  type: number;
+  position: number;
+  parent_id: string | null;
+  permission_overwrites: unknown[];
+}
+
+export interface CachedGuildInfo {
+  id: string;
+  name: string;
+  icon: string | null;
+  owner_id: string;
 }
 
 // Re-export shared types for convenience
 export {
   User,
   UserGuild,
-  SessionData,
   GuildRole,
   GuildChannel,
   ApiResponse,
-  CachedGuildRole,
-  CachedGuildChannel,
-  CachedGuildInfo,
-  CommandConfigUpdate,
 };

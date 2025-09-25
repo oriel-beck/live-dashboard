@@ -1,5 +1,7 @@
 import {
   DiscordLoginRequestSchema,
+  DiscordTokenResponse,
+  DiscordUser,
   UserGuildSchema,
   UserSchema
 } from '@discord-bot/shared-types';
@@ -9,6 +11,7 @@ import { sessionMiddleware } from '../middleware/session';
 import { DiscordService } from '../services/discord';
 import { SessionService } from '../services/session';
 import { logger } from '../utils/logger';
+import { withAbort } from '../utils/request-utils';
 
 export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
   .use(sessionMiddleware)
@@ -23,7 +26,6 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
       // Get user info
       const userData = await DiscordService.getUserInfo(tokenData.access_token);
 
-
       return {
         success: true,
         data: {
@@ -35,7 +37,6 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
       };
     } catch (error) {
       logger.error('[Auth] Login error:', error);
-
 
       if (error instanceof Error && error.name === 'ZodError') {
         set.status = 400;
@@ -72,7 +73,10 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
   })
   
   // GET /auth/discord/callback - OAuth callback endpoint
-  .get('/discord/callback', async ({ query, set, cookie }) => {
+  .get('/discord/callback', async ({ query, set, cookie, request }) => {
+    // Use the request signal for cancellation
+    const signal = request.signal as AbortSignal | undefined;
+
     try {
       const { code, error, state } = query;
       
@@ -89,11 +93,23 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
         return {};
       }
       
-      // Exchange code for token
-      const tokenData = await DiscordService.exchangeCodeForToken(code);
+      // Exchange code for token with cancellation support
+      const tokenData = await withAbort(
+        DiscordService.exchangeCodeForToken(code),
+        signal,
+        'OAuth token exchange cancelled'
+      ) as DiscordTokenResponse;
+
+      if (signal?.aborted) return; // Check after first API call
       
-      // Get user info
-      const userData = await DiscordService.getUserInfo(tokenData.access_token);
+      // Get user info with cancellation support
+      const userData = await withAbort(
+        DiscordService.getUserInfo(tokenData.access_token),
+        signal,
+        'User info fetch cancelled'
+      ) as DiscordUser;
+
+      if (signal?.aborted) return; // Check after second API call
       
       // Create session data
       const sessionData = {
@@ -110,8 +126,14 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
         expiresAt: Date.now() + (tokenData.expires_in * 1000), // Convert seconds to milliseconds
       };
       
-      // Save session to Redis
-      const sessionId = await SessionService.storeUserSession(sessionData);
+      // Save session to Redis with cancellation support
+      const sessionId = await withAbort(
+        SessionService.storeUserSession(sessionData),
+        signal,
+        'Session storage cancelled'
+      );
+
+      if (signal?.aborted) return; // Check after session storage
       
       // Set session cookie
       cookie.session.set({
@@ -123,15 +145,18 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
         path: '/',
       });
       
-      
       // Redirect to dashboard
       const redirectUrl = state ? decodeURIComponent(state) : `${process.env.FRONTEND_URL || 'http://localhost:4200'}/dashboard`;
       set.status = 302;
       set.headers['Location'] = redirectUrl;
       return {};
     } catch (error) {
+        if (signal?.aborted) {
+        logger.debug('[Auth] Request cancelled during OAuth callback');
+        return; // Client already disconnected
+      }
+
       logger.error('[Auth] Discord callback error:', error);
-      
       
       set.status = 302;
       set.headers['Location'] = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/auth/error?error=callback_failed`;
@@ -158,7 +183,7 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
   })
   
   // GET /auth/user - Get current user info (Dashboard expects this)
-  .get('/user', async ({ cookie, set }) => {
+  .get('/user', async ({ cookie, set, request }) => {
     const sessionId = cookie.session?.value;
     
     if (!sessionId) {
@@ -169,9 +194,16 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
       };
     }
 
+    // Use the request signal for cancellation
+    const signal = request.signal as AbortSignal | undefined;
+
     try {
-      // Get a valid access token (refreshes if needed)
-      const accessToken = await SessionService.getValidAccessToken(sessionId);
+      // Get a valid access token (refreshes if needed) with cancellation support
+      const accessToken = await withAbort(
+        SessionService.getValidAccessToken(sessionId),
+        signal,
+        'Access token validation cancelled'
+      ) as string;
       
       if (!accessToken) {
         set.status = 401;
@@ -181,9 +213,17 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
         };
       }
 
-      // Get fresh user data from Discord
-      const userData = await DiscordService.getUserInfo(accessToken);
-      const userGuilds = await DiscordService.getUserGuilds(accessToken);
+      if (signal?.aborted) return; // Check after token validation
+
+      // Get fresh user data from Discord in parallel with cancellation support
+      const [userData, userGuilds] = await withAbort(
+        Promise.all([
+          DiscordService.getUserInfo(accessToken),
+          DiscordService.getUserGuilds(accessToken)
+        ]),
+        signal,
+        'User data fetch cancelled'
+      ) as [DiscordUser, any[]];
 
       // Format user data according to UserSchema
       const formattedUser = UserSchema.parse({
@@ -200,6 +240,11 @@ export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })
         data: formattedUser,
       };
     } catch (error) {
+        if (signal?.aborted) {
+        logger.debug('[Auth] Request cancelled during user info fetch');
+        return; // Client already disconnected
+      }
+
       logger.error('[Auth] User error:', error);
 
       if (error instanceof Error && error.name === 'ZodError') {

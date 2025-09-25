@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterOutlet } from '@angular/router';
 import { DialogService } from 'primeng/dynamicdialog';
 import { AuthService } from '../../core/services/auth.service';
 import { CacheStore } from '../../store/sse.store';
@@ -18,6 +18,7 @@ import {
   CommandCategory,
   CommandConfigResultWithCategory,
 } from '@discord-bot/shared-types';
+import { SidebarNavigationComponent } from '../../shared/sidebar-navigation/sidebar-navigation';
 
 // Temporary interface for subcommands until they're properly implemented
 interface Subcommand {
@@ -36,6 +37,8 @@ interface Subcommand {
     CheckboxModule,
     ButtonModule,
     DividerModule,
+    SidebarNavigationComponent,
+    RouterOutlet,
   ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
@@ -103,14 +106,9 @@ export class Dashboard {
     });
   }
 
-  getSubcommands(command: CommandConfigResultWithCategory): Subcommand[] {
-    // For now, return empty array since subcommands are not included in the current schema
-    // This will be populated when the API includes subcommands in the response
-    return [];
-  }
-
-  getSubcommandCount(command: CommandConfigResultWithCategory) {
-    // For now, return 0 since subcommands are not included in the current schema
-    return 0;
+  // Error handling
+  clearError() {
+    // This method would clear errors if the store had an error clearing method
+    // For now, we'll handle errors through the store's internal mechanisms
   }
 }

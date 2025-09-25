@@ -76,14 +76,6 @@ export class ApiClient {
     return response.json() as Promise<T>;
   }
 
-  async getGuildCommandConfigs(
-    guildId: string,
-    withSubcommands: boolean = false
-  ): Promise<Record<string, CommandConfigResult>> {
-    const params = withSubcommands ? "?withSubcommands=true" : "";
-    const response = await this.get<{ success: boolean; data: Record<string, CommandConfigResult> }>(`/guilds/${guildId}/commands${params}`);
-    return response.data;
-  }
 
   // Get command config by ID
   async getCommandConfig(
@@ -105,29 +97,6 @@ export class ApiClient {
     return response.data;
   }
 
-  // Update command config by ID
-  async updateCommandConfig(
-    guildId: string,
-    commandId: string,
-    updates: unknown
-  ): Promise<ApiResponse<CommandConfigResult>> {
-    const response = await this.put<ApiResponse<CommandConfigResult>>(`/guilds/${guildId}/commands/${commandId}`, updates);
-    return response;
-  }
-
-  // Update subcommand config by ID and subcommand name
-  async updateSubcommandConfig(
-    guildId: string,
-    commandId: string,
-    subcommandName: string,
-    updates: unknown
-  ): Promise<ApiResponse<CommandConfigResult>> {
-    const response = await this.put<ApiResponse<CommandConfigResult>>(
-      `/guilds/${guildId}/commands/${commandId}/${subcommandName}`,
-      updates
-    );
-    return response;
-  }
 
   // Register a default command in the database (upsert operation - creates or updates)
   async registerDefaultCommand(command: DefaultCommandRegistration): Promise<ApiResponse<DefaultCommandRegistrationResponse['data']>> {

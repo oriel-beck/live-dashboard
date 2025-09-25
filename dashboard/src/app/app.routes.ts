@@ -19,6 +19,18 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/dashboard/dashboard').then((m) => m.Dashboard),
     canActivate: [authGuard, guildAccessGuard],
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/bot-config/bot-config').then((m) => m.BotConfig),
+      },
+      {
+        path: 'commands',
+        loadComponent: () =>
+          import('./features/commands/commands').then((m) => m.Commands),
+      }
+    ]
   },
   // Legacy redirect for backward compatibility
   {

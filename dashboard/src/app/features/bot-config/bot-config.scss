@@ -1,0 +1,309 @@
+// Bot Configuration Styles
+
+.bot-config-container {
+  min-height: 100%;
+  padding: var(--space-xl);
+  background: transparent;
+  
+  @media (max-width: 768px) {
+    padding: var(--space-lg);
+  }
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  min-height: 400px;
+  color: var(--color-text-secondary);
+  
+  p {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.config-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.config-header {
+  text-align: center;
+  margin-bottom: var(--space-3xl);
+  
+  h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0 0 var(--space-md) 0;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .config-subtitle {
+    font-size: 1.1rem;
+    color: var(--color-text-secondary);
+    margin: 0;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+}
+
+.config-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+// Override PrimeNG card styles to match our design
+:host ::ng-deep .config-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  
+  .p-card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--glass-border);
+    padding: var(--space-xl);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+  
+  .p-card-subtitle {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    margin-top: var(--space-sm);
+  }
+  
+  .p-card-content {
+    padding: var(--space-xl);
+  }
+}
+
+// Avatar Configuration
+.avatar-config {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xl);
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .current-avatar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+    
+    .avatar-preview {
+      width: 80px;
+      height: 80px;
+      border-radius: var(--radius-lg);
+      border: 2px solid var(--glass-border);
+      object-fit: cover;
+      background: var(--color-bg-secondary);
+    }
+    
+    .avatar-info {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      
+      .avatar-label {
+        font-weight: 500;
+        color: var(--color-text-primary);
+      }
+      
+      .avatar-size {
+        font-size: 0.85rem;
+        color: var(--color-text-secondary);
+      }
+    }
+  }
+  
+  .avatar-actions {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    
+    @media (max-width: 768px) {
+      justify-content: center;
+    }
+  }
+}
+
+// Banner Configuration
+.banner-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  
+  .current-banner {
+    .banner-preview {
+      width: 100%;
+      max-width: 400px;
+      height: 100px;
+      border-radius: var(--radius-lg);
+      border: 2px solid var(--glass-border);
+      object-fit: cover;
+      background: var(--color-bg-secondary);
+      margin-bottom: var(--space-md);
+    }
+    
+    .banner-placeholder {
+      width: 100%;
+      max-width: 400px;
+      height: 100px;
+      border: 2px dashed var(--glass-border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      background: var(--color-bg-glass-hover);
+      margin-bottom: var(--space-md);
+      
+      span {
+        color: var(--color-text-secondary);
+        font-size: 0.9rem;
+      }
+    }
+    
+    .banner-info {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      
+      .banner-label {
+        font-weight: 500;
+        color: var(--color-text-primary);
+      }
+      
+      .banner-size {
+        font-size: 0.85rem;
+        color: var(--color-text-secondary);
+      }
+    }
+  }
+  
+  .banner-actions {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+}
+
+// Nickname Configuration
+.nickname-config {
+  .p-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    
+    label {
+      font-weight: 500;
+      color: var(--color-text-primary);
+    }
+    
+    small {
+      margin-top: var(--space-xs);
+    }
+  }
+}
+
+// Actions
+.config-actions {
+  display: flex;
+  gap: var(--space-lg);
+  justify-content: center;
+  padding-top: var(--space-xl);
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+// Override PrimeNG button styles to match our theme
+:host ::ng-deep {
+  .p-button {
+    border-radius: var(--radius-lg);
+    font-weight: 500;
+    transition: all var(--transition-normal);
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+  }
+  
+  .p-fileupload-basic {
+    .p-button {
+      background: transparent;
+      border: 1px solid var(--glass-border);
+      color: var(--color-text-primary);
+      
+      &:hover {
+        background: var(--color-bg-glass-hover);
+        border-color: var(--color-primary);
+      }
+    }
+  }
+  
+  .p-inputtext {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    padding: var(--space-md);
+    
+    &:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
+    }
+    
+    &::placeholder {
+      color: var(--color-text-secondary);
+    }
+  }
+  
+  .p-divider {
+    &.p-divider-horizontal {
+      margin: var(--space-xl) 0;
+      
+      &:before {
+        border-top-color: var(--glass-border);
+      }
+    }
+  }
+  
+  .p-toast {
+    .p-toast-message {
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      
+      .p-toast-icon-close {
+        color: var(--color-text-secondary);
+        
+        &:hover {
+          background: var(--color-bg-glass-hover);
+        }
+      }
+    }
+  }
+}

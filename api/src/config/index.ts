@@ -74,11 +74,8 @@ export const config = {
   
   // Feature Flags
   features: {
-    analytics: process.env.FEATURE_ANALYTICS === 'true',
-    auditLogs: process.env.FEATURE_AUDIT_LOGS === 'true',
     rateLimiting: process.env.FEATURE_RATE_LIMITING === 'true',
     metrics: process.env.FEATURE_METRICS === 'true',
-    healthChecks: process.env.FEATURE_HEALTH_CHECKS === 'true',
   },
 };
 

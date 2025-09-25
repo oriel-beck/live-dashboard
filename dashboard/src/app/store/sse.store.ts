@@ -46,7 +46,7 @@ const initialState: CacheStore = {
   commandPermissions: new Map<string, GuildApplicationCommandPermissions>(),
   roles: [],
   channels: [],
-  isLoading: false,
+  isLoading: true,
   error: null,
   guildInfo: null,
 };
@@ -104,36 +104,95 @@ export const CacheStore = signalStore(
           });
         });
 
-        source.addEventListener('initial', (evt: MessageEvent) => {
+        // Handle all events with a single listener and switch statement
+        source.addEventListener('message', (evt: MessageEvent) => {
           try {
-            patchState(store, {
-              lastEvent: 'initial',
-            });
             const event = JSON.parse(evt.data);
-            
-            console.log('[DEBUG] Initial event data:', event);
-            
-            patchState(store, {
-              guildInfo: event.guildInfo,
-              roles: event.roles,
-              channels: event.channels,
-              commands: (
-                event.commands as CommandConfigResultWithCategory[]
-              ).reduce((acc, command) => {
-                acc.set(command.id, command);
-                return acc;
-              }, new Map<number, CommandConfigResultWithCategory>()),
-              commandPermissions: (
-                event.commandPermissions as GuildApplicationCommandPermissions[]
-              ).reduce((acc, permission) => {
-                acc.set(permission.id, permission);
-                return acc;
-              }, new Map<string, GuildApplicationCommandPermissions>()),
-            });
+            console.log('[DEBUG] SSE event received:', event);
+
+            switch (event.type) {
+              case 'guild_info_loaded':
+                patchState(store, {
+                  lastEvent: 'guild_info_loaded',
+                  guildInfo: event.guildInfo,
+                  isLoading: false,
+                });
+                break;
+
+              case 'roles_loaded':
+                patchState(store, {
+                  lastEvent: 'roles_loaded',
+                  roles: event.roles,
+                });
+                break;
+
+              case 'channels_loaded':
+                patchState(store, {
+                  lastEvent: 'channels_loaded',
+                  channels: event.channels,
+                });
+                break;
+
+              case 'commands_loaded':
+                patchState(store, {
+                  lastEvent: 'commands_loaded',
+                  commands: (
+                    event.commands as CommandConfigResultWithCategory[]
+                  ).reduce((acc, command) => {
+                    acc.set(command.id, command);
+                    return acc;
+                  }, new Map<number, CommandConfigResultWithCategory>()),
+                });
+                break;
+
+              case 'command_permissions_loaded':
+                patchState(store, {
+                  lastEvent: 'command_permissions_loaded',
+                  commandPermissions: (
+                    event.commandPermissions as GuildApplicationCommandPermissions[]
+                  ).reduce((acc, permission) => {
+                    acc.set(permission.id, permission);
+                    return acc;
+                  }, new Map<string, GuildApplicationCommandPermissions>()),
+                });
+                break;
+
+              case 'initial':
+                // Legacy support for initial event
+                patchState(store, {
+                  lastEvent: 'initial',
+                  guildInfo: event.guildInfo,
+                  roles: event.roles,
+                  channels: event.channels,
+                  commands: (
+                    event.commands as CommandConfigResultWithCategory[]
+                  ).reduce((acc, command) => {
+                    acc.set(command.id, command);
+                    return acc;
+                  }, new Map<number, CommandConfigResultWithCategory>()),
+                  commandPermissions: (
+                    event.commandPermissions as GuildApplicationCommandPermissions[]
+                  ).reduce((acc, permission) => {
+                    acc.set(permission.id, permission);
+                    return acc;
+                  }, new Map<string, GuildApplicationCommandPermissions>()),
+                  isLoading: false,
+                });
+                break;
+
+              default:
+                if (event.error) {
+                  console.error('[Dashboard] SSE error:', event.error);
+                } else {
+                  console.warn('[Dashboard] Unknown SSE event type:', event.type);
+                }
+                break;
+            }
           } catch (error) {
-            console.error('[Dashboard] Error processing initial event:', error);
+            console.error('[Dashboard] Error processing SSE event:', error);
           }
         });
+
 
         source.addEventListener('update', (evt: MessageEvent) => {
           try {
@@ -277,6 +336,43 @@ export const CacheStore = signalStore(
           },
           new Map<number, CommandCategory>()
         );
+      }),
+      // Computed properties to track what data has been loaded
+      isGuildInfoLoaded: computed(() => !!store.guildInfo()),
+      isRolesLoaded: computed(() => {
+        const lastEvent = store.lastEvent();
+        return lastEvent?.includes('roles_loaded') || lastEvent?.includes('initial');
+      }),
+      isChannelsLoaded: computed(() => {
+        const lastEvent = store.lastEvent();
+        return lastEvent?.includes('channels_loaded') || lastEvent?.includes('initial');
+      }),
+      isCommandsLoaded: computed(() => store.commands().size > 0),
+      isCommandPermissionsLoaded: computed(() => store.commandPermissions().size > 0),
+      
+      // Progressive loading computed properties
+      isBasicDataLoaded: computed(() => {
+        // Basic data is loaded when we have guild info (the most critical piece)
+        return !!store.guildInfo();
+      }),
+      isCommandsLoading: computed(() => {
+        // Commands are loading if we have basic data but no commands yet and we're connected
+        const hasBasicData = !!store.guildInfo();
+        const hasCommands = store.commands().size > 0;
+        const isConnected = !!store.lastEvent() && store.lastEvent() !== 'Error';
+        return hasBasicData && !hasCommands && isConnected && !store.error();
+      }),
+      isCommandConfigLoading: computed(() => {
+        // Command config buttons are loading until we have roles and channels
+        const hasCommands = store.commands().size > 0;
+        const rolesLoaded = store.roles();
+        const channelsLoaded = store.channels();
+        
+        return hasCommands && (!rolesLoaded || !channelsLoaded);
+      }),
+      isFullyLoaded: computed(() => {
+        // Fully loaded when we have guild info and commands
+        return !!store.guildInfo() && store.commands().size > 0;
       }),
     };
   }),

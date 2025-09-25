@@ -2,39 +2,6 @@ import { Elysia } from 'elysia';
 import { DiscordService } from '../services/discord';
 import { logger } from '../utils/logger';
 
-// Auth middleware for user authentication
-export const userAuth = new Elysia({ name: 'userAuth' })
-  .derive(async ({ headers, set }) => {
-    const authHeader = headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      set.status = 401;
-      return {
-        error: 'Authorization header required',
-        user: null as any,
-        token: null as string | null
-      };
-    }
-
-    try {
-      const token = authHeader.substring(7);
-      const userData = await DiscordService.getUserInfo(token);
-      
-      return {
-        user: userData,
-        token,
-        error: null
-      };
-    } catch (error) {
-      logger.error('[Auth] User authentication failed:', error);
-      set.status = 401;
-      return {
-        error: 'Invalid or expired token',
-        user: null as any,
-        token: null as string | null
-      };
-    }
-  });
 
 // Auth middleware for bot authentication
 export const botAuth = new Elysia({ name: 'botAuth' })
@@ -126,54 +93,6 @@ export const guildAccess = new Elysia({ name: 'guildAccess' })
       return {
         error: 'Failed to verify guild access',
         hasAccess: false
-      };
-    }
-  });
-
-// Combined auth middleware - accepts either user or bot auth
-export const anyAuth = new Elysia({ name: 'anyAuth' })
-  .derive(async ({ headers, set }) => {
-    const authHeader = headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      set.status = 401;
-      return {
-        error: 'Authorization header required',
-        user: null,
-        isBot: false,
-        token: null
-      };
-    }
-
-    try {
-      const token = authHeader.substring(7);
-      
-      // Check if it's bot token first
-      if (token === process.env.BOT_TOKEN) {
-        return {
-          isBot: true,
-          user: null,
-          token,
-          error: null
-        };
-      }
-      
-      // Otherwise, try user authentication
-      const userData = await DiscordService.getUserInfo(token);
-      return {
-        user: userData,
-        isBot: false,
-        token,
-        error: null
-      };
-    } catch (error) {
-      logger.error('[Auth] Authentication failed:', error);
-      set.status = 401;
-      return {
-        error: 'Invalid or expired token',
-        user: null,
-        isBot: false,
-        token: null
       };
     }
   });

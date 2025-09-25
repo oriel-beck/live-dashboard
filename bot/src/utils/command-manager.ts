@@ -8,11 +8,6 @@ import {
   BaseCommand,
 } from "../types/command";
 
-// Local type definition for command info
-interface CommandInfo {
-  name: string;
-  description: string;
-}
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
 import logger from "./logger";
@@ -46,40 +41,6 @@ export class CommandManager {
     return this.commands;
   }
 
-  /**
-   * Deploy global commands to Discord
-   */
-  async deployGlobalCommands() {
-    try {
-      if (!this.client.application) {
-        logger.error(`[CommandManager] Client application not available`);
-        return;
-      }
-
-      // Deploy all registered commands globally
-      const commandsData = Array.from(this.commands.values()).map((cmd) => {
-        const baseData = cmd.data.toJSON();
-        
-        // Add default permission requirements for the applications.commands.permissions.update scope
-        return {
-          ...baseData,
-          default_member_permissions: "0", // Allow all members by default, server admins can restrict
-          dm_permission: false, // Commands only work in servers
-        };
-      });
-
-      await this.client.application.commands.set(commandsData);
-      logger.debug(
-        `[CommandManager] Deployed ${commandsData.length} global commands`
-      );
-      logger.debug("[CommandManager] Commands now use Discord's application command permissions system.");
-    } catch (error) {
-      logger.error(
-        `[CommandManager] Failed to deploy global commands:`,
-        error
-      );
-    }
-  }
 
   /**
    * Check cooldown for a command locally
@@ -245,30 +206,5 @@ export class CommandManager {
     }
   }
 
-  /**
-   * Get command information for API/Dashboard
-   */
-  getCommandInfo(commandName: string): CommandInfo | null {
-    const command = this.commands.get(commandName);
-    if (!command) return null;
 
-    return {
-      name: command.data.name,
-      description: command.data.description,
-    };
-  }
-
-  /**
-   * Get all command information for API/Dashboard
-   */
-  getAllCommandInfo(): Record<string, CommandInfo> {
-    const result: Record<string, CommandInfo> = {};
-    for (const [commandName] of this.commands) {
-      const info = this.getCommandInfo(commandName);
-      if (info) {
-        result[commandName] = info;
-      }
-    }
-    return result;
-  }
 }

@@ -1,7 +1,6 @@
 import { AppDataSource } from '../config/database';
 import { logger } from '../utils/logger';
 import { DefaultCommand } from '../entities/DefaultCommand';
-import { CommandCategory } from '../entities/CommandCategory';
 import { Repository, IsNull } from 'typeorm';
 import { DefaultCommandRegistration } from '@discord-bot/shared-types';
 
@@ -22,12 +21,6 @@ export class DatabaseService {
     }
   }
 
-  static getConnection() {
-    if (!AppDataSource.isInitialized) {
-      throw new Error('Database not initialized. Call initialize() first.');
-    }
-    return AppDataSource;
-  }
 
   static getRepository<T extends object>(entity: new () => T): Repository<T> {
     if (!AppDataSource.isInitialized) {
@@ -89,19 +82,6 @@ export class DatabaseService {
     }
   }
 
-  static async getDefaultCommands(): Promise<DefaultCommand[]> {
-    const repository = this.getRepository(DefaultCommand);
-    
-    try {
-      return await repository.find({
-        relations: ['category'],
-        order: { name: 'ASC' }
-      });
-    } catch (error) {
-      logger.error('[Database] Error getting default commands:', error);
-      throw error;
-    }
-  }
 
   static async getDefaultCommandsHierarchical(): Promise<DefaultCommand[]> {
     const repository = this.getRepository(DefaultCommand);
@@ -135,84 +115,4 @@ export class DatabaseService {
     }
   }
 
-  // Command Category operations
-  static async getCommandCategories(): Promise<CommandCategory[]> {
-    const repository = this.getRepository(CommandCategory);
-    
-    try {
-      return await repository.find({
-        relations: ['commands'],
-        order: { name: 'ASC' }
-      });
-    } catch (error) {
-      logger.error('[Database] Error getting command categories:', error);
-      throw error;
-    }
-  }
-
-  static async getCommandCategoryById(id: number): Promise<CommandCategory | null> {
-    const repository = this.getRepository(CommandCategory);
-    
-    try {
-      return await repository.findOne({
-        where: { id },
-        relations: ['commands']
-      });
-    } catch (error) {
-      logger.error('[Database] Error getting command category by ID:', error);
-      throw error;
-    }
-  }
-
-  static async createCommandCategory(category: {
-    name: string;
-    description: string;
-  }): Promise<CommandCategory> {
-    const repository = this.getRepository(CommandCategory);
-    
-    try {
-      const newCategory = repository.create(category);
-      return await repository.save(newCategory);
-    } catch (error) {
-      logger.error('[Database] Error creating command category:', error);
-      throw error;
-    }
-  }
-
-  static async updateCommandCategory(id: number, updates: Partial<CommandCategory>): Promise<CommandCategory | null> {
-    const repository = this.getRepository(CommandCategory);
-    
-    try {
-      await repository.update(id, updates);
-      return await this.getCommandCategoryById(id);
-    } catch (error) {
-      logger.error('[Database] Error updating command category:', error);
-      throw error;
-    }
-  }
-
-  static async deleteCommandCategory(id: number): Promise<boolean> {
-    const repository = this.getRepository(CommandCategory);
-    
-    try {
-      const result = await repository.delete(id);
-      return (result.affected ?? 0) > 0;
-    } catch (error) {
-      logger.error('[Database] Error deleting command category:', error);
-      throw error;
-    }
-  }
-
-  // Guild-specific command operations
-  static async getGuildCommandConfig(guildId: string, commandId: string): Promise<any> {
-    // This would need to be implemented based on your guild command configuration needs
-    // For now, returning null as this seems to be a placeholder
-    return null;
-  }
-
-  static async updateGuildCommandConfig(guildId: string, commandId: string, config: any): Promise<any> {
-    // This would need to be implemented based on your guild command configuration needs
-    // For now, returning null as this seems to be a placeholder
-    return null;
-  }
 }

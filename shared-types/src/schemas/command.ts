@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-// Base Command Data Schema - reusable across different contexts
-export const BaseCommandDataSchema = z.object({
+// Base Command Data Schema - reusable across different contexts  
+const BaseCommandDataSchema = z.object({
   id: z.number(),
   discordId: z.bigint().nullable(),
   name: z.string(),
@@ -11,23 +11,6 @@ export const BaseCommandDataSchema = z.object({
   enabled: z.boolean(),
   parentId: z.number().nullable(),
   categoryId: z.number().nullable(),
-  createdAt: z.date().nullable(),
-  updatedAt: z.date().nullable(),
-});
-
-// Command Category Schema
-export const CommandCategorySchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  commands: z.array(z.lazy((): z.ZodTypeAny => BaseCommandDataSchema)).optional(),
-});
-
-// Command Config Result With Category Schema (extends BaseCommandData with category)
-export const CommandConfigResultWithCategorySchema = BaseCommandDataSchema.extend({
-  category: CommandCategorySchema.optional(),
 });
 
 // Command Permissions Update Request Schema
@@ -51,12 +34,6 @@ export const DefaultCommandRegistrationSchema = z.object({
   discordId: z.string().transform((val) => BigInt(val)).nullable().optional(),
 });
 
-// Command Config Update Schema (for updating command configurations)
-export const CommandConfigUpdateSchema = z.object({
-  enabled: z.boolean().optional(),
-  cooldown: z.number().optional(),
-  permissions: z.string().optional(),
-});
 
 // Default Command Registration Response Schema
 export const DefaultCommandRegistrationResponseSchema = z.object({
@@ -65,11 +42,31 @@ export const DefaultCommandRegistrationResponseSchema = z.object({
 });
 
 // Export types
-export type BaseCommandData = z.infer<typeof BaseCommandDataSchema>;
-export type CommandCategory = z.infer<typeof CommandCategorySchema>;
 export type CommandConfigResult = z.infer<typeof BaseCommandDataSchema>;
-export type CommandConfigResultWithCategory = z.infer<typeof CommandConfigResultWithCategorySchema>;
 export type CommandPermissionsUpdate = z.infer<typeof CommandPermissionsUpdateSchema>;
 export type DefaultCommandRegistration = z.infer<typeof DefaultCommandRegistrationSchema>;
-export type CommandConfigUpdate = z.infer<typeof CommandConfigUpdateSchema>;
 export type DefaultCommandRegistrationResponse = z.infer<typeof DefaultCommandRegistrationResponseSchema>;
+
+// Extended type for command results with category information
+export type CommandConfigResultWithCategory = CommandConfigResult & {
+  category?: {
+    id: number;
+    name: string;
+    description: string;
+  };
+};
+
+// Add command category type  
+export type CommandCategory = {
+  id: number;
+  name: string;
+  description: string;
+  commands?: CommandConfigResult[];
+};
+
+// Command permissions response type
+export type CommandPermissionsResponse = {
+  success: boolean;
+  data?: any;
+  error?: string;
+};
