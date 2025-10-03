@@ -603,9 +603,93 @@
       }
     },
     {
+      "title": "Current Active SSE Connections",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 12, "x": 0, "y": 50},
+      "targets": [
+        {
+          "expr": "sum(api_sse_active_connections)",
+          "refId": "A",
+          "legendFormat": "Active Connections"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 50}
+            ]
+          },
+          "color": {"mode": "palette-classic"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "text": {},
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "title": "SSE Active Connections Over Time",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 50},
+      "targets": [
+        {
+          "expr": "sum(api_sse_active_connections)",
+          "refId": "A",
+          "legendFormat": "Total Active Connections"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "vis": false},
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {"type": "linear"},
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 50}
+            ]
+          },
+          "unit": "short",
+          "min": 0
+        }
+      }
+    },
+    {
       "title": "Total Commands Executed",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 50},
+      "gridPos": {"h": 4, "w": 12, "x": 12, "y": 54},
       "targets": [
         {
           "expr": "sum(bot_commands_executed_total)",

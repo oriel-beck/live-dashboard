@@ -12,21 +12,15 @@ import {
 export interface CachedGuildRole {
   id: string;
   name: string;
-  color: number;
-  hoist: boolean;
   position: number;
   permissions: string;
-  managed: boolean;
-  mentionable: boolean;
 }
 
 export interface CachedGuildChannel {
   id: string;
   name: string;
-  type: number;
   position: number;
-  parent_id: string | null;
-  permission_overwrites: unknown[];
+  botPermissions: string;
 }
 
 export interface CachedGuildInfo {

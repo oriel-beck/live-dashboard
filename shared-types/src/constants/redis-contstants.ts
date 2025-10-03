@@ -6,6 +6,7 @@ export const REDIS_KEYS = {
   GUILD_CHANNELS: (guildId: string) => `guild:${guildId}:channels`,
   GUILD_EVENTS: (guildId: string) => `events:guild:${guildId}`,
   GUILD_COMMAND_PERMISSIONS: (guildId: string) => `guild:${guildId}:command_permissions`,
+  BOT_PROFILE: (guildId: string) => `bot_profile:${guildId}`,
   USER_EVENTS: (userId: string) => `events:user:${userId}`,
 } as const;
 
@@ -15,4 +16,5 @@ export const CACHE_TTL = {
   GUILD_ROLES: 60 * 60, // 1 hour
   GUILD_CHANNELS: 60 * 60, // 1 hour
   COMMAND_PERMISSIONS: 5 * 60, // 5 minutes
+  BOT_PROFILE: 10 * 60, // 10 minutes
 } as const;

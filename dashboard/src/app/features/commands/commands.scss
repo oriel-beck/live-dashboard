@@ -1,0 +1,238 @@
+.commands-container {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    gap: 1rem;
+
+    p {
+      color: var(--text-color-secondary);
+      margin: 0;
+    }
+  }
+
+  .error-container {
+    margin-bottom: 1rem;
+  }
+
+  .no-commands {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-color-secondary);
+
+    h3 {
+      margin-bottom: 0.5rem;
+      color: var(--text-color);
+    }
+  }
+
+  .category-description {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--surface-card);
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-color);
+
+    p {
+      margin: 0;
+      color: var(--text-color-secondary);
+      font-style: italic;
+    }
+  }
+
+  .commands-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+
+    .command-card {
+      height: fit-content;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      }
+
+      .command-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 1rem 1rem 0 1rem;
+
+        .command-title {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex: 1;
+
+          h4 {
+            margin: 0;
+            color: var(--text-color);
+            font-size: 1.1rem;
+            font-weight: 600;
+          }
+        }
+      }
+
+      .command-content {
+        padding: 1rem;
+
+        .command-description {
+          margin: 0 0 1rem 0;
+          color: var(--text-color-secondary);
+          line-height: 1.5;
+        }
+
+        .command-permissions {
+          margin-bottom: 1rem;
+
+          .permissions-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-color);
+
+            i {
+              color: var(--primary-color);
+            }
+          }
+
+          .permissions-text {
+            margin: 0;
+            padding: 0.5rem;
+            background: var(--surface-100);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--text-color-secondary);
+            cursor: help;
+            border-left: 3px solid var(--primary-color);
+          }
+        }
+
+        .command-subcommands {
+          margin-bottom: 1rem;
+
+          .subcommands-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-color);
+
+            i {
+              color: var(--primary-color);
+            }
+          }
+
+          .subcommands-list {
+            padding: 0.5rem;
+            background: var(--surface-100);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--text-color-secondary);
+
+            .subcommand-item {
+              font-family: 'Courier New', monospace;
+              background: var(--surface-200);
+              padding: 0.2rem 0.4rem;
+              border-radius: 3px;
+              margin-right: 0.3rem;
+            }
+          }
+        }
+
+        .command-details {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          padding-top: 1rem;
+          border-top: 1px solid var(--surface-border);
+
+          .detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+
+            .detail-label {
+              color: var(--text-color-secondary);
+              font-weight: 500;
+            }
+
+            .detail-value {
+              color: var(--text-color);
+              font-weight: 600;
+
+              &.enabled {
+                color: var(--green-500);
+              }
+
+              &.disabled {
+                color: var(--red-500);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Dark theme adjustments
+:host-context(.dark-theme) {
+  .commands-container {
+    .command-card {
+      .command-content {
+        .command-permissions .permissions-text,
+        .command-subcommands .subcommands-list {
+          background: var(--surface-200);
+        }
+
+        .command-subcommands .subcommands-list .subcommand-item {
+          background: var(--surface-300);
+        }
+      }
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .commands-container {
+    padding: 1rem;
+
+    .commands-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .commands-container {
+    padding: 0.5rem;
+
+    .command-card {
+      .command-header {
+        padding: 0.75rem 0.75rem 0 0.75rem;
+      }
+
+      .command-content {
+        padding: 0.75rem;
+      }
+    }
+  }
+}

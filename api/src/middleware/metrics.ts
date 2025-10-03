@@ -1,4 +1,4 @@
-import { Counter, Histogram, register } from 'prom-client';
+import { Counter, Histogram, Gauge, register } from 'prom-client';
 
 // API-specific metrics
 export const apiRequestDuration = new Histogram({
@@ -6,18 +6,30 @@ export const apiRequestDuration = new Histogram({
   help: 'API request duration in seconds by endpoint type',
   labelNames: ['endpoint_type', 'method', 'status_code'],
   buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+  registers: [register], // Explicitly register with default registry
 });
 
 export const apiErrors = new Counter({
   name: 'api_errors_total',
   help: 'Total API errors by endpoint and error type',
   labelNames: ['endpoint_type', 'method', 'status_code', 'error_type'],
+  registers: [register], // Explicitly register with default registry
 });
 
-export const sseConnections = new Counter({
+// Active SSE connections (current count)
+export const sseActiveConnections = new Gauge({
+  name: 'api_sse_active_connections',
+  help: 'Current number of active SSE connections by guild',
+  labelNames: ['guild_id'],
+  registers: [register], // Explicitly register with default registry
+});
+
+// Total SSE connections (historical counter)
+export const sseTotalConnections = new Counter({
   name: 'api_sse_connections_total',
-  help: 'Total SSE connections by guild',
-  labelNames: ['guild_id', 'connection_type'],
+  help: 'Total SSE connections established by guild',
+  labelNames: ['guild_id'],
+  registers: [register], // Explicitly register with default registry
 });
 
 // Helper to categorize endpoints
@@ -62,8 +74,23 @@ export function recordApiRequest(
 
 // Record SSE connection
 export function recordSseConnection(guildId: string, type: 'connect' | 'disconnect') {
-  sseConnections.inc({
-    guild_id: guildId,
-    connection_type: type,
-  });
+  if (type === 'connect') {
+    // Increment active connections gauge
+    sseActiveConnections.inc({
+      guild_id: guildId,
+    });
+    
+    // Increment total connections counter
+    sseTotalConnections.inc({
+      guild_id: guildId,
+    });
+  } else if (type === 'disconnect') {
+    // Decrement active connections gauge
+    sseActiveConnections.dec({
+      guild_id: guildId,
+    });
+  }
 }
+
+// Export the registry for potential use by other parts of the application
+export { register };

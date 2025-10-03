@@ -1,12 +1,15 @@
 import {
+  APIUser,
   BotConfigUpdateRequestSchema,
-  type BotConfig,
+  BotProfile,
+  SSE_EVENT_TYPES,
   type BotConfigUpdateRequest,
 } from "@discord-bot/shared-types";
 import { Elysia } from "elysia";
 import { config } from "../config";
 import { sessionMiddleware } from "../middleware/session";
 import { DiscordService } from "../services/discord";
+import { RedisService } from "../services/redis";
 import { logger } from "../utils/logger";
 import { withAbort } from "../utils/request-utils";
 
@@ -15,7 +18,7 @@ class BotConfigService {
   /**
    * Get current bot user information from Discord
    */
-  static async getCurrentBotUser(): Promise<any> {
+  static async getCurrentBotUser(): Promise<APIUser> {
     try {
       const response = await fetch("https://discord.com/api/v10/users/@me", {
         headers: {
@@ -38,83 +41,43 @@ class BotConfigService {
   }
 
   /**
-   * Update bot user profile on Discord
+   * Update bot guild profile on Discord and refresh cache
    */
   static async updateBotProfile(
+    guildId: string,
     botConfig: BotConfigUpdateRequest
-  ): Promise<any> {
-    try {
-      const updateData: any = {};
+  ): Promise<BotProfile> {
+    const updateData: any = {};
 
-      // Add username if nickname is provided
-      if (botConfig.nickname && botConfig.nickname.trim()) {
-        updateData.username = botConfig.nickname.trim();
-      }
-
-      // Add avatar if provided (should be base64 data URI)
-      if (botConfig.avatar) {
-        updateData.avatar = botConfig.avatar;
-      }
-
-      // Add banner if provided (should be base64 data URI)
-      if (botConfig.banner) {
-        updateData.banner = botConfig.banner;
-      }
-
-      // Only make the API call if we have something to update
-      if (Object.keys(updateData).length === 0) {
-        throw new Error("No valid fields to update");
-      }
-
-      const response = await fetch("https://discord.com/api/v10/users/@me", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bot ${config.discord.botToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(
-          `Discord API error: ${response.status} ${response.statusText} - ${errorData}`
-        );
-      }
-
-      const updatedUser = await response.json();
-      logger.info("[BotConfig] Successfully updated bot profile on Discord");
-      return updatedUser;
-    } catch (error) {
-      logger.error("[BotConfig] Error updating bot profile:", error);
-      throw error;
+    // Add nickname if provided
+    if (botConfig.nickname !== undefined) {
+      updateData.nick = botConfig.nickname?.trim() || null;
     }
+
+    // Add avatar if provided (should be base64 data URI)
+    if (botConfig.avatar !== undefined) {
+      updateData.avatar = botConfig.avatar;
+    }
+
+    // Add banner if provided (should be base64 data URI)
+    if (botConfig.banner !== undefined) {
+      updateData.banner = botConfig.banner;
+    }
+
+    // Only make the API call if we have something to update
+    if (Object.keys(updateData).length === 0) {
+      throw new Error("No valid fields to update");
+    }
+
+    return await DiscordService.updateBotProfile(guildId, updateData);
   }
 
   /**
-   * Get bot configuration for display (current Discord user info)
+   * Get bot configuration for display (current Discord user info) with caching
    */
-  static async getBotConfig(guildId: string): Promise<BotConfig> {
-    try {
-      const botUser = await this.getCurrentBotUser();
-
-      return {
-        guildId,
-        avatar: botUser.avatar
-          ? `https://cdn.discordapp.com/avatars/${botUser.id}/${botUser.avatar}.png?size=512`
-          : undefined,
-        banner: botUser.banner
-          ? `https://cdn.discordapp.com/banners/${botUser.id}/${botUser.banner}.png?size=1024`
-          : undefined,
-        nickname: botUser.username, // For bots, username is the display name
-      };
-    } catch (error) {
-      logger.error(
-        `[BotConfig] Error getting bot config for guild ${guildId}:`,
-        error
-      );
-      throw error;
-    }
+  static async getBotConfig(guildId: string): Promise<BotProfile> {
+    // Use DiscordService to get bot profile (eliminates code duplication)
+    return await DiscordService.getBotProfile(guildId);
   }
 }
 
@@ -142,10 +105,7 @@ export const botConfigPlugin = new Elysia({
       const userGuilds = await DiscordService.getUserGuilds(
         context.accessToken
       );
-      const hasAccess = await DiscordService.checkGuildAccess(
-        guildId,
-        userGuilds
-      );
+      const hasAccess = DiscordService.checkGuildAccess(guildId, userGuilds);
 
       if (!hasAccess) {
         set.status = 403;
@@ -224,31 +184,39 @@ export const botConfigPlugin = new Elysia({
   })
 
   // PUT /guilds/:guildId/bot-config - Update bot configuration
-  .put("/", async ({ body, guildId, userId, set }) => {
+  .put("/", async ({ body, guildId, set }) => {
     try {
       // Validate request body
       const validatedBody = BotConfigUpdateRequestSchema.parse(body);
 
-      // Update bot profile on Discord
-      const updatedUser = await BotConfigService.updateBotProfile(
+      // Update bot guild member profile on Discord
+      const updatedProfile = await BotConfigService.updateBotProfile(
+        guildId,
         validatedBody
       );
 
-      // Return the updated configuration
-      const updatedConfig: BotConfig = {
-        guildId,
-        avatar: updatedUser.avatar
-          ? `https://cdn.discordapp.com/avatars/${updatedUser.id}/${updatedUser.avatar}.png?size=512`
-          : undefined,
-        banner: updatedUser.banner
-          ? `https://cdn.discordapp.com/banners/${updatedUser.id}/${updatedUser.banner}.png?size=1024`
-          : undefined,
-        nickname: updatedUser.username,
-      };
+      // Cache is automatically refreshed by DiscordService.updateBotProfile
+
+      // Publish SSE update for real-time dashboard updates
+      try {
+        await RedisService.publishGuildEvent(guildId, {
+          type: SSE_EVENT_TYPES.BOT_PROFILE_UPDATE,
+          data: updatedProfile,
+        });
+        logger.info(
+          `[BotConfig] Published bot profile update event for guild ${guildId}`
+        );
+      } catch (error) {
+        logger.warn(
+          `[BotConfig] Failed to publish SSE event for guild ${guildId}:`,
+          error
+        );
+        // Don't fail the request if SSE publish fails
+      }
 
       return {
         success: true,
-        data: updatedConfig,
+        data: updatedProfile,
       };
     } catch (error) {
       logger.error(
@@ -277,28 +245,37 @@ export const botConfigPlugin = new Elysia({
   })
 
   // DELETE /guilds/:guildId/bot-config - Reset bot configuration
-  .delete("/", async ({ guildId, userId, set }) => {
+  .delete("/", async ({ guildId, set }) => {
     try {
-      // Reset bot profile on Discord (remove avatar and banner)
+      // Reset bot guild member profile (remove avatar, banner, and nickname)
       const resetData = {
         avatar: null,
         banner: null,
+        nick: null,
       };
 
-      const response = await fetch("https://discord.com/api/v10/users/@me", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bot ${config.discord.botToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(resetData),
-      });
+      const resetProfile = await DiscordService.updateBotProfile(
+        guildId,
+        resetData
+      );
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(
-          `Discord API error: ${response.status} ${response.statusText} - ${errorData}`
+      // Cache is automatically refreshed by DiscordService.updateBotProfile
+
+      // Publish SSE update for real-time dashboard updates
+      try {
+        await RedisService.publishGuildEvent(guildId, {
+          type: SSE_EVENT_TYPES.BOT_PROFILE_UPDATE,
+          data: resetProfile,
+        });
+        logger.info(
+          `[BotConfig] Published bot profile reset event for guild ${guildId}`
         );
+      } catch (error) {
+        logger.warn(
+          `[BotConfig] Failed to publish SSE event for guild ${guildId}:`,
+          error
+        );
+        // Don't fail the request if SSE publish fails
       }
 
       return {

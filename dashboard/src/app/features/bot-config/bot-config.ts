@@ -1,9 +1,24 @@
-import { Component, computed, inject, signal, OnInit } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  signal,
+  OnInit,
+  effect,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import {
+  ReactiveFormsModule,
+  FormBuilder,
+  FormGroup,
+  Validators,
+} from '@angular/forms';
 import { CacheStore } from '../../store/sse.store';
 import { ApiService } from '../../core/services/api.service';
-import { BotConfig as BotConfigType, BotConfigUpdateRequest } from '@discord-bot/shared-types';
+import {
+  BotConfig as BotConfigType,
+  BotConfigUpdateRequest,
+} from '@discord-bot/shared-types';
 
 // PrimeNG Imports
 import { ButtonModule } from 'primeng/button';
@@ -19,7 +34,7 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
   selector: 'app-bot-config',
   imports: [
     CommonModule,
-    FormsModule,
+    ReactiveFormsModule,
     ButtonModule,
     InputTextModule,
     FileUploadModule,
@@ -33,235 +48,292 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
   providers: [MessageService],
 })
 export class BotConfig implements OnInit {
-  store = inject(CacheStore);
-  messageService = inject(MessageService);
-  apiService = inject(ApiService);
+  // Dependencies
+  readonly store = inject(CacheStore);
+  private readonly messageService = inject(MessageService);
+  private readonly apiService = inject(ApiService);
+  private readonly fb = inject(FormBuilder);
 
-  // Local state
-  botConfig = signal<BotConfigType>({
-    guildId: '',
-    nickname: ''
+  // Constants
+  private readonly MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
+  private readonly ALLOWED_IMAGE_TYPES = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+  ];
+
+  // Reactive Form
+  readonly botConfigForm: FormGroup = this.fb.group({
+    avatar: [null],
+    banner: [null],
+    nickname: ['', [Validators.maxLength(32)]],
   });
 
-  isSaving = signal(false);
-  isLoading = signal(true);
+  readonly botConfigSignal = signal<typeof this.botConfigForm.value>({
+    avatar: null,
+    banner: null,
+    nickname: '',
+  });
 
-  ngOnInit() {
-    this.loadBotConfig();
-  }
+  readonly isSaving = signal(false);
 
-  private async loadBotConfig(): Promise<void> {
-    const guildId = this.store.guildId();
-    if (!guildId) return;
-
-    try {
-      this.isLoading.set(true);
-      const response = await this.apiService.get<BotConfigType>(
-        `/guilds/${guildId}/bot-config`
-      ).toPromise();
-
-      if (response?.success && response?.data) {
-        this.botConfig.set(response.data);
+  constructor() {
+    // Sync form with SSE store data when available
+    effect(() => {
+      const sseProfile = this.store.botProfile();
+      if (sseProfile) {
+        this.botConfigForm.patchValue(
+          {
+            avatar: sseProfile.avatar,
+            banner: sseProfile.banner,
+            nickname: sseProfile.nickname,
+          },
+          { emitEvent: false }
+        );
       }
-    } catch (error) {
-      console.error('Error loading bot configuration:', error);
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Load Failed',
-        detail: 'Failed to load bot configuration',
-      });
-    } finally {
-      this.isLoading.set(false);
-    }
+    });
   }
 
-  getCurrentAvatarUrl(): string {
-    const guildInfo = this.store.guildInfo();
-    if (!guildInfo) return '/assets/default-avatar.png';
+  // Lifecycle
+  ngOnInit() {
+    this.botConfigForm.valueChanges.subscribe({
+      next: (value) => {
+        this.botConfigSignal.set(value);
+      },
+    });
+  }
 
-    // If custom avatar is set, use it, otherwise use guild icon as fallback
+  // Computed properties
+  currentAvatarUrl = computed(() => {
+    const formValue = this.botConfigSignal().avatar;
+    const sseProfile = this.store.botProfile();
+
+    // Show form preview if changed, otherwise show SSE state
+    if (formValue && formValue !== sseProfile?.avatar) {
+      return formValue;
+    }
+
+    return sseProfile?.avatar || '/assets/default-avatar.png';
+  });
+
+  currentBannerUrl = computed(() => {
+    const formValue = this.botConfigSignal().banner;
+    const sseProfile = this.store.botProfile();
+
+    // Show form preview if changed, otherwise show SSE state
+    if (formValue && formValue !== sseProfile?.banner) {
+      return formValue;
+    }
+
+    return sseProfile?.banner || '';
+  });
+
+  hasAvatarChanges = computed(() => {
+    const formValue = this.botConfigSignal().avatar;
+    const sseProfile = this.store.botProfile();
+    return formValue !== sseProfile?.avatar;
+  });
+
+  hasBannerChanges = computed(() => {
+    const formValue = this.botConfigSignal().banner;
+    const sseProfile = this.store.botProfile();
+    return formValue !== sseProfile?.banner;
+  });
+
+  hasNicknameChanges = computed(() => {
+    const formValue = this.botConfigForm.get('nickname')?.value;
+    const sseProfile = this.store.botProfile();
+    return formValue !== sseProfile?.nickname;
+  });
+
+  hasAnyChanges = computed(() => {
     return (
-      this.botConfig().avatar ||
-      (guildInfo.icon
-        ? `https://cdn.discordapp.com/icons/${guildInfo.id}/${guildInfo.icon}.png?size=512`
-        : '/assets/default-avatar.png')
+      this.hasAvatarChanges() ||
+      this.hasBannerChanges() ||
+      this.hasNicknameChanges()
     );
+  });
+
+  // File handling
+  private validateFile(file: File): string | null {
+    if (file.size > this.MAX_FILE_SIZE) {
+      return 'File size must be less than 8MB';
+    }
+
+    if (
+      !this.ALLOWED_IMAGE_TYPES.includes(file.type) &&
+      !file.type.startsWith('image/')
+    ) {
+      return 'Please select a valid image file (JPG, PNG, GIF, WebP)';
+    }
+
+    return null;
+  }
+
+  private processImageFile(file: File, type: 'avatar' | 'banner'): void {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      this.botConfigForm.patchValue({
+        [type]: result,
+      });
+
+      this.messageService.add({
+        severity: 'success',
+        summary: `${type === 'avatar' ? 'Avatar' : 'Banner'} Updated`,
+        detail: `${
+          type === 'avatar' ? 'Avatar' : 'Banner'
+        } preview updated successfully`,
+      });
+    };
+    reader.readAsDataURL(file);
   }
 
   onAvatarSelect(event: any): void {
     const file = event.files[0];
+    if (!file) return;
 
-    if (file) {
-      // Validate file size (max 8MB for Discord)
-      if (file.size > 8 * 1024 * 1024) {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'File Too Large',
-          detail: 'File size must be less than 8MB',
-        });
-        return;
-      }
-
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Invalid File Type',
-          detail: 'Please select a valid image file (JPG, PNG, GIF)',
-        });
-        return;
-      }
-
-      // Create base64 Data URI for Discord API
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        this.botConfig.update((config) => ({
-          ...config,
-          avatar: result, // This will be a data:image/...;base64,... string
-        }));
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Avatar Updated',
-          detail: 'Avatar preview updated successfully',
-        });
-      };
-      reader.readAsDataURL(file);
+    const validationError = this.validateFile(file);
+    if (validationError) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Invalid File',
+        detail: validationError,
+      });
+      return;
     }
+
+    this.processImageFile(file, 'avatar');
   }
 
   onBannerSelect(event: any): void {
     const file = event.files[0];
+    if (!file) return;
 
-    if (file) {
-      // Validate file size (max 8MB)
-      if (file.size > 8 * 1024 * 1024) {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'File Too Large',
-          detail: 'File size must be less than 8MB',
-        });
-        return;
-      }
-
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Invalid File Type',
-          detail: 'Please select a valid image file (JPG, PNG, GIF)',
-        });
-        return;
-      }
-
-      // Create base64 Data URI for Discord API
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        this.botConfig.update((config) => ({
-          ...config,
-          banner: result, // This will be a data:image/...;base64,... string
-        }));
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Banner Updated',
-          detail: 'Banner preview updated successfully',
-        });
-      };
-      reader.readAsDataURL(file);
+    const validationError = this.validateFile(file);
+    if (validationError) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Invalid File',
+        detail: validationError,
+      });
+      return;
     }
+
+    this.processImageFile(file, 'banner');
+  }
+
+  // Form reset methods
+  private resetField(field: 'avatar' | 'banner'): void {
+    const sseProfile = this.store.botProfile();
+    this.botConfigForm.patchValue({
+      [field]: sseProfile?.[field],
+    });
+
+    const fieldName = field === 'avatar' ? 'Avatar' : 'Banner';
+    this.messageService.add({
+      severity: 'info',
+      summary: `${fieldName} Reset`,
+      detail: `${fieldName} changes have been reverted`,
+    });
   }
 
   resetAvatar(): void {
-    this.botConfig.update((config) => ({
-      ...config,
-      avatar: undefined,
-    }));
+    this.resetField('avatar');
   }
 
   resetBanner(): void {
-    this.botConfig.update((config) => ({
-      ...config,
-      banner: undefined,
-    }));
+    this.resetField('banner');
   }
 
-  async saveConfiguration(): Promise<void> {
+  // API operations
+  private showToast(
+    severity: 'success' | 'error' | 'info',
+    summary: string,
+    detail: string
+  ): void {
+    this.messageService.add({ severity, summary, detail });
+  }
+
+  saveConfiguration(): void {
+    const guildId = this.store.guildId();
+    if (!guildId) return;
+
+    this.isSaving.set(true);
+    const configData = this.botConfigSignal();
+
+    this.apiService
+      .put<BotConfigType>(`/guilds/${guildId}/bot-config`, {
+        avatar: configData.avatar,
+        banner: configData.banner,
+        nickname: configData.nickname,
+      })
+      .subscribe({
+        next: (response) => {
+          if (response?.success) {
+            this.showToast(
+              'success',
+              'Configuration Saved',
+              'Bot configuration saved successfully!'
+            );
+            // Configuration will be updated automatically via SSE
+          } else {
+            this.showToast(
+              'error',
+              'Save Failed',
+              response?.error || 'Failed to save configuration'
+            );
+          }
+        },
+        error: (error) => {
+          console.error('Error saving bot configuration:', error);
+          this.showToast(
+            'error',
+            'Save Failed',
+            'Failed to save configuration. Please try again.'
+          );
+        },
+        complete: () => {
+          this.isSaving.set(false);
+        },
+      });
+  }
+
+  resetConfiguration(): void {
     const guildId = this.store.guildId();
     if (!guildId) return;
 
     this.isSaving.set(true);
 
-    try {
-      const configData = this.botConfig();
-
-      const response = await this.apiService.put<BotConfigType>(
-        `/guilds/${guildId}/bot-config`,
-        {
-          avatar: configData.avatar,
-          banner: configData.banner,
-          nickname: configData.nickname
+    this.apiService.delete<any>(`/guilds/${guildId}/bot-config`).subscribe({
+      next: (response) => {
+        if (response?.success) {
+          this.showToast(
+            'success',
+            'Configuration Reset',
+            'Bot configuration reset successfully!'
+          );
+          // Configuration will be updated automatically via SSE
+        } else {
+          this.showToast(
+            'error',
+            'Reset Failed',
+            response?.error || 'Failed to reset configuration'
+          );
         }
-      ).toPromise();
-
-      if (response?.success) {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Configuration Saved',
-          detail: 'Bot configuration saved successfully!',
-        });
-
-        // Update local state with server response
-        if (response.data) {
-          this.botConfig.set(response.data);
-        }
-      } else {
-        throw new Error(response?.error || 'Failed to save configuration');
-      }
-    } catch (error) {
-      console.error('Error saving bot configuration:', error);
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Save Failed',
-        detail: 'Failed to save configuration. Please try again.',
-      });
-    } finally {
-      this.isSaving.set(false);
-    }
-  }
-
-  async resetConfiguration(): Promise<void> {
-    const guildId = this.store.guildId();
-    if (!guildId) return;
-
-    try {
-      this.isSaving.set(true);
-
-      const response = await this.apiService.delete<any>(
-        `/guilds/${guildId}/bot-config`
-      ).toPromise();
-
-      if (response?.success) {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Configuration Reset',
-          detail: 'Bot configuration reset successfully!',
-        });
-
-        // Reload the configuration to get the updated state
-        await this.loadBotConfig();
-      } else {
-        throw new Error(response?.error || 'Failed to reset configuration');
-      }
-    } catch (error) {
-      console.error('Error resetting bot configuration:', error);
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Reset Failed',
-        detail: 'Failed to reset configuration. Please try again.',
-      });
-    } finally {
-      this.isSaving.set(false);
-    }
+      },
+      error: (error) => {
+        console.error('Error resetting bot configuration:', error);
+        this.showToast(
+          'error',
+          'Reset Failed',
+          'Failed to reset configuration. Please try again.'
+        );
+      },
+      complete: () => {
+        this.isSaving.set(false);
+      },
+    });
   }
 }

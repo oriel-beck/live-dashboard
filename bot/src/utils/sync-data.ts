@@ -1,4 +1,5 @@
 import {
+  ChannelType,
   type Client,
   Events,
   type Guild,
@@ -12,11 +13,66 @@ import {
   publishGuildEvent,
   publishUserEvent,
 } from "./redis-cache-utils";
-import { REDIS_KEYS, CACHE_TTL } from "@discord-bot/shared-types";
+import {
+  REDIS_KEYS,
+  CACHE_TTL,
+  SSE_EVENT_TYPES,
+} from "@discord-bot/shared-types";
 import logger from "./logger";
 import { GuildApplicationCommandPermissions } from "@discord-bot/shared-types";
 
 let initiated = false;
+
+// Helper function to sync bot permissions for all channels in a guild
+async function syncGuildChannels(guild: Guild) {
+  const key = REDIS_KEYS.GUILD_CHANNELS(guild.id);
+  const botMember = guild.members.me;
+
+  if (!botMember) {
+    logger.debug(`[SyncData] Bot member not found for guild ${guild.id}`);
+    return;
+  }
+
+  try {
+    // Get all channels from the guild
+    const channels = guild.channels.cache.filter(
+      (ch) => ch.isTextBased() || ch.isVoiceBased()
+    );
+
+    for (const [, channel] of channels) {
+      let botPermissions = "0";
+      
+      try {
+        const permissions = channel.permissionsFor(botMember);
+        botPermissions = permissions?.bitfield.toString() ?? "0";
+      } catch (error) {
+        // Bot doesn't have access to this channel, but we still want to cache it
+        logger.debug(
+          `[SyncData] Bot cannot access channel ${channel.id} (${channel.name}) in guild ${guild.id}`
+        );
+      }
+
+      const data = {
+        id: channel.id,
+        name: channel.name,
+        position:
+          (channel as any).rawPosition ?? (channel as any).position ?? 0,
+        botPermissions,
+      };
+
+      await hsetJson(key, channel.id, data);
+    }
+
+    logger.debug(
+      `[SyncData] Synced ${channels.size} channels for guild ${guild.id}`
+    );
+  } catch (error) {
+    logger.error(
+      `[SyncData] Error syncing channels for guild ${guild.id}:`,
+      error
+    );
+  }
+}
 
 export function startDataSync(client: Client) {
   if (initiated) throw new Error("[SyncData]: Listeners are already set up");
@@ -30,6 +86,9 @@ export function startDataSync(client: Client) {
     // Don't load guild data - it will be loaded on-demand when dashboard requests it
     for (const [, guild] of client.guilds.cache) {
       await redis.sadd(REDIS_KEYS.GUILD_SET, guild.id);
+
+      // Sync bot permissions for all channels in this guild
+      await syncGuildChannels(guild);
     }
 
     logger.debug(
@@ -41,6 +100,10 @@ export function startDataSync(client: Client) {
   client.on(Events.GuildCreate, async (guild) => {
     // Add to guild set for O(1) lookups
     await redis.sadd(REDIS_KEYS.GUILD_SET, guild.id);
+
+    // Sync bot permissions for all channels in this new guild
+    await syncGuildChannels(guild);
+
     logger.debug(
       `[SyncData] Added new guild ${guild.id} (${guild.name}) to guild set`
     );
@@ -55,12 +118,12 @@ export function startDataSync(client: Client) {
       icon: newGuild.icon,
       owner_id: newGuild.ownerId,
     };
-    
+
     await redis.hset(key, guildInfo);
     await redis.expire(key, CACHE_TTL.GUILD_BASICS);
-    
+
     await publishGuildEvent(newGuild.id, {
-      type: "guild.update",
+      type: SSE_EVENT_TYPES.GUILD_UPDATE,
       guildId: newGuild.id,
       data: guildInfo,
     });
@@ -84,7 +147,7 @@ export function startDataSync(client: Client) {
     await pipeline.exec();
 
     await publishGuildEvent(guild.id, {
-      type: "guild.delete",
+      type: SSE_EVENT_TYPES.GUILD_DELETE,
       guildId: guild.id,
     });
   });
@@ -98,14 +161,11 @@ export function startDataSync(client: Client) {
       id: role.id,
       name: role.name,
       position: role.position,
-      color: role.color,
       permissions: role.permissions.bitfield.toString(),
-      managed: role.managed,
-      lastUpdated: Date.now(),
     };
     await hsetJson(key, role.id, data);
     await publishGuildEvent(role.guild.id, {
-      type: "role.create",
+      type: SSE_EVENT_TYPES.ROLE_CREATE,
       roleId: role.id,
       data,
     });
@@ -120,14 +180,11 @@ export function startDataSync(client: Client) {
       id: role.id,
       name: role.name,
       position: role.position,
-      color: role.color,
       permissions: role.permissions.bitfield.toString(),
-      managed: role.managed,
-      lastUpdated: Date.now(),
     };
     await hsetJson(key, role.id, data);
     await publishGuildEvent(role.guild.id, {
-      type: "role.update",
+      type: SSE_EVENT_TYPES.ROLE_UPDATE,
       roleId: role.id,
       data,
     });
@@ -137,27 +194,60 @@ export function startDataSync(client: Client) {
     const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     await hdel(key, role.id);
     await publishGuildEvent(role.guild.id, {
-      type: "role.delete",
+      type: SSE_EVENT_TYPES.ROLE_DELETE,
       roleId: role.id,
     });
   });
 
   client.on(Events.ChannelCreate, async (ch) => {
     // Skip non-text/announcement/voice channels
-    if (![0, 2, 5].includes(ch.type)) return;
+    if (
+      ![
+        ChannelType.GuildText,
+        ChannelType.GuildAnnouncement,
+        ChannelType.GuildVoice,
+      ].includes(ch.type)
+    )
+      return;
 
     const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
+
+    // Get bot permissions in this channel
+    const botMember = await ch.guild.members.fetchMe();
+    if (!botMember) {
+      logger.debug(`[SyncData] Bot member not found for guild ${ch.guild.id}`);
+      return;
+    }
+
+    let botPermissions = "0";
+
+    try {
+      const permissions = ch.permissionsFor(botMember);
+      botPermissions = permissions?.bitfield.toString() ?? "0";
+    } catch (error) {
+      // Bot doesn't have access to this channel
+      logger.debug(
+        `[SyncData] Bot cannot access channel ${ch.id} (${ch.name})`
+      );
+      botPermissions = "0";
+    }
+
+    if (botPermissions === "0") {
+      logger.debug(
+        `[SyncData] Bot cannot access channel ${ch.id} (${ch.name})`
+      );
+      return;
+    }
+
     const data = {
       id: ch.id,
       name: ch.name,
-      type: ch.type,
-      parentId: ch.parentId ?? null,
       position: ch.rawPosition ?? 0,
-      lastUpdated: Date.now(),
+      botPermissions,
     };
     await hsetJson(key, ch.id, data);
     await publishGuildEvent(ch.guild.id, {
-      type: "channel.create",
+      type: SSE_EVENT_TYPES.CHANNEL_CREATE,
       channelId: ch.id,
       data,
     });
@@ -169,17 +259,33 @@ export function startDataSync(client: Client) {
     if (![0, 2, 5].includes(ch.type)) return;
 
     const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
+
+    // Get bot permissions in this channel
+    const botMember = ch.guild.members.me;
+    let botPermissions = "0";
+
+    if (botMember) {
+      try {
+        const permissions = ch.permissionsFor(botMember);
+        botPermissions = permissions?.bitfield.toString() ?? "0";
+      } catch (error) {
+        // Bot doesn't have access to this channel
+        logger.debug(
+          `[SyncData] Bot cannot access channel ${ch.id} (${ch.name})`
+        );
+        botPermissions = "0";
+      }
+    }
+
     const data = {
       id: ch.id,
       name: ch.name,
-      type: ch.type,
-      parentId: ch.parentId ?? null,
       position: ch.rawPosition ?? 0,
-      lastUpdated: Date.now(),
+      botPermissions,
     };
     await hsetJson(key, ch.id, data);
     await publishGuildEvent(ch.guild.id, {
-      type: "channel.update",
+      type: SSE_EVENT_TYPES.CHANNEL_UPDATE,
       channelId: ch.id,
       data,
     });
@@ -191,7 +297,7 @@ export function startDataSync(client: Client) {
     const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
     await hdel(key, ch.id);
     await publishGuildEvent(ch.guild.id, {
-      type: "channel.delete",
+      type: SSE_EVENT_TYPES.CHANNEL_DELETE,
       channelId: ch.id,
     });
   });
@@ -200,7 +306,7 @@ export function startDataSync(client: Client) {
   client.on(Events.GuildMemberUpdate, async (_oldM, newM) => {
     const perms = newM.permissions?.bitfield?.toString() ?? "0";
     await publishUserEvent(newM.id, {
-      type: "member.perms.update",
+      type: SSE_EVENT_TYPES.MEMBER_PERMS_UPDATE,
       guildId: newM.guild.id,
       perms,
     });
@@ -218,7 +324,7 @@ export function startDataSync(client: Client) {
         );
         return;
       }
-      
+
       // Update the cached permissions if they are already cached
       const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(data.guildId);
 
@@ -231,7 +337,9 @@ export function startDataSync(client: Client) {
       }
 
       // Update the permissions for the command
-      const parsedPermissions = JSON.parse(guildPermissions) as GuildApplicationCommandPermissions[];
+      const parsedPermissions = JSON.parse(
+        guildPermissions
+      ) as GuildApplicationCommandPermissions[];
 
       const updatedPermissions = parsedPermissions.map((permission) => {
         if (permission.id === data.id) {
@@ -252,7 +360,7 @@ export function startDataSync(client: Client) {
 
       // Publish the event for real-time updates
       await publishGuildEvent(data.guildId, {
-        type: "command.permissions.update",
+        type: SSE_EVENT_TYPES.COMMAND_PERMISSIONS_UPDATE,
         guildId: data.guildId,
         commandId: data.id,
         permissions: data.permissions,

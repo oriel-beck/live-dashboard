@@ -6,6 +6,7 @@ import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
 import { logger } from "../utils/logger";
 import { withAbort } from "../utils/request-utils";
+import { SSE_EVENT_TYPES, SSEEvent } from "@discord-bot/shared-types";
 
 // Helper function to get command permissions with caching
 async function getCommandPermissions(guildId: string, signal?: AbortSignal) {
@@ -26,7 +27,11 @@ async function getCommandPermissions(guildId: string, signal?: AbortSignal) {
     }
   }
 
-  const permissions = await withAbort(DiscordService.getCommandPermissions(guildId), signal, 'Discord command permissions fetch cancelled');
+  const permissions = await withAbort(
+    DiscordService.getCommandPermissions(guildId),
+    signal,
+    "Discord command permissions fetch cancelled"
+  );
 
   // Cache for 5 minutes
   await client.setEx(cacheKey, 300, JSON.stringify(permissions));
@@ -49,16 +54,16 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
       };
     }
 
-    logger.info(
-      `[Events] SSE connection started for guild ${guildId}`
-    );
+    logger.info(`[Events] SSE connection started for guild ${guildId}`);
 
     // Record SSE connection in metrics
-    import('../middleware/metrics').then(({ recordSseConnection }) => {
-      recordSseConnection(guildId, 'connect');
-    }).catch(() => {
-      // Ignore metrics errors
-    });
+    import("../middleware/metrics")
+      .then(({ recordSseConnection }) => {
+        recordSseConnection(guildId, "connect");
+      })
+      .catch(() => {
+        // Ignore metrics errors
+      });
 
     // Use a simpler SSE approach with manual chunking
     const encoder = new TextEncoder();
@@ -71,16 +76,16 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
         // AbortController to cancel ongoing requests when stream closes
         const abortController = new AbortController();
         const { signal } = abortController;
-        
+
         // Store the abort controller for cleanup
         cleanup.push(() => abortController.abort());
-        
-        // Helper function to send individual data events
-        const sendDataEvent = (eventType: string, data: any) => {
+
+        // Helper function to send individual data events with type safety
+        const sendDataEvent = <T extends SSEEvent>(event: T) => {
           if (signal.aborted || !isActive) return;
           controller.enqueue(
             encoder.encode(
-              `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`
+              `event: message\ndata: ${JSON.stringify(event)}\n\n`
             )
           );
         };
@@ -89,74 +94,168 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
           // Start all operations in parallel and send results as they complete
           const operations = [
             {
-              name: 'guild_info',
-              promise: withAbort(RedisService.getGuildInfo(guildId), signal, 'Guild info fetch cancelled')
-                .then(result => {
-                  sendDataEvent('guild_info_loaded', { guildInfo: result });
+              name: "guild_info",
+              promise: withAbort(
+                RedisService.getGuildInfo(guildId),
+                signal,
+                "Guild info fetch cancelled"
+              )
+                .then((result) => {
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.GUILD_INFO_LOADED,
+                    data: result,
+                  });
                   return result;
-                }).catch(error => {
+                })
+                .catch((error) => {
                   if (signal.aborted) return null;
-                  logger.error(`[Events] Error fetching guild info for ${guildId}:`, error);
-                  sendDataEvent('guild_info_failed', { error: error.message });
+                  logger.error(
+                    `[Events] Error fetching guild info for ${guildId}:`,
+                    error
+                  );
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.GUILD_INFO_FAILED,
+                    data: error.message,
+                  });
                   return null;
-                })
+                }),
             },
             {
-              name: 'roles',
-              promise: withAbort(RedisService.getGuildRoles(guildId), signal, 'Guild roles fetch cancelled')
-                .then(result => {
-                  sendDataEvent('roles_loaded', { roles: result });
+              name: "roles",
+              promise: withAbort(
+                RedisService.getGuildRoles(guildId),
+                signal,
+                "Guild roles fetch cancelled"
+              )
+                .then((result) => {
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.ROLES_LOADED,
+                    data: result,
+                  });
                   return result;
-                }).catch(error => {
+                })
+                .catch((error) => {
                   if (signal.aborted) return [];
-                  logger.error(`[Events] Error fetching roles for ${guildId}:`, error);
-                  sendDataEvent('roles_failed', { error: error.message });
+                  logger.error(
+                    `[Events] Error fetching roles for ${guildId}:`,
+                    error
+                  );
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.ROLES_FAILED,
+                    data: error.message,
+                  });
                   return [];
-                })
+                }),
             },
             {
-              name: 'channels',
-              promise: withAbort(RedisService.getGuildChannels(guildId), signal, 'Guild channels fetch cancelled')
-                .then(result => {
-                  sendDataEvent('channels_loaded', { channels: result });
+              name: "channels",
+              promise: withAbort(
+                RedisService.getGuildChannels(guildId),
+                signal,
+                "Guild channels fetch cancelled"
+              )
+                .then((result) => {
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.CHANNELS_LOADED,
+                    data: result,
+                  });
                   return result;
-                }).catch(error => {
+                })
+                .catch((error) => {
                   if (signal.aborted) return [];
-                  logger.error(`[Events] Error fetching channels for ${guildId}:`, error);
-                  sendDataEvent('channels_failed', { error: error.message });
+                  logger.error(
+                    `[Events] Error fetching channels for ${guildId}:`,
+                    error
+                  );
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.CHANNELS_FAILED,
+                    data: error.message,
+                  });
                   return [];
-                })
+                }),
             },
             {
-              name: 'commands',
-              promise: withAbort(DatabaseService.getDefaultCommandsHierarchical(), signal, 'Commands fetch cancelled')
-                .then(result => {
-                  sendDataEvent('commands_loaded', { commands: result });
+              name: "commands",
+              promise: withAbort(
+                DatabaseService.getDefaultCommandsHierarchical(),
+                signal,
+                "Commands fetch cancelled"
+              )
+                .then((result) => {
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.COMMANDS_LOADED,
+                    data: result as any, // Type mismatch: DefaultCommand.discordId is string, but CommandConfigResultWithCategory expects bigint
+                  });
                   return result;
-                }).catch(error => {
+                })
+                .catch((error) => {
                   if (signal.aborted) return [];
                   logger.error(`[Events] Error fetching commands:`, error);
-                  sendDataEvent('commands_failed', { error: error.message });
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.COMMANDS_FAILED,
+                    data: error.message,
+                  });
                   return [];
-                })
+                }),
             },
             {
-              name: 'command_permissions',
-              promise: withAbort(getCommandPermissions(guildId, signal), signal, 'Command permissions fetch cancelled')
-                .then(result => {
-                  sendDataEvent('command_permissions_loaded', { commandPermissions: result });
+              name: "command_permissions",
+              promise: withAbort(
+                getCommandPermissions(guildId, signal),
+                signal,
+                "Command permissions fetch cancelled"
+              )
+                .then((result) => {
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.COMMAND_PERMISSIONS_LOADED,
+                    data: result,
+                  });
                   return result;
-                }).catch(error => {
-                  if (signal.aborted) return [];
-                  logger.error(`[Events] Error fetching command permissions for ${guildId}:`, error);
-                  sendDataEvent('command_permissions_failed', { error: error.message });
-                  return [];
                 })
-            }
+                .catch((error) => {
+                  if (signal.aborted) return [];
+                  logger.error(
+                    `[Events] Error fetching command permissions for ${guildId}:`,
+                    error
+                  );
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.COMMAND_PERMISSIONS_FAILED,
+                    data: error.message,
+                  });
+                  return [];
+                }),
+            },
+            {
+              name: "bot_profile",
+              promise: withAbort(
+                DiscordService.getBotProfile(guildId, signal),
+                signal,
+                "Bot profile fetch cancelled"
+              )
+                .then((result) => {
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.BOT_PROFILE_LOADED,
+                    data: result,
+                  });
+                  return result;
+                })
+                .catch((error) => {
+                  if (signal.aborted) return null;
+                  logger.error(
+                    `[Events] Error fetching bot profile for ${guildId}:`,
+                    error
+                  );
+                  sendDataEvent({
+                    type: SSE_EVENT_TYPES.BOT_PROFILE_FAILED,
+                    data: error.message,
+                  });
+                  return null;
+                }),
+            },
           ];
 
           // Start all operations and wait for all to complete
-          await Promise.allSettled(operations.map(op => op.promise));
+          await Promise.allSettled(operations.map((op) => op.promise));
 
           // Keep-alive pings
           heartbeatInterval = setInterval(() => {
@@ -166,42 +265,51 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
           // Redis subscription
           await RedisService.subscribeToGuildEvents(guildId, (message) => {
             if (!isActive) return;
-            controller.enqueue(
-              encoder.encode(`event: update\ndata: ${message}\n\n`)
-            );
+            try {
+              // Parse the message from Redis and send it as a proper SSE event
+              const event = JSON.parse(message);
+              sendDataEvent(event as SSEEvent);
+            } catch (error) {
+              logger.error('[Events] Error parsing Redis message:', error);
+            }
           });
         } catch (error) {
-          console.error(`[Events] Error fetching initial data for guild ${guildId}:`, error);
-          controller.enqueue(
-            encoder.encode(
-              `event: guild_fetch_failed\ndata: ${JSON.stringify({
-                guildId,
-                error: error instanceof Error ? error.message : "Unknown error",
-              })}\n\n`
-            )
+          console.error(
+            `[Events] Error fetching initial data for guild ${guildId}:`,
+            error
           );
+          sendDataEvent({
+            type: SSE_EVENT_TYPES.GUILD_FETCH_FAILED,
+            data: {
+              guildId,
+              error:
+                error instanceof Error ? error.message : "Unknown error",
+            },
+          });
         }
       },
       cancel() {
         console.log(`[Events] SSE connection cancelled for guild ${guildId}`);
         isActive = false;
-        
+
         // Execute all cleanup functions (including AbortController)
-        cleanup.forEach(fn => {
+        cleanup.forEach((fn) => {
           try {
             fn();
           } catch (error) {
             logger.error(`[Events] Error during cleanup:`, error);
           }
         });
-        
+
         // Record SSE disconnection in metrics
-        import('../middleware/metrics').then(({ recordSseConnection }) => {
-          recordSseConnection(guildId, 'disconnect');
-        }).catch(() => {
-          // Ignore metrics errors
-        });
-        
+        import("../middleware/metrics")
+          .then(({ recordSseConnection }) => {
+            recordSseConnection(guildId, "disconnect");
+          })
+          .catch(() => {
+            // Ignore metrics errors
+          });
+
         RedisService.unsubscribeFromGuildEvents(guildId).catch((error) => {
           logger.error(`[Events] Error unsubscribing:`, error);
         });

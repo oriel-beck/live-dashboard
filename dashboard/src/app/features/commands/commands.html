@@ -1,1 +1,147 @@
-<p>commands works!</p>
+<div class="commands-container">
+  <!-- Loading State -->
+  @if (isCommandsLoading()) {
+    <div class="loading-container">
+      <p-progressSpinner [style]="{ width: '50px', height: '50px' }"></p-progressSpinner>
+      <p>Loading commands...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error() && !isCommandsLoading()) {
+    <div class="error-container">
+      <p-message severity="error" [text]="error()!"></p-message>
+    </div>
+  }
+
+  <!-- Commands Content -->
+  @if (!isCommandsLoading() && !error()) {
+    <div class="commands-content">
+      <!-- No Commands State -->
+      @if (categoriesArray().length === 0) {
+        <div class="no-commands">
+          <h3>No Commands Available</h3>
+          <p>There are no commands configured for this server.</p>
+        </div>
+      }
+
+      <!-- Commands with Categories -->
+      @if (categoriesArray().length > 0) {
+        <div>
+          <p-tabs [value]="selectedCategory()?.id?.toString() || '0'">
+            <p-tablist>
+              @for (category of categoriesArray(); track category.id) {
+                <p-tab 
+                  [value]="category.id.toString()"
+                  (click)="selectCategory(category)">
+                  {{ category.name }}
+                </p-tab>
+              }
+            </p-tablist>
+            <p-tabpanels>
+              @for (category of categoriesArray(); track category.id) {
+                <p-tabpanel [value]="category.id.toString()">
+                  @if (category.description) {
+                    <div class="category-description">
+                      <p>{{ category.description }}</p>
+                    </div>
+                  }
+
+                  <!-- Commands Grid -->
+                  <div class="commands-grid">
+                    @for (command of category.commands; track command.id) {
+                      <p-card class="command-card">
+                        <ng-template pTemplate="header">
+                          <div class="command-header">
+                            <div class="command-title">
+                              <h4>{{ command.name }}</h4>
+                              @if (!command.enabled) {
+                                <p-badge 
+                                  value="Disabled" 
+                                  severity="danger">
+                                </p-badge>
+                              }
+                            </div>
+                            <p-button 
+                              icon="pi pi-cog" 
+                              [text]="true" 
+                              [rounded]="true"
+                              [loading]="isCommandsConfigLoading()"
+                              [disabled]="!command.discordId || isCommandsConfigLoading()"
+                              (onClick)="openCommandConfig(command)"
+                              pTooltip="Configure command permissions">
+                            </p-button>
+                          </div>
+                        </ng-template>
+
+                        <div class="command-content">
+                          <!-- Command Description -->
+                          <p class="command-description">{{ command.description }}</p>
+
+                          <!-- Required Permissions -->
+                          @if (hasRequiredPermissions(command)) {
+                            <div class="command-permissions">
+                              <div class="permissions-label">
+                                <i class="pi pi-shield"></i>
+                                <span>Required Permissions:</span>
+                              </div>
+                              <p 
+                                class="permissions-text" 
+                                [pTooltip]="getPermissionTooltip(command)"
+                                tooltipPosition="top">
+                                {{ getPermissionText(command) }}
+                              </p>
+                            </div>
+                          } @else {
+                            <div class="command-permissions">
+                              <div class="permissions-label">
+                                <i class="pi pi-shield"></i>
+                                <span>Required Permissions:</span>
+                              </div>
+                              <p class="permissions-text">None required</p>
+                            </div>
+                          }
+
+                          <!-- Subcommands -->
+                          @if (hasSubcommands(command)) {
+                            <div class="command-subcommands">
+                              <div class="subcommands-label">
+                                <i class="pi pi-list"></i>
+                                <span>Subcommands:</span>
+                              </div>
+                              <div class="subcommands-list">
+                                @for (subcommand of command.subcommands || []; track subcommand.id; let last = $last) {
+                                  <span class="subcommand-item">
+                                    {{ subcommand.name }}@if (!last) {, }
+                                  </span>
+                                }
+                              </div>
+                            </div>
+                          }
+
+                          <!-- Command Details -->
+                          <div class="command-details">
+                            <div class="detail-item">
+                              <span class="detail-label">Cooldown:</span>
+                              <span class="detail-value">{{ command.cooldown }}s</span>
+                            </div>
+                            <div class="detail-item">
+                              <span class="detail-label">Status:</span>
+                              <span class="detail-value" [class.enabled]="command.enabled" [class.disabled]="!command.enabled">
+                                {{ command.enabled ? 'Enabled' : 'Disabled' }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </p-card>
+                    }
+                  </div>
+                </p-tabpanel>
+              }
+            </p-tabpanels>
+          </p-tabs>
+        </div>
+      }
+    </div>
+  }
+</div>

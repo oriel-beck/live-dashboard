@@ -1,7 +1,14 @@
 <div class="bot-config-container">
   <p-toast></p-toast>
   
-  @if (store.isLoading() || isLoading()) {
+  @if (store.isLoading()) {
+    <!-- Page is still loading basic guild info -->
+    <div class="loading-state">
+      <p-progressSpinner class="w-4rem h-4rem" strokeWidth="4"></p-progressSpinner>
+      <p>Loading server information...</p>
+    </div>
+  } @else if (store.isBotLoading()) {
+    <!-- Bot profile data is loading -->
     <div class="loading-state">
       <p-progressSpinner class="w-4rem h-4rem" strokeWidth="4"></p-progressSpinner>
       <p>Loading bot configuration...</p>
@@ -13,13 +20,13 @@
         <p class="config-subtitle">Customize your bot's appearance and presence for this server</p>
       </div>
 
-      <div class="config-sections">
+      <form [formGroup]="botConfigForm" class="config-sections">
         <!-- Avatar Section -->
         <p-card header="Bot Avatar" subheader="Upload a custom avatar for your bot in this server" class="config-card">
           <div class="avatar-config">
             <div class="current-avatar">
               <img 
-                [src]="getCurrentAvatarUrl()" 
+                [src]="currentAvatarUrl()" 
                 [alt]="store.guildInfo()?.name + ' bot avatar'"
                 class="avatar-preview"
               />
@@ -41,7 +48,7 @@
                 class="p-button-outlined"
               ></p-fileUpload>
               
-              @if (botConfig().avatar) {
+              @if (hasAvatarChanges()) {
                 <p-button 
                   label="Reset" 
                   icon="pi pi-refresh" 
@@ -60,9 +67,9 @@
         <p-card header="Bot Banner" subheader="Set a custom banner for your bot's profile" class="config-card">
           <div class="banner-config">
             <div class="current-banner">
-              @if (botConfig().banner) {
+              @if (currentBannerUrl()) {
                 <img 
-                  [src]="botConfig().banner" 
+                  [src]="currentBannerUrl()" 
                   alt="Bot banner"
                   class="banner-preview"
                 />
@@ -90,10 +97,10 @@
                 class="p-button-outlined"
               ></p-fileUpload>
               
-              @if (botConfig().banner) {
+              @if (hasBannerChanges()) {
                 <p-button 
-                  label="Remove" 
-                  icon="pi pi-trash" 
+                  label="Reset" 
+                  icon="pi pi-refresh" 
                   severity="secondary"
                   (onClick)="resetBanner()"
                   [outlined]="true"
@@ -113,12 +120,16 @@
               <input 
                 pInputText 
                 id="nickname"
-                [(ngModel)]="botConfig().nickname"
+                formControlName="nickname"
                 placeholder="Enter custom nickname..."
                 maxlength="32"
                 class="w-full"
+                [class.ng-invalid]="botConfigForm.get('nickname')?.invalid && botConfigForm.get('nickname')?.touched"
               />
               <small class="p-text-secondary">Leave empty to use the default bot name</small>
+              @if (botConfigForm.get('nickname')?.errors?.['maxlength'] && botConfigForm.get('nickname')?.touched) {
+                <small class="p-error">Nickname must be 32 characters or less</small>
+              }
             </div>
           </div>
         </p-card>
@@ -132,6 +143,7 @@
             icon="pi pi-save"
             (onClick)="saveConfiguration()"
             [loading]="isSaving()"
+            [disabled]="!hasAnyChanges() || isSaving() || botConfigForm.invalid"
             loadingIcon="pi pi-spin pi-spinner"
             severity="success"
           ></p-button>
@@ -145,7 +157,7 @@
             [outlined]="true"
           ></p-button>
         </div>
-      </div>
+      </form>
     </div>
   }
 </div>

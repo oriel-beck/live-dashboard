@@ -52,10 +52,12 @@
       <div class="header-right">
         <div
           class="real-time-indicator"
-          [class.connected]="!!store.lastEvent()"
+          [class.connected]="store.isConnected()"
+          [class.connecting]="store.isConnecting()"
+          [class.error]="store.hasConnectionError()"
         >
           <div class="status-dot"></div>
-          <span>{{ store.lastEvent() ? 'Live' : 'Connecting...' }}</span>
+          <span>{{ store.connectionStatusText() }}</span>
         </div>
 
         <button class="logout-btn" (click)="logout()" title="Logout">
@@ -79,12 +81,12 @@
       </div>
     }
 
-    <!-- Progressive Loading States -->
-    @if (store.isLoading() && !store.isBasicDataLoaded()) {
+    <!-- Page Loading State - only depends on guild info -->
+    @if (store.isLoading()) {
       <!-- Initial loading spinner -->
       <div class="loading-state">
         <div class="loading-spinner"></div>
-        <p>Connecting to server...</p>
+        <p>Loading server information...</p>
       </div>
     } @else {
       <!-- Basic UI is ready, show content with progressive enhancements -->
@@ -99,7 +101,7 @@
             <div class="commands-loading-overlay">
               <div class="loading-progress">
                 <div class="loading-spinner-small"></div>
-                <span>Loading commands and permissions...</span>
+                <span>Loading commands...</span>
               </div>
             </div>
           }

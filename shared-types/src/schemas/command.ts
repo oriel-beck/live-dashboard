@@ -54,6 +54,7 @@ export type CommandConfigResultWithCategory = CommandConfigResult & {
     name: string;
     description: string;
   };
+  subcommands?: CommandConfigResult[];
 };
 
 // Add command category type  
@@ -61,7 +62,7 @@ export type CommandCategory = {
   id: number;
   name: string;
   description: string;
-  commands?: CommandConfigResult[];
+  commands?: CommandConfigResultWithCategory[];
 };
 
 // Command permissions response type

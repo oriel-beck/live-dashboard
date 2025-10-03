@@ -73,7 +73,7 @@ export const guildAccess = new Elysia({ name: 'guildAccess' })
       
       // For user tokens, check guild access
       const userGuilds = await DiscordService.getUserGuilds(token);
-      const hasAccess = await DiscordService.checkGuildAccess(guildId, userGuilds);
+      const hasAccess = DiscordService.checkGuildAccess(guildId, userGuilds);
       
       if (!hasAccess) {
         set.status = 403;
