@@ -1,4 +1,11 @@
-import { Component, computed, inject, Signal, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  Signal,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
@@ -9,16 +16,16 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { MessageModule } from 'primeng/message';
 import { DialogService } from 'primeng/dynamicdialog';
 import { injectParams } from 'ngxtension/inject-params';
-import { 
-  CommandCategory, 
+import {
+  CommandCategory,
   CommandConfigResultWithCategory,
   GuildApplicationCommandPermissions,
   GuildChannel,
-  GuildRole
+  GuildRole,
 } from '@discord-bot/shared-types';
 import { CacheStore } from '../../store/sse.store';
 import { CommandConfigDialog } from '../command-config-dialog/command-config-dialog';
-// 
+//
 @Component({
   selector: 'app-commands',
   imports: [
@@ -29,10 +36,10 @@ import { CommandConfigDialog } from '../command-config-dialog/command-config-dia
     BadgeModule,
     TooltipModule,
     ProgressSpinnerModule,
-    MessageModule
+    MessageModule,
   ],
   templateUrl: './commands.html',
-  styleUrl: './commands.scss'
+  styleUrl: './commands.scss',
 })
 export class Commands implements OnInit {
   private store = inject(CacheStore);
@@ -40,12 +47,14 @@ export class Commands implements OnInit {
   private params = injectParams();
 
   // Computed properties from store
-  commandsCategories: Signal<Map<number, CommandCategory>> = this.store.commandsCategories;
+  commandsCategories: Signal<Map<number, CommandCategory>> =
+    this.store.commandsCategories;
   isCommandsLoading: Signal<boolean> = this.store.isCommandsLoading;
   isCommandsConfigLoading: Signal<boolean> = this.store.isCommandsConfigLoading;
   roles: Signal<GuildRole[]> = this.store.roles;
   channels: Signal<GuildChannel[]> = this.store.channels;
-  commandPermissions: Signal<Map<string, GuildApplicationCommandPermissions>> = this.store.commandPermissions;
+  commandPermissions: Signal<Map<string, GuildApplicationCommandPermissions>> =
+    this.store.commandPermissions;
   error: Signal<string | null> = this.store.error;
 
   // Get guild ID from route params
@@ -57,7 +66,9 @@ export class Commands implements OnInit {
   // Convert Map to Array for template iteration
   categoriesArray = computed(() => {
     const categories = this.commandsCategories();
-    return Array.from(categories.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(categories.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   });
 
   // Get commands for selected category
@@ -93,7 +104,9 @@ export class Commands implements OnInit {
     } else if (permissionNames.length <= 3) {
       return permissionNames.join(', ');
     } else {
-      return `${permissionNames.slice(0, 2).join(', ')} +${permissionNames.length - 2} more`;
+      return `${permissionNames.slice(0, 2).join(', ')} +${
+        permissionNames.length - 2
+      } more`;
     }
   }
 
@@ -129,26 +142,24 @@ export class Commands implements OnInit {
     if (permissionBits & BigInt(0x40)) permissionNames.push('Kick Members');
     if (permissionBits & BigInt(0x80)) permissionNames.push('Ban Members');
     if (permissionBits & BigInt(0x400)) permissionNames.push('Manage Messages');
-    if (permissionBits & BigInt(0x40000)) permissionNames.push('Read Message History');
-    if (permissionBits & BigInt(0x80000)) permissionNames.push('Mention Everyone');
-    if (permissionBits & BigInt(0x100000)) permissionNames.push('Use External Emojis');
-    if (permissionBits & BigInt(0x200000)) permissionNames.push('Add Reactions');
-    if (permissionBits & BigInt(0x1000000)) permissionNames.push('Mute Members');
-    if (permissionBits & BigInt(0x2000000)) permissionNames.push('Deafen Members');
-    if (permissionBits & BigInt(0x4000000)) permissionNames.push('Move Members');
-    if (permissionBits & BigInt(0x8000000)) permissionNames.push('Use Voice Activity');
+    if (permissionBits & BigInt(0x40000))
+      permissionNames.push('Read Message History');
+    if (permissionBits & BigInt(0x80000))
+      permissionNames.push('Mention Everyone');
+    if (permissionBits & BigInt(0x100000))
+      permissionNames.push('Use External Emojis');
+    if (permissionBits & BigInt(0x200000))
+      permissionNames.push('Add Reactions');
+    if (permissionBits & BigInt(0x1000000))
+      permissionNames.push('Mute Members');
+    if (permissionBits & BigInt(0x2000000))
+      permissionNames.push('Deafen Members');
+    if (permissionBits & BigInt(0x4000000))
+      permissionNames.push('Move Members');
+    if (permissionBits & BigInt(0x8000000))
+      permissionNames.push('Use Voice Activity');
 
     return permissionNames;
-  }
-
-  // Check if command has required permissions
-  hasRequiredPermissions(command: CommandConfigResultWithCategory): boolean {
-    return !!(command.permissions && command.permissions !== '0');
-  }
-
-  // Check if command has subcommands
-  hasSubcommands(command: CommandConfigResultWithCategory): boolean {
-    return !!(command.subcommands && command.subcommands.length > 0);
   }
 
   // Open command configuration dialog
@@ -167,8 +178,8 @@ export class Commands implements OnInit {
         guildId: this.guildId(),
         roles: this.roles,
         channels: this.channels,
-        commandPermissions: this.commandPermissions
-      }
+        commandPermissions: this.commandPermissions,
+      },
     });
   }
 

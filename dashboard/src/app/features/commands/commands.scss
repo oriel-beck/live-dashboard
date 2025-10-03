@@ -48,17 +48,31 @@
 
   .commands-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 2rem;
+    margin-top: 1.5rem;
 
     .command-card {
       height: fit-content;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
+      border: 2px solid var(--surface-border);
+      background: var(--surface-card);
 
       &:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        border-color: var(--primary-color);
+      }
+
+      // Highlight disabled commands in red
+      &.disabled-command {
+        border-color: var(--red-500);
+        background: rgba(var(--red-500-rgb), 0.05);
+        
+        &:hover {
+          border-color: var(--red-600);
+          background: rgba(var(--red-500-rgb), 0.1);
+        }
       }
 
       .command-header {
@@ -66,29 +80,38 @@
         justify-content: space-between;
         align-items: flex-start;
         padding: 1rem 1rem 0 1rem;
+        gap: 1rem;
 
         .command-title {
           display: flex;
           align-items: center;
           gap: 0.5rem;
           flex: 1;
+          min-width: 0; // Allow text to wrap if needed
 
           h4 {
             margin: 0;
             color: var(--text-color);
             font-size: 1.1rem;
             font-weight: 600;
+            word-break: break-word;
           }
+        }
+
+        // Ensure button doesn't get cut off
+        p-button {
+          flex-shrink: 0;
         }
       }
 
       .command-content {
-        padding: 1rem;
+        padding: 1.25rem;
 
         .command-description {
-          margin: 0 0 1rem 0;
+          margin: 0 0 1.25rem 0;
           color: var(--text-color-secondary);
-          line-height: 1.5;
+          line-height: 1.6;
+          font-size: 0.95rem;
         }
 
         .command-permissions {
@@ -154,38 +177,6 @@
           }
         }
 
-        .command-details {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          padding-top: 1rem;
-          border-top: 1px solid var(--surface-border);
-
-          .detail-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85rem;
-
-            .detail-label {
-              color: var(--text-color-secondary);
-              font-weight: 500;
-            }
-
-            .detail-value {
-              color: var(--text-color);
-              font-weight: 600;
-
-              &.enabled {
-                color: var(--green-500);
-              }
-
-              &.disabled {
-                color: var(--red-500);
-              }
-            }
-          }
-        }
       }
     }
   }

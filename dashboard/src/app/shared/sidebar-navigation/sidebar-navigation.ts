@@ -1,6 +1,8 @@
-import { Component, inject, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { Component, inject, input, OnDestroy, OnInit } from '@angular/core';
+import { NavigationEnd, Router, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { CacheStore } from '../../store/sse.store';
 
 // PrimeNG Imports
@@ -20,12 +22,15 @@ interface NavigationItem {
   templateUrl: './sidebar-navigation.html',
   styleUrl: './sidebar-navigation.scss'
 })
-export class SidebarNavigationComponent {
+export class SidebarNavigationComponent implements OnInit, OnDestroy {
   store = inject(CacheStore);
   router = inject(Router);
   
   // Input for mobile sidebar visibility
   isMobileMenuOpen = input<boolean>(false);
+  
+  // Router subscription
+  private routerSubscription?: Subscription;
   
   // Navigation items
   navigationItems: NavigationItem[] = [
@@ -42,9 +47,22 @@ export class SidebarNavigationComponent {
     }
   ];
 
-  constructor() {
+  ngOnInit() {
     // Update active state based on current route
     this.updateActiveState();
+    
+    // Subscribe to route changes
+    this.routerSubscription = this.router.events
+      .pipe(filter(event => event instanceof NavigationEnd))
+      .subscribe(() => {
+        this.updateActiveState();
+      });
+  }
+
+  ngOnDestroy() {
+    if (this.routerSubscription) {
+      this.routerSubscription.unsubscribe();
+    }
   }
 
   isItemDisabled(item: NavigationItem): boolean {

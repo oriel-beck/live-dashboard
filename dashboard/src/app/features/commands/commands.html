@@ -50,7 +50,7 @@
                   <!-- Commands Grid -->
                   <div class="commands-grid">
                     @for (command of category.commands; track command.id) {
-                      <p-card class="command-card">
+                      <p-card class="command-card" [class.disabled-command]="!command.enabled">
                         <ng-template pTemplate="header">
                           <div class="command-header">
                             <div class="command-title">
@@ -64,12 +64,10 @@
                             </div>
                             <p-button 
                               icon="pi pi-cog" 
-                              [text]="true" 
-                              [rounded]="true"
+                              label="Configure"
                               [loading]="isCommandsConfigLoading()"
                               [disabled]="!command.discordId || isCommandsConfigLoading()"
-                              (onClick)="openCommandConfig(command)"
-                              pTooltip="Configure command permissions">
+                              (onClick)="openCommandConfig(command)">
                             </p-button>
                           </div>
                         </ng-template>
@@ -79,31 +77,20 @@
                           <p class="command-description">{{ command.description }}</p>
 
                           <!-- Required Permissions -->
-                          @if (hasRequiredPermissions(command)) {
+                          @if (!!(command.permissions && command.permissions !== '0')) {
                             <div class="command-permissions">
                               <div class="permissions-label">
                                 <i class="pi pi-shield"></i>
                                 <span>Required Permissions:</span>
                               </div>
-                              <p 
-                                class="permissions-text" 
-                                [pTooltip]="getPermissionTooltip(command)"
-                                tooltipPosition="top">
+                              <p class="permissions-text">
                                 {{ getPermissionText(command) }}
                               </p>
-                            </div>
-                          } @else {
-                            <div class="command-permissions">
-                              <div class="permissions-label">
-                                <i class="pi pi-shield"></i>
-                                <span>Required Permissions:</span>
-                              </div>
-                              <p class="permissions-text">None required</p>
                             </div>
                           }
 
                           <!-- Subcommands -->
-                          @if (hasSubcommands(command)) {
+                          @if (!!(command.subcommands && command.subcommands.length > 0)) {
                             <div class="command-subcommands">
                               <div class="subcommands-label">
                                 <i class="pi pi-list"></i>
@@ -119,19 +106,6 @@
                             </div>
                           }
 
-                          <!-- Command Details -->
-                          <div class="command-details">
-                            <div class="detail-item">
-                              <span class="detail-label">Cooldown:</span>
-                              <span class="detail-value">{{ command.cooldown }}s</span>
-                            </div>
-                            <div class="detail-item">
-                              <span class="detail-label">Status:</span>
-                              <span class="detail-value" [class.enabled]="command.enabled" [class.disabled]="!command.enabled">
-                                {{ command.enabled ? 'Enabled' : 'Disabled' }}
-                              </span>
-                            </div>
-                          </div>
                         </div>
                       </p-card>
                     }
