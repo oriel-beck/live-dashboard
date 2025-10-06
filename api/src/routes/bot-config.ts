@@ -1,85 +1,15 @@
 import {
-  APIUser,
   BotConfigUpdateRequestSchema,
-  BotProfile,
   SSE_EVENT_TYPES,
-  type BotConfigUpdateRequest,
+  type BotConfigUpdateRequest
 } from "@discord-bot/shared-types";
 import { Elysia } from "elysia";
-import { config } from "../config";
 import { sessionMiddleware } from "../middleware/session";
 import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
 import { logger } from "../utils/logger";
 import { withAbort } from "../utils/request-utils";
 
-// Bot Configuration Service
-class BotConfigService {
-  /**
-   * Get current bot user information from Discord
-   */
-  static async getCurrentBotUser(): Promise<APIUser> {
-    try {
-      const response = await fetch("https://discord.com/api/v10/users/@me", {
-        headers: {
-          Authorization: `Bot ${config.discord.botToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Discord API error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      logger.error("[BotConfig] Error getting current bot user:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update bot guild profile on Discord and refresh cache
-   */
-  static async updateBotProfile(
-    guildId: string,
-    botConfig: BotConfigUpdateRequest
-  ): Promise<BotProfile> {
-    const updateData: any = {};
-
-    // Add nickname if provided
-    if (botConfig.nickname !== undefined) {
-      updateData.nick = botConfig.nickname?.trim() || null;
-    }
-
-    // Add avatar if provided (should be base64 data URI)
-    if (botConfig.avatar !== undefined) {
-      updateData.avatar = botConfig.avatar;
-    }
-
-    // Add banner if provided (should be base64 data URI)
-    if (botConfig.banner !== undefined) {
-      updateData.banner = botConfig.banner;
-    }
-
-    // Only make the API call if we have something to update
-    if (Object.keys(updateData).length === 0) {
-      throw new Error("No valid fields to update");
-    }
-
-    return await DiscordService.updateBotProfile(guildId, updateData);
-  }
-
-  /**
-   * Get bot configuration for display (current Discord user info) with caching
-   */
-  static async getBotConfig(guildId: string): Promise<BotProfile> {
-    // Use DiscordService to get bot profile (eliminates code duplication)
-    return await DiscordService.getBotProfile(guildId);
-  }
-}
 
 export const botConfigPlugin = new Elysia({
   name: "bot-config",
@@ -156,7 +86,7 @@ export const botConfigPlugin = new Elysia({
 
     try {
       const config = await withAbort(
-        BotConfigService.getBotConfig(guildId),
+        DiscordService.getBotProfile(guildId),
         signal,
         `Bot config fetch cancelled for guild ${guildId}`
       );
@@ -189,13 +119,23 @@ export const botConfigPlugin = new Elysia({
       // Validate request body
       const validatedBody = BotConfigUpdateRequestSchema.parse(body);
 
-      // Update bot guild member profile on Discord
-      const updatedProfile = await BotConfigService.updateBotProfile(
-        guildId,
-        validatedBody
-      );
+      // Validate that we have something to update
+      if (Object.keys(validatedBody).length === 0) {
+        throw new Error("No valid fields to update");
+      }
 
-      // Cache is automatically refreshed by DiscordService.updateBotProfile
+      // Map the request fields to Discord API format
+      const updateData = {
+        avatar: validatedBody.avatar,
+        banner: validatedBody.banner,
+        nick: validatedBody.nickname?.trim() || null,
+      };
+
+      // Update bot guild member profile on Discord
+      const updatedProfile = await DiscordService.updateBotProfile(
+        guildId,
+        updateData
+      );
 
       // Publish SSE update for real-time dashboard updates
       try {

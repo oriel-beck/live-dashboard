@@ -641,4 +641,29 @@ export class DiscordService {
       `[DiscordService] Invalidated bot profile cache for guild ${guildId}`
     );
   }
+
+  /**
+   * Get current bot user information from Discord
+   */
+  static async getCurrentBotUser(): Promise<APIUser> {
+    try {
+      const response = await fetch("https://discord.com/api/v10/users/@me", {
+        headers: {
+          Authorization: `Bot ${config.discord.botToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Discord API error: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      logger.error("[DiscordService] Error getting current bot user:", error);
+      throw error;
+    }
+  }
 }

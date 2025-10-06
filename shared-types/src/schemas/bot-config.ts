@@ -3,9 +3,9 @@ import { z } from 'zod';
 
 // Bot Configuration Update Request Schema
 export const BotConfigUpdateRequestSchema = z.object({
-  avatar: z.string().optional(),
-  banner: z.string().optional(),
-  nickname: z.string().max(32).optional(),
+  avatar: z.string().optional().nullable(),
+  banner: z.string().optional().nullable(),
+  nickname: z.string().max(32).optional().nullable(),
 });
 
 
