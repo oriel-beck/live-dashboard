@@ -193,11 +193,9 @@ export class DiscordService {
    */
   static async getGuildRoles(
     guildId: string
-  ): Promise<(GuildRole & { managed: boolean })[]> {
+  ): Promise<GuildRole[]> {
     try {
-      const response = await makeRequestWithRetry<
-        (GuildRole & { managed: boolean })[]
-      >(
+      const response = await makeRequestWithRetry<GuildRole[]>(
         `${config.discord.apiUrl}/guilds/${guildId}/roles`,
         {
           headers: {
@@ -209,7 +207,7 @@ export class DiscordService {
         1000
       );
 
-      return response.filter((role) => !role.managed);
+      return response;
     } catch (error) {
       logger.error(
         `[DiscordService] Error getting guild roles for ${guildId}:`,
@@ -222,7 +220,9 @@ export class DiscordService {
   /**
    * Get guild channels from Discord API
    */
-  static async getGuildChannels(guildId: string): Promise<APIGuildChannel<any>[]> {
+  static async getGuildChannels(
+    guildId: string
+  ): Promise<APIGuildChannel<any>[]> {
     try {
       const response = await makeRequestWithRetry<APIGuildChannel<any>[]>(
         `${config.discord.apiUrl}/guilds/${guildId}/channels`,
@@ -314,10 +314,7 @@ export class DiscordService {
   /**
    * Check if user has permission to access guild
    */
-  static checkGuildAccess(
-    guildId: string,
-    userGuilds: UserGuild[]
-  ): boolean {
+  static checkGuildAccess(guildId: string, userGuilds: UserGuild[]): boolean {
     return userGuilds.some((guild) => guild.id === guildId);
   }
 
@@ -356,9 +353,12 @@ export class DiscordService {
   }
 
   /**
-   * Get bot profile data with caching
+   * Get bot profile data with caching (returns both guild and global profiles)
    */
-  static async getBotProfile(guildId: string, signal?: AbortSignal): Promise<BotProfile> {
+  static async getBotGuildProfile(
+    guildId: string,
+    signal?: AbortSignal
+  ): Promise<{ guildProfile: BotProfile; globalProfile: BotProfile }> {
     const client = RedisService.getClient();
     const cacheKey = REDIS_KEYS.BOT_PROFILE(guildId);
 
@@ -367,7 +367,16 @@ export class DiscordService {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        return BotProfileSchema.parse(parsed);
+        // Check if it's the new format with both profiles
+        if (parsed.guildProfile && parsed.globalProfile) {
+          return parsed;
+        }
+        // If it's the old format, convert it
+        const oldProfile = BotProfileSchema.parse(parsed);
+        return {
+          guildProfile: oldProfile,
+          globalProfile: oldProfile, // Use same data for both (fallback)
+        };
       } catch (error) {
         logger.error(
           `[DiscordService] Failed to parse cached bot profile: ${cached}`,
@@ -379,20 +388,17 @@ export class DiscordService {
     }
 
     try {
-      // Now get the bot's guild member info and guild roles in parallel
-      const [guildMemberResponse, guildRoles] = await Promise.all([
-        fetch(
-          `https://discord.com/api/v10/guilds/${guildId}/members/${config.discord.clientId}`,
-          {
-            headers: {
-              Authorization: `Bot ${config.discord.botToken}`,
-              "Content-Type": "application/json",
-            },
-            signal,
-          }
-        ),
-        this.getGuildRoles(guildId)
-      ]);
+      // Fetch guild member info (includes user data)
+      const guildMemberResponse = await fetch(
+        `https://discord.com/api/v10/guilds/${guildId}/members/${config.discord.clientId}`,
+        {
+          headers: {
+            Authorization: `Bot ${config.discord.botToken}`,
+            "Content-Type": "application/json",
+          },
+          signal,
+        }
+      );
 
       if (!guildMemberResponse.ok) {
         throw new Error(
@@ -403,10 +409,15 @@ export class DiscordService {
       const guildMember: APIGuildMember = await guildMemberResponse.json();
       const memberUser: APIUser = guildMember.user;
 
-      // Calculate bot permissions from roles
-      const botPermissions = this.calculateBotGuildPermissions(guildId, guildMember, guildRoles);
+      // Get guild roles for permissions calculation
+      const guildRoles = await this.getGuildRoles(guildId);
+      const botPermissions = this.calculateBotGuildPermissions(
+        guildId,
+        guildMember,
+        guildRoles
+      );
 
-      // Calculate avatar URL
+      // Calculate guild-specific avatar URL
       let avatarUrl: string | null = null;
       if (guildMember.avatar) {
         avatarUrl = `https://cdn.discordapp.com/guilds/${guildId}/users/${memberUser.id}/avatars/${guildMember.avatar}.webp?size=512`;
@@ -414,7 +425,7 @@ export class DiscordService {
         avatarUrl = `https://cdn.discordapp.com/avatars/${memberUser.id}/${memberUser.avatar}.webp?size=512`;
       }
 
-      // Calculate banner URL
+      // Calculate guild-specific banner URL
       let bannerUrl: string | null = null;
       if (guildMember.banner) {
         bannerUrl = `https://cdn.discordapp.com/guilds/${guildId}/users/${memberUser.id}/banners/${guildMember.banner}.webp?size=1024`;
@@ -422,7 +433,7 @@ export class DiscordService {
         bannerUrl = `https://cdn.discordapp.com/banners/${memberUser.id}/${memberUser.banner}.webp?size=1024`;
       }
 
-      const botProfile: BotProfile = {
+      const guildProfile: BotProfile = {
         nickname: guildMember.nick ?? null,
         globalName: memberUser.global_name ?? null,
         username: memberUser.username,
@@ -431,14 +442,39 @@ export class DiscordService {
         permissions: botPermissions.toString(),
       };
 
+      // Create global profile from user data (original bot appearance)
+      let globalAvatarUrl: string | null = null;
+      if (memberUser.avatar) {
+        globalAvatarUrl = `https://cdn.discordapp.com/avatars/${memberUser.id}/${memberUser.avatar}.webp?size=512`;
+      }
+
+      let globalBannerUrl: string | null = null;
+      if (memberUser.banner) {
+        globalBannerUrl = `https://cdn.discordapp.com/banners/${memberUser.id}/${memberUser.banner}.webp?size=1024`;
+      }
+
+      const globalProfile: BotProfile = {
+        nickname: null, // Global profile has no nickname
+        globalName: memberUser.global_name ?? null,
+        username: memberUser.username,
+        avatar: globalAvatarUrl,
+        banner: globalBannerUrl,
+        permissions: "0", // Global profile has no guild-specific permissions
+      };
+
+      const result = {
+        guildProfile,
+        globalProfile,
+      };
+
       // Cache for 10 minutes
       await client.setEx(
         cacheKey,
         CACHE_TTL.BOT_PROFILE,
-        JSON.stringify(botProfile)
+        JSON.stringify(result)
       );
 
-      return botProfile;
+      return result;
     } catch (error) {
       logger.error(
         `[DiscordService] Error getting bot profile for guild ${guildId}:`,
@@ -449,88 +485,52 @@ export class DiscordService {
   }
 
   /**
-   * Get bot's guild member info
-   */
-  static async getBotGuildMember(guildId: string): Promise<APIGuildMember | null> {
-    try {
-      // First get the bot's user ID
-      const botUserResponse = await fetch(
-        `https://discord.com/api/v10/users/@me`,
-        {
-          headers: {
-            Authorization: `Bot ${config.discord.botToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!botUserResponse.ok) {
-        logger.debug(`[DiscordService] Could not fetch bot user info: ${botUserResponse.status}`);
-        return null;
-      }
-
-      const botUser: APIUser = await botUserResponse.json();
-
-      // Now get the bot's guild member info
-      const guildMemberResponse = await fetch(
-        `https://discord.com/api/v10/guilds/${guildId}/members/${botUser.id}`,
-        {
-          headers: {
-            Authorization: `Bot ${config.discord.botToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!guildMemberResponse.ok) {
-        logger.debug(`[DiscordService] Could not fetch bot guild member for ${guildId}: ${guildMemberResponse.status}`);
-        return null;
-      }
-
-      return await guildMemberResponse.json();
-    } catch (error) {
-      logger.debug(`[DiscordService] Error getting bot guild member for ${guildId}:`, error);
-      return null;
-    }
-  }
-
-  /**
    * Calculate bot's permissions for a specific channel
    */
-  static calculateChannelPermissions(channel: APIGuildChannel<any>, botMember: APIGuildMember, guildRoles: (GuildRole & { managed: boolean })[]): bigint {
+  static calculateChannelPermissions(
+    channel: APIGuildChannel<any>,
+    botMember: APIGuildMember,
+    guildRoles: GuildRole[]
+  ): bigint {
     try {
       // Calculate base permissions from bot's roles
       let permissions = 0n;
       const botRoleIds = botMember.roles || [];
-      
+
       // Add permissions from each role the bot has
       for (const roleId of botRoleIds) {
-        const role = guildRoles.find(r => r.id === roleId);
+        const role = guildRoles.find((r) => r.id === roleId);
         if (role) {
           permissions |= BigInt(role.permissions);
         }
       }
-      
+
       // Add @everyone role permissions
-      const everyoneRole = guildRoles.find(r => r.id === channel.guild_id);
+      const everyoneRole = guildRoles.find((r) => r.id === channel.guild_id);
       if (everyoneRole) {
         permissions |= BigInt(everyoneRole.permissions);
       }
-      
+
       // Apply channel-specific overwrites
       if (channel.permission_overwrites) {
         for (const overwrite of channel.permission_overwrites) {
           // Check if this overwrite applies to the bot
-          if (overwrite.id === channel.guild_id || botRoleIds.includes(overwrite.id)) {
+          if (
+            overwrite.id === channel.guild_id ||
+            botRoleIds.includes(overwrite.id)
+          ) {
             permissions &= ~BigInt(overwrite.deny || 0); // Remove denied permissions
-            permissions |= BigInt(overwrite.allow || 0);  // Add allowed permissions
+            permissions |= BigInt(overwrite.allow || 0); // Add allowed permissions
           }
         }
       }
-      
+
       return permissions;
     } catch (error) {
-      logger.debug(`[DiscordService] Error calculating channel permissions:`, error);
+      logger.debug(
+        `[DiscordService] Error calculating channel permissions:`,
+        error
+      );
       return 0n;
     }
   }
@@ -538,27 +538,31 @@ export class DiscordService {
   /**
    * Calculate bot's permissions in a guild based on its roles
    */
-  static calculateBotGuildPermissions(guildId: string, guildMember: APIGuildMember, guildRoles: (GuildRole & { managed: boolean })[]): bigint {
+  static calculateBotGuildPermissions(
+    guildId: string,
+    guildMember: APIGuildMember,
+    guildRoles: (GuildRole & { managed: boolean })[]
+  ): bigint {
     let permissions = 0n;
-    
+
     // Get bot's role IDs
     const botRoleIds = guildMember.roles || [];
-    
+
     // Add permissions from each role the bot has
     for (const roleId of botRoleIds) {
-      const role = guildRoles.find(r => r.id === roleId);
+      const role = guildRoles.find((r) => r.id === roleId);
       if (role) {
         permissions |= BigInt(role.permissions);
       }
     }
-    
+
     // Add @everyone role permissions (usually 0, but some guilds might have basic permissions)
     // The @everyone role ID is the same as the guild ID
-    const everyoneRole = guildRoles.find(r => r.id === guildId);
+    const everyoneRole = guildRoles.find((r) => r.id === guildId);
     if (everyoneRole) {
       permissions |= BigInt(everyoneRole.permissions);
     }
-    
+
     return permissions;
   }
 
@@ -594,8 +598,52 @@ export class DiscordService {
         );
       }
 
-      // Immediately refresh the cache with fresh data and return the updated profile
-      const updatedProfile = await this.refreshBotProfileCache(guildId);
+      const responseData = await response.json();
+      // Get the current cached profile and update only the changed fields
+      const client = RedisService.getClient();
+      const cacheKey = REDIS_KEYS.BOT_PROFILE(guildId);
+      const cachedProfile = await client.get(cacheKey);
+
+      let updatedProfile: BotProfile;
+      if (cachedProfile) {
+        // Update existing profile with new data
+        updatedProfile = JSON.parse(cachedProfile);
+        updatedProfile.nickname = responseData.nick ?? null;
+
+        // Update avatar URL if it changed
+        if (updates.avatar !== undefined) {
+          const memberUser: APIUser = responseData.user;
+          if (responseData.avatar) {
+            updatedProfile.avatar = `https://cdn.discordapp.com/guilds/${guildId}/users/${memberUser.id}/avatars/${responseData.avatar}.webp?size=512`;
+          } else if (memberUser.avatar) {
+            updatedProfile.avatar = `https://cdn.discordapp.com/avatars/${memberUser.id}/${memberUser.avatar}.webp?size=512`;
+          } else {
+            updatedProfile.avatar = null;
+          }
+        }
+
+        // Update banner URL if it changed
+        if (updates.banner !== undefined) {
+          const memberUser: APIUser = responseData.user;
+          if (responseData.banner) {
+            updatedProfile.banner = `https://cdn.discordapp.com/guilds/${guildId}/users/${memberUser.id}/banners/${responseData.banner}.webp?size=1024`;
+          } else if (memberUser.banner) {
+            updatedProfile.banner = `https://cdn.discordapp.com/banners/${memberUser.id}/${memberUser.banner}.webp?size=1024`;
+          } else {
+            updatedProfile.banner = null;
+          }
+        }
+      } else {
+        // Fallback: fetch full profile if cache is empty
+        updatedProfile = await this.refreshBotProfileCache(guildId);
+      }
+
+      // Update the cache with the updated profile
+      await client.setEx(
+        cacheKey,
+        CACHE_TTL.BOT_PROFILE,
+        JSON.stringify(updatedProfile)
+      );
 
       logger.info(
         `[DiscordService] Updated bot guild member profile for guild ${guildId}`
@@ -616,11 +664,11 @@ export class DiscordService {
   static async refreshBotProfileCache(guildId: string): Promise<BotProfile> {
     try {
       // Fetch fresh data and cache it
-      const profile = await this.getBotProfile(guildId);
+      const result = await this.getBotGuildProfile(guildId);
       logger.info(
         `[DiscordService] Refreshed bot profile cache for guild ${guildId}`
       );
-      return profile;
+      return result.guildProfile;
     } catch (error) {
       logger.error(
         `[DiscordService] Error refreshing bot profile cache for guild ${guildId}:`,
@@ -640,6 +688,46 @@ export class DiscordService {
     logger.info(
       `[DiscordService] Invalidated bot profile cache for guild ${guildId}`
     );
+  }
+
+  /**
+   * Get bot guild member information from Discord API (without user data)
+   */
+  static async getBotGuildMember(
+    guildId: string
+  ): Promise<APIGuildMember | null> {
+    try {
+      const response = await fetch(
+        `https://discord.com/api/v10/guilds/${guildId}/members/${config.discord.clientId}`,
+        {
+          headers: {
+            Authorization: `Bot ${config.discord.botToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          logger.warn(`[DiscordService] Bot not found in guild ${guildId}`);
+          return null;
+        }
+        throw new Error(
+          `Could not fetch bot guild member for ${guildId}: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const guildMember: APIGuildMember = await response.json();
+
+      // Strip the user data from the guild member object
+      return guildMember;
+    } catch (error) {
+      logger.error(
+        `[DiscordService] Error getting bot guild member for ${guildId}:`,
+        error
+      );
+      throw error;
+    }
   }
 
   /**

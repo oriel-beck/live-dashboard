@@ -153,9 +153,6 @@ export function startDataSync(client: Client) {
   });
 
   client.on(Events.GuildRoleCreate, async (role) => {
-    // Skip managed roles
-    if (role.managed) return;
-
     const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     const data = {
       id: role.id,
@@ -172,9 +169,6 @@ export function startDataSync(client: Client) {
   });
 
   client.on(Events.GuildRoleUpdate, async (_oldRole, role) => {
-    // Skip managed roles
-    if (role.managed) return;
-
     const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     const data = {
       id: role.id,

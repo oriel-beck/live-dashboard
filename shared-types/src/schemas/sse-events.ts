@@ -97,7 +97,10 @@ export interface CommandPermissionsFailedEvent extends BaseSSEEvent {
 
 export interface BotProfileLoadedEvent extends BaseSSEEvent {
   type: typeof SSE_EVENT_TYPES.BOT_PROFILE_LOADED;
-  data: BotProfile;
+  data: {
+    guildProfile: BotProfile;
+    globalProfile: BotProfile;
+  };
 }
 
 export interface BotProfileFailedEvent extends BaseSSEEvent {

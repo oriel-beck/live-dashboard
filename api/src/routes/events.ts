@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { config } from "../config";
-import { guildAccess } from "../middleware/auth";
+import { combinedAuth } from "../middleware/auth";
 import { DatabaseService } from "../services/database";
 import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
@@ -40,7 +40,7 @@ async function getCommandPermissions(guildId: string, signal?: AbortSignal) {
 }
 
 export const eventRoutes = new Elysia({ prefix: "/guilds" })
-  .use(guildAccess)
+  .use(combinedAuth)
 
   // GET /guilds/:guildId/events - Server-Sent Events endpoint
   .get("/:guildId/events", async ({ params, set }) => {
@@ -84,9 +84,7 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
         const sendDataEvent = <T extends SSEEvent>(event: T) => {
           if (signal.aborted || !isActive) return;
           controller.enqueue(
-            encoder.encode(
-              `event: message\ndata: ${JSON.stringify(event)}\n\n`
-            )
+            encoder.encode(`event: message\ndata: ${JSON.stringify(event)}\n\n`)
           );
         };
 
@@ -228,11 +226,15 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
             {
               name: "bot_profile",
               promise: withAbort(
-                DiscordService.getBotProfile(guildId, signal),
+                DiscordService.getBotGuildProfile(guildId, signal),
                 signal,
                 "Bot profile fetch cancelled"
               )
-                .then((result) => {
+                .then(({ guildProfile, globalProfile }) => {
+                  const result = {
+                    guildProfile,
+                    globalProfile,
+                  };
                   sendDataEvent({
                     type: SSE_EVENT_TYPES.BOT_PROFILE_LOADED,
                     data: result,
@@ -270,7 +272,7 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
               const event = JSON.parse(message);
               sendDataEvent(event as SSEEvent);
             } catch (error) {
-              logger.error('[Events] Error parsing Redis message:', error);
+              logger.error("[Events] Error parsing Redis message:", error);
             }
           });
         } catch (error) {
@@ -282,8 +284,7 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
             type: SSE_EVENT_TYPES.GUILD_FETCH_FAILED,
             data: {
               guildId,
-              error:
-                error instanceof Error ? error.message : "Unknown error",
+              error: error instanceof Error ? error.message : "Unknown error",
             },
           });
         }

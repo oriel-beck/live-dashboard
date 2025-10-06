@@ -14,6 +14,7 @@ export interface CachedGuildRole {
   name: string;
   position: number;
   permissions: string;
+  managed: boolean;
 }
 
 export interface CachedGuildChannel {

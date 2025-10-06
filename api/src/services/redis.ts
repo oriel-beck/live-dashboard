@@ -164,15 +164,14 @@ export class RedisService {
         try {
           const rolesData = await DiscordService.getGuildRoles(guildId);
 
-          // Transform and cache the roles (excluding managed roles)
-          const roles = rolesData
-            .filter((role) => !role.managed) // Filter out managed roles
-            .map((role) => ({
-              id: role.id,
-              name: role.name,
-              position: role.position,
-              permissions: role.permissions,
-            }));
+          // Transform and cache the roles (including managed roles for permission calculations)
+          const roles = rolesData.map((role) => ({
+            id: role.id,
+            name: role.name,
+            position: role.position,
+            permissions: role.permissions,
+            managed: role.managed,
+          }));
 
           // Cache roles with TTL
           if (roles.length > 0) {
@@ -221,6 +220,7 @@ export class RedisService {
     }
   }
 
+
   static async getGuildChannels(
     guildId: string
   ): Promise<CachedGuildChannel[]> {
@@ -242,7 +242,7 @@ export class RedisService {
           // Get bot's guild member info and guild roles to calculate permissions
           const [botMember, guildRoles] = await Promise.all([
             DiscordService.getBotGuildMember(guildId),
-            DiscordService.getGuildRoles(guildId)
+            this.getGuildRoles(guildId)
           ]);
 
           // Transform and cache the channels (text, announcement, and voice channels)
@@ -263,7 +263,7 @@ export class RedisService {
               return {
                 id: channel.id,
                 name: channel.name,
-                position: channel.position,
+                position: (channel as any).position || 0,
                 botPermissions: botPermissions.toString(),
               };
             });

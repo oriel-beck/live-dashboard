@@ -48,7 +48,7 @@
                 class="p-button-outlined"
               ></p-fileUpload>
               
-              @if (hasAvatarChanges()) {
+              @if (showAvatarReset()) {
                 <p-button 
                   label="Reset" 
                   icon="pi pi-refresh" 
@@ -97,7 +97,7 @@
                 class="p-button-outlined"
               ></p-fileUpload>
               
-              @if (hasBannerChanges()) {
+              @if (showBannerReset()) {
                 <p-button 
                   label="Reset" 
                   icon="pi pi-refresh" 

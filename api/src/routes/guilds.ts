@@ -1,7 +1,6 @@
 import { CommandPermissionsUpdateSchema } from "@discord-bot/shared-types";
 import { Elysia } from "elysia";
-import { guildAccess } from "../middleware/auth";
-import { sessionMiddleware } from "../middleware/session";
+import { combinedAuth } from "../middleware/auth";
 import { DatabaseService } from "../services/database";
 import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
@@ -9,8 +8,7 @@ import { logger } from "../utils/logger";
 import { withAbort } from "../utils/request-utils";
 
 export const guildPlugin = new Elysia({ name: "guild", prefix: "/guilds" })
-  .use(sessionMiddleware)
-  .use(guildAccess)
+  .use(combinedAuth)
   // GET /guilds/:guildId/commands/:commandId - Get command configuration by Discord ID
   .get("/:guildId/commands/:commandId", async ({ params, set, request }) => {
     const { guildId, commandId } = params as {

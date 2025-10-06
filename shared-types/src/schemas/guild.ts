@@ -6,6 +6,7 @@ export const GuildRoleSchema = z.object({
   name: z.string(),
   position: z.number(),
   permissions: z.string(),
+  managed: z.boolean(),
 });
 
 // Guild Channel Schema

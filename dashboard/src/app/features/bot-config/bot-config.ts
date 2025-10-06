@@ -12,6 +12,7 @@ import {
   FormBuilder,
   FormGroup,
   Validators,
+  FormControl,
 } from '@angular/forms';
 import { CacheStore } from '../../store/sse.store';
 import { ApiService } from '../../core/services/api.service';
@@ -64,15 +65,17 @@ export class BotConfig implements OnInit {
   ];
 
   // Reactive Form
-  readonly botConfigForm: FormGroup = this.fb.group({
-    avatar: [null],
-    banner: [null],
-    nickname: ['', [Validators.maxLength(32)]],
+  readonly botConfigForm = this.fb.group({
+    avatar: this.fb.control<string | null | undefined>(null),
+    banner: this.fb.control<string | null | undefined>(null),
+    nickname: this.fb.control<string | null | undefined>('', [
+      Validators.maxLength(32),
+    ]),
   });
 
   readonly botConfigSignal = signal<typeof this.botConfigForm.value>({
-    avatar: null,
-    banner: null,
+    avatar: undefined,
+    banner: undefined,
     nickname: '',
   });
 
@@ -108,43 +111,93 @@ export class BotConfig implements OnInit {
   currentAvatarUrl = computed(() => {
     const formValue = this.botConfigSignal().avatar;
     const sseProfile = this.store.botProfile();
-
-    // Show form preview if changed, otherwise show SSE state
-    if (formValue && formValue !== sseProfile?.avatar) {
+    const globalProfile = this.store.globalBotProfile();
+    
+    // If form value is null, it means reset to global profile (original bot appearance)
+    if (formValue === null) {
+      return globalProfile?.avatar || '/assets/default-avatar.png';
+    }
+    
+    // If form value is a string, it means a new value was uploaded
+    if (formValue) {
       return formValue;
     }
 
+    // If form value is undefined (default), return SSE avatar or default
     return sseProfile?.avatar || '/assets/default-avatar.png';
   });
 
   currentBannerUrl = computed(() => {
     const formValue = this.botConfigSignal().banner;
     const sseProfile = this.store.botProfile();
+    const globalProfile = this.store.globalBotProfile();
 
-    // Show form preview if changed, otherwise show SSE state
-    if (formValue && formValue !== sseProfile?.banner) {
+    // If form value is null, it means reset to global profile (original bot appearance)
+    if (formValue === null) {
+      return globalProfile?.banner || '';
+    }
+
+    // If form value is a string, it means a new value was uploaded
+    if (formValue) {
       return formValue;
     }
 
+    // If form value is undefined (default), return SSE banner or empty
     return sseProfile?.banner || '';
   });
 
   hasAvatarChanges = computed(() => {
     const formValue = this.botConfigSignal().avatar;
     const sseProfile = this.store.botProfile();
-    return formValue !== sseProfile?.avatar;
+    
+    // If form value is null, it means reset to clear guild customization (which is a change if there was an avatar)
+    if (formValue === null) {
+      return sseProfile?.avatar != null;
+    }
+    
+    // If form value is a string, it means a new value was uploaded (which is a change if different from current)
+    if (formValue) {
+      return formValue !== sseProfile?.avatar;
+    }
+    
+    // If form value is undefined (default), no changes
+    return false;
   });
 
   hasBannerChanges = computed(() => {
     const formValue = this.botConfigSignal().banner;
     const sseProfile = this.store.botProfile();
-    return formValue !== sseProfile?.banner;
+    
+    // If form value is null, it means reset to clear guild customization (which is a change if there was a banner)
+    if (formValue === null) {
+      return sseProfile?.banner != null && sseProfile?.banner !== '';
+    }
+    
+    // If form value is a string, it means a new value was uploaded (which is a change if different from current)
+    if (typeof formValue === 'string') {
+      return formValue !== sseProfile?.banner;
+    }
+    
+    // If form value is undefined (default), no changes
+    return false;
   });
 
   hasNicknameChanges = computed(() => {
-    const formValue = this.botConfigForm.get('nickname')?.value;
+    const formValue = this.botConfigSignal().nickname;
     const sseProfile = this.store.botProfile();
-    return formValue !== sseProfile?.nickname;
+    
+    // If form value is null, it means reset to clear guild customization (which is a change if there was a nickname)
+    if (formValue === null) {
+      return sseProfile?.nickname != null && sseProfile?.nickname !== '';
+    }
+    
+    // If form value is a string, it means a new value was entered (which is a change if different from current)
+    if (typeof formValue === 'string') {
+      return formValue !== sseProfile?.nickname;
+    }
+    
+    // If form value is undefined (default), no changes
+    return false;
   });
 
   hasAnyChanges = computed(() => {
@@ -153,6 +206,46 @@ export class BotConfig implements OnInit {
       this.hasBannerChanges() ||
       this.hasNicknameChanges()
     );
+  });
+
+  // Show reset button when there's a custom avatar to reset
+  showAvatarReset = computed(() => {
+    const formValue = this.botConfigSignal().avatar;
+    const sseProfile = this.store.botProfile();
+    const globalProfile = this.store.globalBotProfile();
+    
+    // If form has a value (string), show reset button
+    if (formValue) {
+      return true;
+    }
+    
+    // If form is null (reset pending), don't show reset button
+    if (formValue === null) {
+      return false;
+    }
+    
+    // If form is undefined (default), show reset if there's a custom avatar
+    return sseProfile?.avatar != null && sseProfile?.avatar !== globalProfile?.avatar;
+  });
+
+  // Show reset button when there's a custom banner to reset
+  showBannerReset = computed(() => {
+    const formValue = this.botConfigSignal().banner;
+    const sseProfile = this.store.botProfile();
+    const globalProfile = this.store.globalBotProfile();
+    
+    // If form has a value (string), show reset button
+    if (formValue) {
+      return true;
+    }
+    
+    // If form is null (reset pending), don't show reset button
+    if (formValue === null) {
+      return false;
+    }
+    
+    // If form is undefined (default), show reset if there's a custom banner
+    return sseProfile?.banner != null && sseProfile?.banner !== globalProfile?.banner;
   });
 
   // File handling
@@ -226,16 +319,16 @@ export class BotConfig implements OnInit {
 
   // Form reset methods
   private resetField(field: 'avatar' | 'banner'): void {
-    const sseProfile = this.store.botProfile();
+    // Reset to null to clear guild-specific customizations
     this.botConfigForm.patchValue({
-      [field]: sseProfile?.[field],
+      [field]: null,
     });
 
     const fieldName = field === 'avatar' ? 'Avatar' : 'Banner';
     this.messageService.add({
       severity: 'info',
       summary: `${fieldName} Reset`,
-      detail: `${fieldName} changes have been reverted`,
+      detail: `${fieldName} will be reset to original bot appearance when saved`,
     });
   }
 

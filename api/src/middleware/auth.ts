@@ -1,98 +1,131 @@
-import { Elysia } from 'elysia';
-import { DiscordService } from '../services/discord';
-import { logger } from '../utils/logger';
-
+import { Elysia } from "elysia";
+import { DiscordService } from "../services/discord";
+import { SessionService } from "../services/session";
+import { logger } from "../utils/logger";
 
 // Auth middleware for bot authentication
-export const botAuth = new Elysia({ name: 'botAuth' })
-  .derive(async ({ headers, set }) => {
+export const botAuth = new Elysia({ name: "botAuth" }).derive(
+  async ({ headers, set }) => {
     const authHeader = headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       set.status = 401;
       return {
-        error: 'Authorization header required',
+        error: "Authorization header required",
         isBot: false,
-        token: null
+        token: null,
       };
     }
 
     try {
       const token = authHeader.substring(7);
-      
+
       // Check if token is the bot token
       if (token === process.env.BOT_TOKEN) {
         return {
           isBot: true,
           token,
-          error: null
+          error: null,
         };
       }
-      
+
       set.status = 401;
       return {
-        error: 'Invalid bot token',
+        error: "Invalid bot token",
         isBot: false,
-        token: null
+        token: null,
       };
     } catch (error) {
-      logger.error('[Auth] Bot authentication failed:', error);
+      logger.error("[Auth] Bot authentication failed:", error);
       set.status = 401;
       return {
-        error: 'Invalid bot token',
+        error: "Invalid bot token",
         isBot: false,
-        token: null
+        token: null,
       };
     }
-  });
+  }
+);
 
-// Guild access middleware - checks if user has access to a specific guild
-export const guildAccess = new Elysia({ name: 'guildAccess' })
-  .derive(async ({ headers, params, set }) => {
+
+// Combined authentication middleware - supports both session and Bearer token
+export const combinedAuth = new Elysia({ name: "combinedAuth" }).derive(
+  async ({ headers, params, set, cookie }) => {
     const authHeader = headers.authorization;
     const guildId = (params as any).guildId;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const sessionId = cookie.session?.value;
+
+    // Check for Bearer token first (bot authentication)
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+
+      // Bot token passes with no checks
+      if (token === process.env.BOT_TOKEN) {
+        return {
+          isAuthenticated: true,
+          accessToken: token,
+          userId: "bot",
+          authMethod: "bot",
+        };
+      }
+
+      // Any other Bearer token is unauthorized
       set.status = 401;
-      return {
-        error: 'Authorization header required',
-        hasAccess: false
-      };
+      throw new Error("Unauthorized");
+    }
+
+    // Check for session cookie (frontend authentication)
+    if (!sessionId) {
+      set.status = 401;
+      throw new Error("Authentication required");
     }
 
     try {
-      const token = authHeader.substring(7);
-      
-      // Check if it's bot token (bot bypasses guild access checks)
-      if (token === process.env.BOT_TOKEN) {
-        return {
-          hasAccess: true,
-          error: null
-        };
+      // Validate session
+      const session = await SessionService.getUserSession(sessionId);
+
+      if (!session) {
+        set.status = 401;
+        throw new Error("Invalid session");
       }
-      
-      // For user tokens, check guild access
-      const userGuilds = await DiscordService.getUserGuilds(token);
-      const hasAccess = DiscordService.checkGuildAccess(guildId, userGuilds);
-      
-      if (!hasAccess) {
-        set.status = 403;
-        return {
-          error: 'Access denied to this guild',
-          hasAccess: false
-        };
+
+      // If guildId is provided, check if user has access to that guild
+      if (guildId) {
+        const userGuilds = await DiscordService.getUserGuilds(
+          session.accessToken
+        );
+        const hasAccess = DiscordService.checkGuildAccess(guildId, userGuilds);
+
+        if (!hasAccess) {
+          set.status = 403;
+          throw new Error("Access denied to this guild");
+        }
       }
-      
+
       return {
-        hasAccess: true,
-        error: null
+        isAuthenticated: true,
+        accessToken: session.accessToken,
+        userId: session.user.id,
+        session,
+        authMethod: "session",
       };
     } catch (error) {
-      logger.error(`[Auth] Guild access check failed for guild ${guildId}:`, error);
-      set.status = 403;
-      return {
-        error: 'Failed to verify guild access',
-        hasAccess: false
-      };
+      logger.error(
+        `[Auth] Session authentication failed for guild ${guildId}:`,
+        error
+      );
+
+      // Re-throw authentication errors
+      if (
+        error instanceof Error &&
+        (error.message === "Invalid session" ||
+          error.message === "Access denied to this guild")
+      ) {
+        throw error;
+      }
+
+      set.status = 401;
+      throw new Error("Authentication failed");
     }
-  });
+  }
+);

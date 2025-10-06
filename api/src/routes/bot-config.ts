@@ -1,71 +1,20 @@
 import {
   BotConfigUpdateRequestSchema,
-  SSE_EVENT_TYPES,
-  type BotConfigUpdateRequest
+  BotConfigResponseSchema,
+  SSE_EVENT_TYPES
 } from "@discord-bot/shared-types";
 import { Elysia } from "elysia";
-import { sessionMiddleware } from "../middleware/session";
+import { combinedAuth } from "../middleware/auth";
 import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
 import { logger } from "../utils/logger";
 import { withAbort } from "../utils/request-utils";
 
-
 export const botConfigPlugin = new Elysia({
   name: "bot-config",
   prefix: "/guilds/:guildId/bot-config",
 })
-  .use(sessionMiddleware)
-  .derive(async (context: any) => {
-    const { params, set } = context;
-    const guildId = params?.guildId;
-
-    if (!context.isAuthenticated || !context.session || !context.accessToken) {
-      set.status = 401;
-      throw new Error("Authentication required");
-    }
-
-    if (!guildId) {
-      set.status = 400;
-      throw new Error("Guild ID required");
-    }
-
-    try {
-      // Check if user has access to this guild
-      const userGuilds = await DiscordService.getUserGuilds(
-        context.accessToken
-      );
-      const hasAccess = DiscordService.checkGuildAccess(guildId, userGuilds);
-
-      if (!hasAccess) {
-        set.status = 403;
-        throw new Error("Access denied to this guild");
-      }
-
-      return {
-        guildId,
-        userId: context.session.user.id,
-        accessToken: context.accessToken,
-      };
-    } catch (error) {
-      logger.error(
-        `[BotConfig] Error checking guild access for ${guildId}:`,
-        error
-      );
-
-      if (
-        error instanceof Error &&
-        (error.message === "Authentication required" ||
-          error.message === "Guild ID required" ||
-          error.message === "Access denied to this guild")
-      ) {
-        throw error;
-      }
-
-      set.status = 500;
-      throw new Error("Internal server error");
-    }
-  })
+  .use(combinedAuth)
   .onError(({ error, set }) => {
     const statusCode = set.status || 500;
 
@@ -80,20 +29,25 @@ export const botConfigPlugin = new Elysia({
   })
 
   // GET /guilds/:guildId/bot-config - Get bot configuration
-  .get("/", async ({ guildId, set, request }) => {
+  .get("/", async ({ params, set, request }) => {
+    const { guildId } = params as { guildId: string };
     // Use the request signal for cancellation
     const signal = request.signal as AbortSignal | undefined;
 
     try {
-      const config = await withAbort(
-        DiscordService.getBotProfile(guildId),
+      // Fetch both guild-specific and global bot profiles in parallel
+      const res = await withAbort(
+        DiscordService.getBotGuildProfile(guildId),
         signal,
         `Bot config fetch cancelled for guild ${guildId}`
-      );
+      )
+
+      // Validate the response structure
+      const validatedResponse = BotConfigResponseSchema.parse(res);
 
       return {
         success: true,
-        data: config,
+        data: validatedResponse,
       };
     } catch (error) {
       if (signal?.aborted) {
@@ -114,7 +68,8 @@ export const botConfigPlugin = new Elysia({
   })
 
   // PUT /guilds/:guildId/bot-config - Update bot configuration
-  .put("/", async ({ body, guildId, set }) => {
+  .put("/", async ({ body, params, set }) => {
+    const { guildId } = params as { guildId: string };
     try {
       // Validate request body
       const validatedBody = BotConfigUpdateRequestSchema.parse(body);
@@ -185,7 +140,8 @@ export const botConfigPlugin = new Elysia({
   })
 
   // DELETE /guilds/:guildId/bot-config - Reset bot configuration
-  .delete("/", async ({ guildId, set }) => {
+  .delete("/", async ({ params, set }) => {
+    const { guildId } = params as { guildId: string };
     try {
       // Reset bot guild member profile (remove avatar, banner, and nickname)
       const resetData = {

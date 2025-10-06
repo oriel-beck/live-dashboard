@@ -34,6 +34,7 @@ interface CacheStore {
   error: string | null;
   guildInfo: GuildInfo | null;
   botProfile: BotProfile | null;
+  globalBotProfile: BotProfile | null;
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
 }
 
@@ -48,6 +49,7 @@ const initialState: CacheStore = {
   error: null,
   guildInfo: null,
   botProfile: null,
+  globalBotProfile: null,
   connectionStatus: 'disconnected',
 };
 
@@ -194,7 +196,8 @@ export const CacheStore = signalStore(
 
               case SSE_EVENT_TYPES.BOT_PROFILE_LOADED:
                 patchState(store, {
-                  botProfile: event.data,
+                  botProfile: event.data.guildProfile,
+                  globalBotProfile: event.data.globalProfile,
                 });
                 break;
 
