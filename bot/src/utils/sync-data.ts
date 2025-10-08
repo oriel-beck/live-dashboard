@@ -39,6 +39,9 @@ async function syncGuildChannels(guild: Guild) {
       (ch) => ch.isTextBased() || ch.isVoiceBased()
     );
 
+    // Prepare all channel data first
+    const channelData: Record<string, string> = {};
+    
     for (const [, channel] of channels) {
       let botPermissions = "0";
       
@@ -60,7 +63,12 @@ async function syncGuildChannels(guild: Guild) {
         botPermissions,
       };
 
-      await hsetJson(key, channel.id, data);
+      channelData[channel.id] = JSON.stringify(data);
+    }
+
+    // Set all channels at once
+    if (Object.keys(channelData).length > 0) {
+      await redis.hset(key, channelData);
     }
 
     logger.debug(
@@ -84,10 +92,15 @@ export function startDataSync(client: Client) {
 
     // Only add guild IDs to the set for O(1) lookups
     // Don't load guild data - it will be loaded on-demand when dashboard requests it
-    for (const [, guild] of client.guilds.cache) {
-      await redis.sadd(REDIS_KEYS.GUILD_SET, guild.id);
+    const guildIds = Array.from(client.guilds.cache.keys());
+    
+    // Add all guild IDs to the set at once
+    if (guildIds.length > 0) {
+      await redis.sadd(REDIS_KEYS.GUILD_SET, ...guildIds);
+    }
 
-      // Sync bot permissions for all channels in this guild
+    // Sync bot permissions for all channels in each guild
+    for (const [, guild] of client.guilds.cache) {
       await syncGuildChannels(guild);
     }
 
@@ -137,14 +150,11 @@ export function startDataSync(client: Client) {
     );
 
     // Remove cached data if it exists
-    const pipeline = redis
-      .pipeline()
-      .del(
-        REDIS_KEYS.GUILD_INFO(guild.id),
-        REDIS_KEYS.GUILD_ROLES(guild.id),
-        REDIS_KEYS.GUILD_CHANNELS(guild.id)
-      );
-    await pipeline.exec();
+    await redis.del(
+      REDIS_KEYS.GUILD_INFO(guild.id),
+      REDIS_KEYS.GUILD_ROLES(guild.id),
+      REDIS_KEYS.GUILD_CHANNELS(guild.id)
+    );
 
     await publishGuildEvent(guild.id, {
       type: SSE_EVENT_TYPES.GUILD_DELETE,

@@ -176,11 +176,11 @@ export class RedisService {
           // Cache roles with TTL
           if (roles.length > 0) {
             await client.del(key);
-            const pipeline = client.multi();
-            roles.forEach((role) => {
-              pipeline.hSet(key, role.id, JSON.stringify(role));
-            });
-            await pipeline.exec();
+            const roleData = roles.reduce((acc, role) => {
+              acc[role.id] = JSON.stringify(role);
+              return acc;
+            }, {} as Record<string, string>);
+            await client.hSet(key, roleData);
             await client.expire(key, CACHE_TTL.GUILD_ROLES);
           }
 
@@ -271,11 +271,11 @@ export class RedisService {
           // Cache channels with TTL
           if (channels.length > 0) {
             await client.del(key);
-            const pipeline = client.multi();
-            channels.forEach((channel) => {
-              pipeline.hSet(key, channel.id, JSON.stringify(channel));
-            });
-            await pipeline.exec();
+            const channelData = channels.reduce((acc, channel) => {
+              acc[channel.id] = JSON.stringify(channel);
+              return acc;
+            }, {} as Record<string, string>);
+            await client.hSet(key, channelData);
             await client.expire(key, CACHE_TTL.GUILD_CHANNELS);
           }
 
