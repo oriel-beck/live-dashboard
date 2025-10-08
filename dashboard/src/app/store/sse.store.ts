@@ -10,7 +10,7 @@ import {
   GuildInfo,
   GuildRole,
   SSEEvent,
-  SSE_EVENT_TYPES
+  SSE_EVENT_TYPES,
 } from '@discord-bot/shared-types';
 import {
   patchState,
@@ -180,15 +180,24 @@ export const CacheStore = signalStore(
 
               case SSE_EVENT_TYPES.COMMAND_PERMISSIONS_LOADED:
                 patchState(store, {
-                  commandPermissions: event.data.reduce((acc: Map<string, GuildApplicationCommandPermissions>, permission: GuildApplicationCommandPermissions) => {
-                    acc.set(permission.id, permission);
-                    return acc;
-                  }, new Map<string, GuildApplicationCommandPermissions>()),
+                  commandPermissions: event.data.reduce(
+                    (
+                      acc: Map<string, GuildApplicationCommandPermissions>,
+                      permission: GuildApplicationCommandPermissions
+                    ) => {
+                      acc.set(permission.id, permission);
+                      return acc;
+                    },
+                    new Map<string, GuildApplicationCommandPermissions>()
+                  ),
                 });
                 break;
 
               case SSE_EVENT_TYPES.COMMAND_PERMISSIONS_FAILED:
-                console.error('[Dashboard] Command permissions failed:', event.data);
+                console.error(
+                  '[Dashboard] Command permissions failed:',
+                  event.data
+                );
                 patchState(store, {
                   error: `Failed to load command permissions: ${event.data}`,
                 });
@@ -227,7 +236,11 @@ export const CacheStore = signalStore(
                 break;
 
               case SSE_EVENT_TYPES.GUILD_DELETE:
-                console.log(`[Dashboard] Guild ${event.guildId} was deleted`);
+                // Redirect to servers page if the deleted guild is the current guild
+                // The deleted is always the current guild since the SSE event is only sent when the user is viewing the guild
+                console.log(
+                  `[Dashboard] Guild ${event.guildId} was deleted, redirecting to servers page`
+                );
                 store.source()?.close();
                 router.navigate(['/servers']);
                 break;
@@ -294,7 +307,9 @@ export const CacheStore = signalStore(
               case SSE_EVENT_TYPES.MEMBER_PERMS_UPDATE:
                 // This event is for user-specific permissions, not guild-wide
                 // We don't need to update the store for this event
-                console.log(`[Dashboard] Member permissions updated for guild ${event.guildId}`);
+                console.log(
+                  `[Dashboard] Member permissions updated for guild ${event.guildId}`
+                );
                 break;
 
               case SSE_EVENT_TYPES.BOT_PROFILE_UPDATE:
