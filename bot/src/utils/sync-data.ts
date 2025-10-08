@@ -2,9 +2,6 @@ import {
   ChannelType,
   type Client,
   Events,
-  type Guild,
-  type GuildChannel,
-  type Role,
 } from "discord.js";
 import redis from "../redis";
 import {
@@ -23,64 +20,6 @@ import { GuildApplicationCommandPermissions } from "@discord-bot/shared-types";
 
 let initiated = false;
 
-// Helper function to sync bot permissions for all channels in a guild
-async function syncGuildChannels(guild: Guild) {
-  const key = REDIS_KEYS.GUILD_CHANNELS(guild.id);
-  const botMember = guild.members.me;
-
-  if (!botMember) {
-    logger.debug(`[SyncData] Bot member not found for guild ${guild.id}`);
-    return;
-  }
-
-  try {
-    // Get all channels from the guild
-    const channels = guild.channels.cache.filter(
-      (ch) => ch.isTextBased() || ch.isVoiceBased()
-    );
-
-    // Prepare all channel data first
-    const channelData: Record<string, string> = {};
-    
-    for (const [, channel] of channels) {
-      let botPermissions = "0";
-      
-      try {
-        const permissions = channel.permissionsFor(botMember);
-        botPermissions = permissions?.bitfield.toString() ?? "0";
-      } catch (error) {
-        // Bot doesn't have access to this channel, but we still want to cache it
-        logger.debug(
-          `[SyncData] Bot cannot access channel ${channel.id} (${channel.name}) in guild ${guild.id}`
-        );
-      }
-
-      const data = {
-        id: channel.id,
-        name: channel.name,
-        position:
-          (channel as any).rawPosition ?? (channel as any).position ?? 0,
-        botPermissions,
-      };
-
-      channelData[channel.id] = JSON.stringify(data);
-    }
-
-    // Set all channels at once
-    if (Object.keys(channelData).length > 0) {
-      await redis.hset(key, channelData);
-    }
-
-    logger.debug(
-      `[SyncData] Synced ${channels.size} channels for guild ${guild.id}`
-    );
-  } catch (error) {
-    logger.error(
-      `[SyncData] Error syncing channels for guild ${guild.id}:`,
-      error
-    );
-  }
-}
 
 export function startDataSync(client: Client) {
   if (initiated) throw new Error("[SyncData]: Listeners are already set up");
@@ -99,11 +38,6 @@ export function startDataSync(client: Client) {
       await redis.sadd(REDIS_KEYS.GUILD_SET, ...guildIds);
     }
 
-    // Sync bot permissions for all channels in each guild
-    for (const [, guild] of client.guilds.cache) {
-      await syncGuildChannels(guild);
-    }
-
     logger.debug(
       `[SyncData] Guild set initialized with ${client.guilds.cache.size} guilds`
     );
@@ -113,9 +47,6 @@ export function startDataSync(client: Client) {
   client.on(Events.GuildCreate, async (guild) => {
     // Add to guild set for O(1) lookups
     await redis.sadd(REDIS_KEYS.GUILD_SET, guild.id);
-
-    // Sync bot permissions for all channels in this new guild
-    await syncGuildChannels(guild);
 
     logger.debug(
       `[SyncData] Added new guild ${guild.id} (${guild.name}) to guild set`
@@ -170,7 +101,14 @@ export function startDataSync(client: Client) {
       position: role.position,
       permissions: role.permissions.bitfield.toString(),
     };
-    await hsetJson(key, role.id, data);
+
+    // Only update cache if it already exists (roles are cached on-demand)
+    const cacheExists = await redis.exists(key);
+    if (cacheExists) {
+      await hsetJson(key, role.id, data);
+    }
+
+    // Always publish the event for frontend updates
     await publishGuildEvent(role.guild.id, {
       type: SSE_EVENT_TYPES.ROLE_CREATE,
       roleId: role.id,
@@ -186,7 +124,14 @@ export function startDataSync(client: Client) {
       position: role.position,
       permissions: role.permissions.bitfield.toString(),
     };
-    await hsetJson(key, role.id, data);
+
+    // Only update cache if it already exists (roles are cached on-demand)
+    const cacheExists = await redis.exists(key);
+    if (cacheExists) {
+      await hsetJson(key, role.id, data);
+    }
+
+    // Always publish the event for frontend updates
     await publishGuildEvent(role.guild.id, {
       type: SSE_EVENT_TYPES.ROLE_UPDATE,
       roleId: role.id,
@@ -196,7 +141,14 @@ export function startDataSync(client: Client) {
 
   client.on(Events.GuildRoleDelete, async (role) => {
     const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
-    await hdel(key, role.id);
+
+    // Only update cache if it already exists (roles are cached on-demand)
+    const cacheExists = await redis.exists(key);
+    if (cacheExists) {
+      await hdel(key, role.id);
+    }
+
+    // Always publish the event for frontend updates
     await publishGuildEvent(role.guild.id, {
       type: SSE_EVENT_TYPES.ROLE_DELETE,
       roleId: role.id,
@@ -249,7 +201,14 @@ export function startDataSync(client: Client) {
       position: ch.rawPosition ?? 0,
       botPermissions,
     };
-    await hsetJson(key, ch.id, data);
+
+    // Only update cache if it already exists (channels are cached on-demand)
+    const cacheExists = await redis.exists(key);
+    if (cacheExists) {
+      await hsetJson(key, ch.id, data);
+    }
+
+    // Always publish the event for frontend updates
     await publishGuildEvent(ch.guild.id, {
       type: SSE_EVENT_TYPES.CHANNEL_CREATE,
       channelId: ch.id,
@@ -287,7 +246,14 @@ export function startDataSync(client: Client) {
       position: ch.rawPosition ?? 0,
       botPermissions,
     };
-    await hsetJson(key, ch.id, data);
+
+    // Only update cache if it already exists (channels are cached on-demand)
+    const cacheExists = await redis.exists(key);
+    if (cacheExists) {
+      await hsetJson(key, ch.id, data);
+    }
+
+    // Always publish the event for frontend updates
     await publishGuildEvent(ch.guild.id, {
       type: SSE_EVENT_TYPES.CHANNEL_UPDATE,
       channelId: ch.id,
@@ -299,7 +265,14 @@ export function startDataSync(client: Client) {
     if (ch.isDMBased()) return;
 
     const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
-    await hdel(key, ch.id);
+
+    // Only update cache if it already exists (channels are cached on-demand)
+    const cacheExists = await redis.exists(key);
+    if (cacheExists) {
+      await hdel(key, ch.id);
+    }
+
+    // Always publish the event for frontend updates
     await publishGuildEvent(ch.guild.id, {
       type: SSE_EVENT_TYPES.CHANNEL_DELETE,
       channelId: ch.id,
@@ -333,36 +306,35 @@ export function startDataSync(client: Client) {
       const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(data.guildId);
 
       const guildPermissions = await redis.get(cacheKey);
-      if (!guildPermissions) {
+      if (guildPermissions) {
+        // Update the permissions for the command
+        const parsedPermissions = JSON.parse(
+          guildPermissions
+        ) as GuildApplicationCommandPermissions[];
+
+        const updatedPermissions = parsedPermissions.map((permission) => {
+          if (permission.id === data.id) {
+            return data.permissions;
+          }
+          return permission;
+        });
+
+        await redis.setex(
+          cacheKey,
+          CACHE_TTL.COMMAND_PERMISSIONS,
+          JSON.stringify(updatedPermissions)
+        );
+
+        logger.debug(
+          `[SyncData] Updated command permissions cache for guild ${data.guildId}`
+        );
+      } else {
         logger.debug(
           `[SyncData] Command permissions cache for guild ${data.guildId} does not exist, will be re-fetched from Discord API when needed`
         );
-        return;
       }
 
-      // Update the permissions for the command
-      const parsedPermissions = JSON.parse(
-        guildPermissions
-      ) as GuildApplicationCommandPermissions[];
-
-      const updatedPermissions = parsedPermissions.map((permission) => {
-        if (permission.id === data.id) {
-          return data.permissions;
-        }
-        return permission;
-      });
-
-      await redis.setex(
-        cacheKey,
-        CACHE_TTL.COMMAND_PERMISSIONS,
-        JSON.stringify(updatedPermissions)
-      );
-
-      logger.debug(
-        `[SyncData] Updated command permissions cache for guild ${data.guildId}`
-      );
-
-      // Publish the event for real-time updates
+      // Always publish the event for frontend updates
       await publishGuildEvent(data.guildId, {
         type: SSE_EVENT_TYPES.COMMAND_PERMISSIONS_UPDATE,
         guildId: data.guildId,
