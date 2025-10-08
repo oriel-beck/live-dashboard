@@ -131,6 +131,18 @@
                 <small class="p-error">Nickname must be 32 characters or less</small>
               }
             </div>
+            
+            @if (showNicknameReset()) {
+              <div class="nickname-actions">
+                <p-button 
+                  label="Reset Nickname" 
+                  icon="pi pi-refresh" 
+                  severity="secondary"
+                  (onClick)="resetNickname()"
+                  [outlined]="true"
+                ></p-button>
+              </div>
+            }
           </div>
         </p-card>
 

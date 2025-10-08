@@ -222,6 +222,13 @@
       margin-top: var(--space-xs);
     }
   }
+  
+  .nickname-actions {
+    display: flex;
+    gap: var(--space-md);
+    margin-top: var(--space-lg);
+    justify-content: flex-start;
+  }
 }
 
 // Actions

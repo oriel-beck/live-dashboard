@@ -66,9 +66,9 @@ export class BotConfig implements OnInit {
 
   // Reactive Form
   readonly botConfigForm = this.fb.group({
-    avatar: this.fb.control<string | null | undefined>(null),
-    banner: this.fb.control<string | null | undefined>(null),
-    nickname: this.fb.control<string | null | undefined>('', [
+    avatar: this.fb.control<string | undefined>(undefined),
+    banner: this.fb.control<string | undefined>(undefined),
+    nickname: this.fb.control<string | undefined>(undefined, [
       Validators.maxLength(32),
     ]),
   });
@@ -76,7 +76,7 @@ export class BotConfig implements OnInit {
   readonly botConfigSignal = signal<typeof this.botConfigForm.value>({
     avatar: undefined,
     banner: undefined,
-    nickname: '',
+    nickname: undefined,
   });
 
   readonly isSaving = signal(false);
@@ -113,18 +113,13 @@ export class BotConfig implements OnInit {
     const sseProfile = this.store.botProfile();
     const globalProfile = this.store.globalBotProfile();
     
-    // If form value is null, it means reset to global profile (original bot appearance)
-    if (formValue === null) {
-      return globalProfile?.avatar || '/assets/default-avatar.png';
-    }
-    
-    // If form value is a string, it means a new value was uploaded
+    // If form has a custom value, show it
     if (formValue) {
       return formValue;
     }
 
-    // If form value is undefined (default), return SSE avatar or default
-    return sseProfile?.avatar || '/assets/default-avatar.png';
+    // Otherwise show the current guild avatar or default to global avatar
+    return sseProfile?.avatar || globalProfile?.avatar || '/assets/default-avatar.png';
   });
 
   currentBannerUrl = computed(() => {
@@ -132,35 +127,25 @@ export class BotConfig implements OnInit {
     const sseProfile = this.store.botProfile();
     const globalProfile = this.store.globalBotProfile();
 
-    // If form value is null, it means reset to global profile (original bot appearance)
-    if (formValue === null) {
-      return globalProfile?.banner || '';
-    }
-
-    // If form value is a string, it means a new value was uploaded
+    // If form has a custom value, show it
     if (formValue) {
       return formValue;
     }
 
-    // If form value is undefined (default), return SSE banner or empty
-    return sseProfile?.banner || '';
+    // Otherwise show the current guild banner or default to global banner
+    return sseProfile?.banner || globalProfile?.banner || '';
   });
 
   hasAvatarChanges = computed(() => {
     const formValue = this.botConfigSignal().avatar;
     const sseProfile = this.store.botProfile();
     
-    // If form value is null, it means reset to clear guild customization (which is a change if there was an avatar)
-    if (formValue === null) {
-      return sseProfile?.avatar != null;
-    }
-    
-    // If form value is a string, it means a new value was uploaded (which is a change if different from current)
+    // Only detect changes if form has a value
     if (formValue) {
       return formValue !== sseProfile?.avatar;
     }
     
-    // If form value is undefined (default), no changes
+    // If form is undefined, no changes
     return false;
   });
 
@@ -168,17 +153,12 @@ export class BotConfig implements OnInit {
     const formValue = this.botConfigSignal().banner;
     const sseProfile = this.store.botProfile();
     
-    // If form value is null, it means reset to clear guild customization (which is a change if there was a banner)
-    if (formValue === null) {
-      return sseProfile?.banner != null && sseProfile?.banner !== '';
-    }
-    
-    // If form value is a string, it means a new value was uploaded (which is a change if different from current)
-    if (typeof formValue === 'string') {
+    // Only detect changes if form has a value
+    if (formValue) {
       return formValue !== sseProfile?.banner;
     }
     
-    // If form value is undefined (default), no changes
+    // If form is undefined, no changes
     return false;
   });
 
@@ -186,17 +166,12 @@ export class BotConfig implements OnInit {
     const formValue = this.botConfigSignal().nickname;
     const sseProfile = this.store.botProfile();
     
-    // If form value is null, it means reset to clear guild customization (which is a change if there was a nickname)
-    if (formValue === null) {
-      return sseProfile?.nickname != null && sseProfile?.nickname !== '';
-    }
-    
-    // If form value is a string, it means a new value was entered (which is a change if different from current)
-    if (typeof formValue === 'string') {
+    // Only detect changes if form has a value
+    if (formValue) {
       return formValue !== sseProfile?.nickname;
     }
     
-    // If form value is undefined (default), no changes
+    // If form is undefined, no changes
     return false;
   });
 
@@ -211,41 +186,25 @@ export class BotConfig implements OnInit {
   // Show reset button when there's a custom avatar to reset
   showAvatarReset = computed(() => {
     const formValue = this.botConfigSignal().avatar;
-    const sseProfile = this.store.botProfile();
-    const globalProfile = this.store.globalBotProfile();
     
-    // If form has a value (string), show reset button
-    if (formValue) {
-      return true;
-    }
-    
-    // If form is null (reset pending), don't show reset button
-    if (formValue === null) {
-      return false;
-    }
-    
-    // If form is undefined (default), show reset if there's a custom avatar
-    return sseProfile?.avatar != null && sseProfile?.avatar !== globalProfile?.avatar;
+    // Only show reset button if form has a custom value
+    return formValue != null;
   });
 
   // Show reset button when there's a custom banner to reset
   showBannerReset = computed(() => {
     const formValue = this.botConfigSignal().banner;
-    const sseProfile = this.store.botProfile();
-    const globalProfile = this.store.globalBotProfile();
     
-    // If form has a value (string), show reset button
-    if (formValue) {
-      return true;
-    }
+    // Only show reset button if form has a custom value
+    return formValue != null;
+  });
+
+  // Show reset button when there's a custom nickname to reset
+  showNicknameReset = computed(() => {
+    const formValue = this.botConfigSignal().nickname;
     
-    // If form is null (reset pending), don't show reset button
-    if (formValue === null) {
-      return false;
-    }
-    
-    // If form is undefined (default), show reset if there's a custom banner
-    return sseProfile?.banner != null && sseProfile?.banner !== globalProfile?.banner;
+    // Only show reset button if form has a custom value
+    return formValue != null;
   });
 
   // File handling
@@ -319,16 +278,16 @@ export class BotConfig implements OnInit {
 
   // Form reset methods
   private resetField(field: 'avatar' | 'banner'): void {
-    // Reset to null to clear guild-specific customizations
+    // Reset to undefined to clear custom value
     this.botConfigForm.patchValue({
-      [field]: null,
+      [field]: undefined,
     });
 
     const fieldName = field === 'avatar' ? 'Avatar' : 'Banner';
     this.messageService.add({
       severity: 'info',
       summary: `${fieldName} Reset`,
-      detail: `${fieldName} will be reset to original bot appearance when saved`,
+      detail: `${fieldName} reset to default appearance`,
     });
   }
 
@@ -338,6 +297,18 @@ export class BotConfig implements OnInit {
 
   resetBanner(): void {
     this.resetField('banner');
+  }
+
+  resetNickname(): void {
+    this.botConfigForm.patchValue({
+      nickname: undefined,
+    });
+
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Nickname Reset',
+      detail: 'Nickname reset to default bot name',
+    });
   }
 
   // API operations
@@ -356,12 +327,15 @@ export class BotConfig implements OnInit {
     this.isSaving.set(true);
     const configData = this.botConfigSignal();
 
+    // Convert undefined values to null for API (null means reset to default)
+    const apiData = {
+      avatar: configData.avatar || null,
+      banner: configData.banner || null,
+      nickname: configData.nickname || null,
+    };
+
     this.apiService
-      .put<BotConfigType>(`/guilds/${guildId}/bot-config`, {
-        avatar: configData.avatar,
-        banner: configData.banner,
-        nickname: configData.nickname,
-      })
+      .put<BotConfigType>(`/guilds/${guildId}/bot-config`, apiData)
       .subscribe({
         next: (response) => {
           if (response?.success) {
