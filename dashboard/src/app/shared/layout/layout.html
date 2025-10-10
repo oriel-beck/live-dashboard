@@ -1,0 +1,115 @@
+@let pageInformation = this.pageInformation();
+@let pageIcon = pageInformation?.icon;
+@let pageTitle = pageInformation?.title;
+@let pageDescription = pageInformation?.description;
+@let serverContext = getServerContext();
+
+<div class="layout-container">
+  <!-- Header -->
+  <header class="layout-header">
+    <div class="header-content">
+      <!-- Top Row -->
+      <div class="header-top-row">
+        <div class="header-left">
+          <button
+            class="home-btn btn btn-ghost"
+            (click)="navigateToHome()"
+            title="Back to Home"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+            </svg>
+            <span>Home</span>
+          </button>
+        </div>
+
+        <div class="header-right">
+          @if (authService.user()) {
+            <div class="user-avatar-container">
+              <img
+                #userAvatar
+                [src]="getUserAvatarUrl()"
+                [alt]="authService.user()!.username"
+                class="user-avatar"
+                (click)="userMenu.toggle($event)"
+              />
+              <p-menu 
+                #userMenu 
+                [model]="userMenuItems" 
+                [popup]="true"
+                appendTo="body"
+                styleClass="user-dropdown-menu">
+                
+                <ng-template #start>
+                  <div class="user-menu-header">
+                    <img
+                      [src]="getUserAvatarUrl()"
+                      [alt]="authService.user()!.username"
+                      class="user-avatar-large"
+                    />
+                    <div class="user-info">
+                      <span class="user-name">{{ authService.user()!.username }}</span>
+                      <!-- TODO: Add user role, such as "Developer", "Admin", "Discord User", "Premium User", etc -->
+                      <span class="user-role">Discord User</span>
+                    </div>
+                  </div>
+                </ng-template>
+
+                <ng-template #item let-item>
+                  <a pRipple class="custom-menu-item">
+                    <span [class]="item.icon" class="menu-icon"></span>
+                    <span class="menu-label">{{ item.label }}</span>
+                    @if (item.badge) {
+                      <p-badge class="menu-badge" [value]="item.badge" />
+                    }
+                  </a>
+                </ng-template>
+
+              </p-menu>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Bottom Row -->
+      <div class="header-bottom-row">
+        <div class="page-info">
+          @if (pageIcon) {
+            <div class="page-icon">{{ pageIcon }}</div>
+          }
+          <div class="page-details">
+            <h1 class="page-title">{{ pageTitle }}</h1>
+            @if (pageDescription) {
+              <p class="page-description">{{ pageDescription }}</p>
+            }
+          </div>
+        </div>
+        @if (serverContext && serverContext.id) {
+          <div class="server-info">
+            <img
+              [src]="getServerIconUrl()"
+              [alt]="serverContext.name"
+              class="server-avatar"
+            />
+            <div class="server-details">
+              <span class="server-name">{{ serverContext.name }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="layout-main" [class.has-sidebar]="shouldShowSidebar()">
+    <!-- Sidebar Navigation (only show on server pages) -->
+    @if (shouldShowSidebar()) {
+      <app-sidebar-navigation></app-sidebar-navigation>
+    }
+    
+    <!-- Page Content -->
+    <div class="page-content">
+      <router-outlet></router-outlet>
+    </div>
+  </main>
+</div>

@@ -8,8 +8,9 @@
   padding: var(--space-2xl);
   height: fit-content;
   position: sticky;
-  top: calc(var(--space-xl) + 80px);
+  top: calc(200px + var(--space-xl));
   min-width: 280px;
+  z-index: 10;
   
   @media (max-width: 1024px) {
     min-width: 250px;
@@ -20,6 +21,7 @@
     top: 0;
     margin-bottom: var(--space-xl);
     min-width: auto;
+    z-index: auto;
   }
 }
 

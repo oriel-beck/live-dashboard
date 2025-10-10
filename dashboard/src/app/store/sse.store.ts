@@ -20,8 +20,8 @@ import {
   withMethods,
   withState,
 } from '@ngrx/signals';
-import { injectParams } from 'ngxtension/inject-params';
 import { environment } from '../../environments/environment';
+import { SERVER_CONTEXT_PROVIDER } from '../shared/interfaces/server-context.interface';
 
 interface CacheStore {
   source: EventSource | null;
@@ -53,10 +53,16 @@ const initialState: CacheStore = {
   connectionStatus: 'disconnected',
 };
 
+/**
+ * The cache store is used to store the data from the SSE connection.
+ * The store creates a new source and connection to the SSE endpoint when the store is created.
+ * The store disconnects the source and connection when the store is destroyed or disconnect is used.
+ */
 export const CacheStore = signalStore(
   withState(initialState),
   withMethods((store) => {
     const router = inject(Router);
+    const serverContextProvider = inject(SERVER_CONTEXT_PROVIDER);
     const obj = {
       retryConnection: () => {
         if (store.retryCount() === 5) {
@@ -79,14 +85,14 @@ export const CacheStore = signalStore(
         // Add delay between retries to prevent overwhelming the server
         const delay = Math.min(1000 * Math.pow(2, store.retryCount()), 10000); // Exponential backoff, max 10s
         setTimeout(() => {
-          obj.createSource();
+          obj.createSource(store.guildId()!);
         }, delay);
 
         patchState(store, {
           retryCount: store.retryCount() + 1,
         });
       },
-      createSource: () => {
+      createSource: (guildId: string) => {
         // Close existing connection if any
         if (store.source()) {
           console.log(
@@ -96,12 +102,10 @@ export const CacheStore = signalStore(
         }
 
         console.log(
-          `[SSE] Creating new connection to ${
-            environment.apiUrl
-          }/guilds/${store.guildId()}/events`
+          `[SSE] Creating new connection to ${environment.apiUrl}/guilds/${guildId}/events`
         );
         const source = new EventSource(
-          `${environment.apiUrl}/guilds/${store.guildId()}/events`,
+          `${environment.apiUrl}/guilds/${guildId}/events`,
           {
             withCredentials: true,
           }
@@ -126,6 +130,11 @@ export const CacheStore = signalStore(
               case SSE_EVENT_TYPES.GUILD_INFO_LOADED:
                 patchState(store, {
                   guildInfo: event.data,
+                });
+                serverContextProvider.set({
+                  icon: event.data.icon,
+                  name: event.data.name,
+                  id: event.data.id,
                 });
                 break;
 
@@ -365,14 +374,32 @@ export const CacheStore = signalStore(
 
         patchState(store, {
           source,
+          guildId,
           connectionStatus: 'connecting',
         });
       },
+      disconnect() {
+        console.log('[SSE] Disconnecting...');
+        store.source()?.close();
+        patchState(store, {
+          source: null,
+          guildId: null,
+          retryCount: 0,
+          connectionStatus: 'disconnected',
+          error: null,
+        });
+        // Clear server context when disconnecting
+        serverContextProvider.set({ id: '', name: '', icon: null });
+      },
+      connect(guildId: string) {
+        console.log(`[SSE] Connecting to guild: ${guildId}`);
+        patchState(store, {
+          retryCount: 0,
+          error: null,
+        });
+        obj.createSource(guildId);
+      },
     };
-    return obj;
-  }),
-  withMethods((store) => {
-    const obj = {};
     return obj;
   }),
   withComputed((store) => {
@@ -456,17 +483,9 @@ export const CacheStore = signalStore(
     };
   }),
   withHooks((store) => {
-    const params = injectParams();
-    const guildId = params()['serverId'];
     return {
-      onInit: () => {
-        patchState(store, {
-          guildId,
-        });
-        store.createSource();
-      },
       onDestroy: () => {
-        store.source()?.close();
+        store.disconnect();
       },
     };
   })

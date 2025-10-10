@@ -1,39 +1,40 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-servers',
   imports: [CommonModule, FormsModule],
-  templateUrl: './servers.component.html',
-  styleUrls: ['./servers.component.scss']
+  templateUrl: './servers.html',
+  styleUrls: ['./servers.scss'],
 })
-export class ServersComponent implements OnInit {
+export class Servers implements OnInit {
   authService = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+
   error = signal<string>('');
   searchQuery = signal<string>('');
 
   // Computed values from auth service
   servers = computed(() => this.authService.userGuilds());
   isLoading = computed(() => this.authService.isLoading());
-  
+
   // Filtered servers based on search
   filteredServers = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
     if (!query) return this.servers();
-    
-    return this.servers().filter(server =>
+
+    return this.servers().filter((server) =>
       server.name.toLowerCase().includes(query)
     );
   });
 
   ngOnInit() {
     // Check for error messages from query params
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.subscribe((params) => {
       if (params['error']) {
         this.error.set(params['error']);
       }
@@ -49,20 +50,12 @@ export class ServersComponent implements OnInit {
     this.authService.getUserGuilds().subscribe({
       error: () => {
         this.error.set('Failed to load your servers. Please try again.');
-      }
+      },
     });
   }
 
   navigateToServer(serverId: string) {
     this.router.navigate(['/servers', serverId]);
-  }
-
-  navigateToHome() {
-    this.router.navigate(['/']);
-  }
-
-  logout() {
-    this.authService.logout().subscribe();
   }
 
   clearSearch() {
@@ -72,7 +65,7 @@ export class ServersComponent implements OnInit {
   getServerInitials(name: string): string {
     return name
       .split(' ')
-      .map(word => word[0])
+      .map((word) => word[0])
       .join('')
       .substring(0, 2)
       .toUpperCase();

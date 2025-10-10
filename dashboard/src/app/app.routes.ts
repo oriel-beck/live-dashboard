@@ -11,24 +11,46 @@ export const routes: Routes = [
   {
     path: 'servers',
     loadComponent: () =>
-      import('./features/servers/servers.component').then((feature) => feature.ServersComponent),
+      import('./shared/layout/layout').then((m) => m.Layout),
     canActivate: [authGuard],
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/servers/servers').then((feature) => feature.Servers),
+        data: {
+          title: 'Your Servers',
+          description: 'Select a server to manage your bot configuration',
+          icon: '🏠'
+        }
+      }
+    ]
   },
   {
     path: 'servers/:serverId',
     loadComponent: () =>
-      import('./features/dashboard/dashboard').then((m) => m.Dashboard),
+      import('./shared/layout/layout').then((m) => m.Layout),
     canActivate: [authGuard, guildAccessGuard],
     children: [
       {
         path: '',
         loadComponent: () =>
           import('./features/bot-config/bot-config').then((m) => m.BotConfig),
+        data: {
+          title: 'Bot Configuration',
+          description: 'Customize your bot\'s appearance and presence for this server',
+          icon: '⚙️'
+        }
       },
       {
         path: 'commands',
         loadComponent: () =>
           import('./features/commands/commands').then((m) => m.Commands),
+        data: {
+          title: 'Commands',
+          description: 'Manage and configure bot commands for this server',
+          icon: '💬'
+        }
       }
     ]
   },

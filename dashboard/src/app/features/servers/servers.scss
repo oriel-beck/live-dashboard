@@ -5,62 +5,14 @@
   background: var(--color-bg-primary);
 }
 
-// Header
-.servers-header {
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  border-bottom: 1px solid var(--glass-border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+// Search and Actions
+.servers-actions {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-2xl) 0;
 
-  .header-content {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: var(--space-xl) var(--space-2xl);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    @media (max-width: 768px) {
-      flex-direction: column;
-      gap: var(--space-lg);
-      align-items: flex-start;
-    }
-  }
-
-  .header-left {
-    .page-title {
-      font-size: 2.5rem;
-      font-weight: 700;
-      margin: 0 0 var(--space-sm) 0;
-      display: flex;
-      align-items: center;
-      gap: var(--space-md);
-
-      .title-icon {
-        font-size: 2rem;
-      }
-    }
-
-    .page-subtitle {
-      color: var(--color-text-secondary);
-      margin: 0;
-      font-size: 1.1rem;
-    }
-  }
-
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--space-lg);
-
-    @media (max-width: 768px) {
-      width: 100%;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: var(--space-md);
-    }
+  @media (max-width: 768px) {
+    padding: var(--space-lg) var(--space-lg) 0;
   }
 
   .search-container {
@@ -122,34 +74,6 @@
           color: var(--color-text-primary);
         }
       }
-    }
-  }
-
-  .page-info {
-    margin-left: var(--space-lg);
-  }
-
-  .home-btn {
-    flex-shrink: 0;
-  }
-
-  .user-info {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-md) var(--space-lg);
-    border-radius: var(--radius-lg);
-
-    .user-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      border: 2px solid var(--glass-border);
-    }
-
-    .user-name {
-      font-weight: 500;
-      color: var(--color-text-primary);
     }
   }
 }
@@ -429,16 +353,6 @@
 
 // Responsive Design
 @media (max-width: 480px) {
-  .servers-header {
-    .header-content {
-      padding: var(--space-lg);
-    }
-
-    .page-title {
-      font-size: 2rem !important;
-    }
-  }
-
   .servers-main {
     padding: var(--space-lg);
   }

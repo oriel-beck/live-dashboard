@@ -1,8 +1,10 @@
 /* Modern Design System - Global Styles */
-
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 @import "primeicons/primeicons.css";
+
+// Component Styles
+@import "./assets/styles/user-nav.scss";
 
 :root {
   // Modern Color Palette
@@ -445,7 +447,7 @@ body {
       background: transparent;
       display: block;
       width: 100%;
-      
+
       &.p-placeholder {
         color: var(--color-text-muted) !important;
       }
