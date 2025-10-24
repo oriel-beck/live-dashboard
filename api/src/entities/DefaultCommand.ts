@@ -43,6 +43,9 @@ export class DefaultCommand {
   @Column({ name: "category_id", type: "integer", nullable: true })
   categoryId!: number | null;
 
+  @Column({ name: "file_path", type: "varchar", length: 500, nullable: true })
+  filePath!: string | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

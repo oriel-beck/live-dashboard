@@ -11,8 +11,7 @@
     "dev": "bun --watch --env-file=../.env run src/cluster-manager.ts",
     "dev:cluster": "bun --watch --env-file=../.env run src/cluster-manager.ts",
     "dev:single": "USE_SHARDING=false bun --watch --env-file=../.env run src/index.ts",
-    "deploy-commands": "bun --env-file=../.env run src/deploy-commands.ts",
-    "deploy-commands:prod": "bun --env-file=../.env run src/deploy-commands.ts"
+    "deploy-commands": "bun --env-file=../.env run src/deploy-commands.ts"
   },
   "author": "",
   "license": "ISC",
@@ -25,6 +24,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.18.2",
     "ioredis": "^5.7.0",
+    "node-global-proxy": "^1.0.1",
     "prom-client": "^15.1.0",
     "winston": "^3.17.0"
   },

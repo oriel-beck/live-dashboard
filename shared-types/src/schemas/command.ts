@@ -11,6 +11,7 @@ const BaseCommandDataSchema = z.object({
   enabled: z.boolean(),
   parentId: z.number().nullable(),
   categoryId: z.number().nullable(),
+  filePath: z.string().nullable(),
 });
 
 // Command Permissions Update Request Schema
@@ -32,6 +33,7 @@ export const DefaultCommandRegistrationSchema = z.object({
   categoryId: z.number().nullable().default(null),
   parentId: z.number().nullable().default(null),
   discordId: z.string().transform((val) => BigInt(val)).nullable().optional(),
+  filePath: z.string().nullable().default(null),
 });
 
 

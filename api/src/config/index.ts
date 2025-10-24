@@ -9,12 +9,12 @@ export const config = {
   
   // Database
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/discord_bot',
+    url: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/public',
     host: process.env.POSTGRES_HOST || 'localhost',
     port: parseInt(process.env.POSTGRES_PORT || '5432'),
     user: process.env.POSTGRES_USER || 'postgres',
     password: process.env.POSTGRES_PASSWORD || 'password',
-    database: process.env.POSTGRES_DB || 'discord_bot',
+    database: process.env.POSTGRES_DB || 'public',
   },
   
   // Redis

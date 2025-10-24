@@ -53,11 +53,14 @@ services:
     depends_on: 
       - redis
       - api
+      - nirn-proxy
     ports:
       - "30000:30000"  # Shard manager metrics API
     environment:
       - METRICS_PORT=30000  # Base port for shard 0
       - USE_SHARDING=${USE_SHARDING:-true}
+      - NIRN_HOST=nirn-proxy
+      - NIRN_PORT=8081
     env_file:
       - .env
     networks:
@@ -126,7 +129,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d discord_bot"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d public"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -290,6 +293,32 @@ services:
     networks:
       - monitoring
 
+  nirn-proxy:
+    image: ghcr.io/germanoeich/nirn-proxy:latest
+    container_name: nirn-proxy
+    ports:
+      - "8081:8081"  # Main proxy port
+      - "9000:9000"  # Metrics port
+    restart: unless-stopped
+    networks:
+      - dev-network
+      - monitoring
+    environment:
+      - ENABLE_METRICS=true
+      - PORT=8081
+    volumes:
+      - nirn_proxy_data:/app/data
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9000"
+      - "prometheus.io/path=/metrics"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/nirn/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 volumes:
   postgres_data:
   prometheus_data:
@@ -298,6 +327,7 @@ volumes:
   alertmanager_data:
   api_logs:
   bot_logs:
+  nirn_proxy_data:
 
 networks:
   dev-network:

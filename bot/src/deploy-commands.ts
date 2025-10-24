@@ -92,14 +92,15 @@ async function registerCommandsInDatabase(
 
     // Register main command (upsert - creates or updates)
     const mainCommandResponse = await apiClient.registerDefaultCommand({
-      discordId: BigInt(deployedCmd.id),
+      discordId: deployedCmd.id.toString(),
       name: localCommand.name,
       description: localCommand.description,
       cooldown: localCommand.cooldown,
-      permissions: localCommand.defaultPermissions,
+      permissions: localCommand.defaultPermissions?.toString() || "0",
       enabled: true,
       parentId: null,
       categoryId: null,
+      filePath: (localCommand as any).filePath || null,
     });
 
     const mainCommandId = Number(mainCommandResponse.data?.id);
@@ -141,11 +142,12 @@ async function registerSubcommands(
         name: option.name,
         description: option.description || "Subcommand group",
         cooldown: parentCommand.cooldown, // Groups don't have cooldowns
-        permissions: parentCommand.defaultPermissions || 0n,
+        permissions: (parentCommand.defaultPermissions || 0n).toString(),
         enabled: true,
         parentId: parentId,
         discordId: null,
         categoryId: null,
+        filePath: null,
       });
 
       const groupId = groupResponse.data!.id;
@@ -162,11 +164,12 @@ async function registerSubcommands(
               name: subOption.name,
               description: subOption.description || "Subcommand",
               cooldown: parentCommand.cooldown, // Default subcommand cooldown
-              permissions: parentCommand.defaultPermissions || 0n,
+              permissions: (parentCommand.defaultPermissions || 0n).toString(),
               enabled: true,
               parentId: groupId,
               discordId: null,
               categoryId: null,
+              filePath: null,
             });
             logger.debug(
               `[Deploy] Registered nested subcommand: ${subOption.name}`
@@ -182,11 +185,12 @@ async function registerSubcommands(
         name: option.name,
         description: option.description || "Subcommand",
         cooldown: parentCommand.cooldown, // Default subcommand cooldown
-        permissions: parentCommand.defaultPermissions || 0n,
+        permissions: (parentCommand.defaultPermissions || 0n).toString(),
         enabled: true,
         parentId: parentId,
         discordId: null,
         categoryId: null,
+        filePath: null,
       });
       logger.debug(`[Deploy] Registered subcommand: ${option.name}`);
     }

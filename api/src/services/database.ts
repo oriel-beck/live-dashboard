@@ -39,6 +39,7 @@ export class DatabaseService {
   // Default Command operations
   static async upsertDefaultCommand(command: DefaultCommandRegistration): Promise<DefaultCommand> {
     const repository = this.getRepository(DefaultCommand);
+    logger.debug('[Database] Upserting command:', command);
 
     try {
       // Check if command exists by discord_id or name
@@ -48,6 +49,7 @@ export class DatabaseService {
           { name: command.name }
         ]
       });
+
 
       if (existingCommand) {
         // Update existing command
@@ -59,6 +61,7 @@ export class DatabaseService {
         existingCommand.enabled = command.enabled !== false;
         existingCommand.parentId = command.parentId || null;
         existingCommand.categoryId = command.categoryId || null;
+        existingCommand.filePath = command.filePath || null;
         
         return await repository.save(existingCommand);
       } else {
@@ -71,7 +74,8 @@ export class DatabaseService {
           permissions: command.permissions?.toString() || '0',
           enabled: command.enabled !== false,
           parentId: command.parentId || null,
-          categoryId: command.categoryId || null
+          categoryId: command.categoryId || null,
+          filePath: command.filePath || null
         });
         
         return await repository.save(newCommand);

@@ -1,5 +1,7 @@
 // Load environment variables first
 import { config } from "dotenv";
+import { default as proxy } from "node-global-proxy";
+import { ProxyAgent } from "undici";
 import { resolve } from "path";
 config({ path: resolve(__dirname, "../../.env") });
 
@@ -8,14 +10,16 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-import {
-  Client,
-  Events,
-  GatewayIntentBits,
-  Options,
-  Partials,
-} from "discord.js";
+const restProxyUrl = `http://${process.env.NIRN_HOST}:${process.env.NIRN_PORT}/api`;
+// proxy.setConfig({
+//   http: restProxyUrl,
+//   https: restProxyUrl,
+// });
+
+// proxy.start();
+
 import { ClusterClient, getInfo } from "discord-hybrid-sharding";
+import { Client, Events, GatewayIntentBits, Options } from "discord.js";
 
 // Extend Client type to include cluster property
 declare module "discord.js" {
@@ -48,13 +52,15 @@ const client = new Client({
   shards: getInfo().SHARD_LIST,
   shardCount: getInfo().TOTAL_SHARDS,
   intents: [GatewayIntentBits.Guilds],
+  rest: {
+    api: restProxyUrl,
+  },
   // Remove partials for memory optimization
   makeCache: Options.cacheWithLimits({
     // Essential managers - only keep the bot user/member
     UserManager: {
       maxSize: 0,
       keepOverLimit: (user) => user.id === clientId,
-      
     }, // Keep minimal users
     GuildMemberManager: {
       maxSize: 0,
@@ -98,15 +104,25 @@ export { commandManager };
 // Redis client for inter-shard communication
 const redis = createRedisClient();
 
-// Load and register all commands automatically
+// Load and register all commands automatically from API
 async function initializeCommands() {
   try {
     const clusterId = Math.floor(clusterInfo.FIRST_SHARD_ID / 16);
     const shardId = client.cluster.shardList[0] || 0;
     logger.debug(
-      `[Cluster ${clusterId}, Shard ${shardId}] Loading commands...`
+      `[Cluster ${clusterId}, Shard ${shardId}] Loading commands from API...`
     );
-    const commands = await CommandLoader.loadAllCommands();
+
+    // Try to load commands from API first
+    let commands = await CommandLoader.loadCommandsFromAPI();
+
+    // Fallback to filesystem loading if API fails
+    if (commands.length === 0) {
+      logger.warn(
+        `[Cluster ${clusterId}, Shard ${shardId}] No commands loaded from API, falling back to filesystem loading...`
+      );
+      commands = await CommandLoader.loadAllCommands();
+    }
 
     // Validate and register each command
     for (const command of commands) {
@@ -203,7 +219,9 @@ function setupMetricsReporting() {
   const delay = clusterId * 500; // 500ms delay per cluster for manager reports
   setTimeout(() => {
     setInterval(sendMetricsToManager, 10000);
-    logger.info(`[Cluster ${clusterId}] Metrics reporting to manager enabled (delayed ${delay}ms)`);
+    logger.info(
+      `[Cluster ${clusterId}] Metrics reporting to manager enabled (delayed ${delay}ms)`
+    );
   }, delay);
 }
 
