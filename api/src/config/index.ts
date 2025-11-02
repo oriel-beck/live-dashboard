@@ -68,14 +68,11 @@ export const config = {
   monitoring: {
     healthCheckTimeout: parseInt(process.env.HEALTH_CHECK_TIMEOUT || '5000'),
     healthCheckInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL || '30000'),
-    metricsEnabled: process.env.METRICS_ENABLED === 'true',
-    metricsPort: parseInt(process.env.METRICS_PORT || '9090'),
   },
   
   // Feature Flags
   features: {
     rateLimiting: process.env.FEATURE_RATE_LIMITING === 'true',
-    metrics: process.env.FEATURE_METRICS === 'true',
   },
 };
 

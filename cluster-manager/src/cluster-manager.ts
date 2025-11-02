@@ -1,6 +1,5 @@
 import { CLUSTER_EVENTS } from "@discord-bot/shared-types";
 import Docker from "dockerode";
-import { Elysia } from "elysia";
 import { DiscordGatewayService } from "./services/discord-gateway";
 import { RabbitMQService } from "./services/rabbitmq";
 import { ShardAssignmentService } from "./services/shard-assignment";
@@ -23,8 +22,6 @@ export class ClusterManager {
   private docker: Docker | null = null;
   private containers = new Map<number, string>(); // clusterId -> containerId
   private clusters = new Map<number, ClusterInstance>();
-  private metricsServer: any;
-  private clusterMetrics = new Map<number, any>();
   private isRunning = false;
   private currentDistribution: ShardDistribution | null = null;
 
@@ -47,9 +44,7 @@ export class ClusterManager {
     this.rabbitMQ = new RabbitMQService();
 
     // Configuration
-    this.imageName =
-      process.env.DOCKER_IMAGE_NAME ||
-      "bot:latest";
+    this.imageName = process.env.DOCKER_IMAGE_NAME || "bot:latest";
     this.startupDelay = parseInt(process.env.CLUSTER_STARTUP_DELAY || "5000");
     this.readyTimeout = parseInt(process.env.CLUSTER_READY_TIMEOUT || "30000");
     this.healthCheckInterval = parseInt(
@@ -100,55 +95,60 @@ export class ClusterManager {
       // Connect to RabbitMQ with retry logic (RabbitMQ may be marked healthy but AMQP port may not be ready)
       const maxRetries = 10;
       const baseDelay = 2000; // 2 seconds
-      
+
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          logger.info(`[ClusterManager] RabbitMQ connection attempt ${attempt}/${maxRetries}...`);
+          logger.info(
+            `[ClusterManager] RabbitMQ connection attempt ${attempt}/${maxRetries}...`
+          );
           await this.rabbitMQ.connect();
           await this.rabbitMQ.initializeDefaults();
           await this.setupRabbitMQHandlers();
-          logger.info('[ClusterManager] RabbitMQ connected successfully');
+          logger.info("[ClusterManager] RabbitMQ connected successfully");
           break; // Success, exit retry loop
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+
           if (attempt === maxRetries) {
-            logger.error('[ClusterManager] Failed to connect to RabbitMQ after all retries:', {
-              message: errorMessage,
-              error: error
-            });
+            logger.error(
+              "[ClusterManager] Failed to connect to RabbitMQ after all retries:",
+              {
+                message: errorMessage,
+                error: error,
+              }
+            );
             throw error;
           }
-          
-          logger.warn(`[ClusterManager] RabbitMQ connection attempt ${attempt} failed:`, errorMessage);
-          
+
+          logger.warn(
+            `[ClusterManager] RabbitMQ connection attempt ${attempt} failed:`,
+            errorMessage
+          );
+
           // Exponential backoff with jitter
-          const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
+          const delay =
+            baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
-
-      // Start metrics server
-      this.metricsServer = await this.setupMetricsServer();
 
       // Get Discord gateway information
       const gatewayInfo = await this.discordGateway.getGatewayInfo();
       const totalShards = gatewayInfo.shards;
-      const maxConcurrency = gatewayInfo.session_start_limit.max_concurrency;
 
       logger.info(
-        `[ClusterManager] Discord gateway info - Shards: ${totalShards}, Max Concurrency: ${maxConcurrency}`
+        `[ClusterManager] Discord gateway info - Shards: ${totalShards}`
       );
 
-      // Set environment variable for clusters
+      // Set environment variables for clusters
       process.env.TOTAL_SHARDS = totalShards.toString();
 
       // Calculate shard distribution with Discord max concurrency
       this.currentDistribution =
         this.shardAssignment.calculateShardDistribution(
           totalShards,
-          undefined,
-          maxConcurrency
+          16
         );
 
       // Validate distribution
@@ -200,11 +200,6 @@ export class ClusterManager {
       // Disconnect from RabbitMQ
       await this.rabbitMQ.disconnect();
 
-      // Stop metrics server
-      if (this.metricsServer) {
-        this.metricsServer.close();
-      }
-
       this.isRunning = false;
       this.currentDistribution = null;
       this.clusters.clear();
@@ -251,8 +246,7 @@ export class ClusterManager {
       // Calculate new distribution with Discord max concurrency
       const newDistribution = this.shardAssignment.calculateShardDistribution(
         newTotalShards,
-        undefined,
-        gatewayInfo.session_start_limit.max_concurrency
+        16,
       );
 
       // Get current clusters
@@ -263,8 +257,12 @@ export class ClusterManager {
       const clustersToRemove: number[] = [];
       const clustersToModify: { id: number; newShards: number[] }[] = [];
 
-      logger.debug(`[ClusterManager] Current distribution: ${this.currentDistribution.totalClusters} clusters, ${this.currentDistribution.totalShards} shards`);
-      logger.debug(`[ClusterManager] New distribution: ${newDistribution.totalClusters} clusters, ${newDistribution.totalShards} shards`);
+      logger.debug(
+        `[ClusterManager] Current distribution: ${this.currentDistribution.totalClusters} clusters, ${this.currentDistribution.totalShards} shards`
+      );
+      logger.debug(
+        `[ClusterManager] New distribution: ${newDistribution.totalClusters} clusters, ${newDistribution.totalShards} shards`
+      );
 
       // Find clusters to add
       for (
@@ -310,10 +308,22 @@ export class ClusterManager {
       }
 
       if (clustersToAdd.length > 0) {
-        logger.info(`[ClusterManager] Scaling plan - adding ${clustersToAdd.length} clusters, removing ${clustersToRemove.length} clusters, modifying ${clustersToModify.length} clusters`);
-        logger.debug(`[ClusterManager] Clusters to add: [${clustersToAdd.join(", ")}]`);
-        logger.debug(`[ClusterManager] Clusters to remove: [${clustersToRemove.join(", ")}]`);
-        logger.debug(`[ClusterManager] Clusters to modify: [${clustersToModify.map(c => `${c.id}(${c.newShards.length} shards)`).join(", ")}]`);
+        logger.info(
+          `[ClusterManager] Scaling plan - adding ${clustersToAdd.length} clusters, removing ${clustersToRemove.length} clusters, modifying ${clustersToModify.length} clusters`
+        );
+        logger.debug(
+          `[ClusterManager] Clusters to add: [${clustersToAdd.join(", ")}]`
+        );
+        logger.debug(
+          `[ClusterManager] Clusters to remove: [${clustersToRemove.join(
+            ", "
+          )}]`
+        );
+        logger.debug(
+          `[ClusterManager] Clusters to modify: [${clustersToModify
+            .map((c) => `${c.id}(${c.newShards.length} shards)`)
+            .join(", ")}]`
+        );
         for (const clusterId of clustersToAdd) {
           const shards = newDistribution.clusterShards.get(clusterId) || [];
           await this.createCluster(clusterId, shards);
@@ -420,20 +430,28 @@ export class ClusterManager {
       // Store the cluster
       this.clusters.set(clusterId, instance);
       this.containers.set(clusterId, containerId);
-      logger.debug(`[ClusterManager] Cluster ${clusterId} stored - containerId: ${containerId}`);
+      logger.debug(
+        `[ClusterManager] Cluster ${clusterId} stored - containerId: ${containerId}`
+      );
 
       // Wait for cluster to be ready
-      logger.info(`[ClusterManager] Waiting for cluster ${clusterId} to become ready (timeout: ${this.readyTimeout}ms)`);
+      logger.info(
+        `[ClusterManager] Waiting for cluster ${clusterId} to become ready (timeout: ${this.readyTimeout}ms)`
+      );
       const isReady = await this.waitForClusterReady(clusterId);
       if (!isReady) {
-        logger.error(`[ClusterManager] Cluster ${clusterId} failed to become ready within ${this.readyTimeout}ms`);
+        logger.error(
+          `[ClusterManager] Cluster ${clusterId} failed to become ready within ${this.readyTimeout}ms`
+        );
         await this.stopCluster(clusterId);
         throw new Error(
           `Cluster ${clusterId} failed to become ready within timeout`
         );
       }
 
-      logger.info(`[ClusterManager] Cluster ${clusterId} created successfully and is ready`);
+      logger.info(
+        `[ClusterManager] Cluster ${clusterId} created successfully and is ready`
+      );
       return instance;
     } catch (error) {
       logger.error(
@@ -482,14 +500,18 @@ export class ClusterManager {
   ): Promise<ClusterStatus> {
     const cluster = this.clusters.get(clusterId);
     if (!cluster) {
-      logger.warn(`[ClusterManager] Cluster ${clusterId} not found in clusters map`);
+      logger.warn(
+        `[ClusterManager] Cluster ${clusterId} not found in clusters map`
+      );
       throw new Error(`Cluster ${clusterId} not found`);
     }
 
     if (cluster.containerId) {
       return this.getDockerClusterStatus(clusterId, cluster.containerId);
     } else {
-      logger.debug(`[ClusterManager] Cluster ${clusterId} has no containerId, marking as unhealthy`);
+      logger.debug(
+        `[ClusterManager] Cluster ${clusterId} has no containerId, marking as unhealthy`
+      );
       cluster.status.isRunning = false;
       cluster.status.isReady = false;
       cluster.status.health = "unhealthy";
@@ -578,19 +600,25 @@ export class ClusterManager {
     const startTime = Date.now();
     let checkCount = 0;
 
-    logger.debug(`[ClusterManager] Starting readiness check for cluster ${clusterId} (checking every 1s, timeout: ${this.readyTimeout}ms)`);
+    logger.debug(
+      `[ClusterManager] Starting readiness check for cluster ${clusterId} (checking every 1s, timeout: ${this.readyTimeout}ms)`
+    );
 
     while (Date.now() - startTime < this.readyTimeout) {
       checkCount++;
       const elapsed = Date.now() - startTime;
-      
+
       try {
         const status = await this.getClusterStatusById(clusterId);
-        
-        logger.debug(`[ClusterManager] Cluster ${clusterId} readiness check ${checkCount} - running: ${status.isRunning}, ready: ${status.isReady}, health: ${status.health}, elapsed: ${elapsed}ms`);
-        
+
+        logger.debug(
+          `[ClusterManager] Cluster ${clusterId} readiness check ${checkCount} - running: ${status.isRunning}, ready: ${status.isReady}, health: ${status.health}, elapsed: ${elapsed}ms`
+        );
+
         if (status.isReady && status.health === "healthy") {
-          logger.info(`[ClusterManager] Cluster ${clusterId} is ready (after ${elapsed}ms, ${checkCount} checks)`);
+          logger.info(
+            `[ClusterManager] Cluster ${clusterId} is ready (after ${elapsed}ms, ${checkCount} checks)`
+          );
           return true;
         }
 
@@ -616,13 +644,26 @@ export class ClusterManager {
    * Start health check monitoring
    */
   private startHealthCheckMonitoring(): void {
-    logger.info(`[ClusterManager] Starting periodic health check monitoring (interval: ${this.healthCheckInterval}ms)`);
-    
+    logger.info(
+      `[ClusterManager] Starting periodic health check monitoring (interval: ${this.healthCheckInterval}ms)`
+    );
+
+    const recreatingClusters = new Set<number>(); // Track clusters being recreated to avoid duplicate recreation
+
     setInterval(async () => {
       const clusterIds = Array.from(this.clusters.keys());
-      logger.debug(`[ClusterManager] Running health check for ${clusterIds.length} clusters: [${clusterIds.join(", ")}]`);
-      
-      for (const [clusterId] of this.clusters) {
+      logger.debug(
+        `[ClusterManager] Running health check for ${
+          clusterIds.length
+        } clusters: [${clusterIds.join(", ")}]`
+      );
+
+      for (const [clusterId, cluster] of this.clusters) {
+        // Skip if already being recreated
+        if (recreatingClusters.has(clusterId)) {
+          continue;
+        }
+
         try {
           const status = await this.getClusterStatusById(clusterId);
           if (!status.isRunning || status.health !== "healthy") {
@@ -630,13 +671,62 @@ export class ClusterManager {
               `[ClusterManager] Cluster ${clusterId} health check failed - running: ${status.isRunning}, health: ${status.health}`
             );
           } else {
-            logger.debug(`[ClusterManager] Cluster ${clusterId} health check passed - uptime: ${status.uptime}ms`);
+            logger.debug(
+              `[ClusterManager] Cluster ${clusterId} health check passed - uptime: ${status.uptime}ms`
+            );
           }
-        } catch (error) {
-          logger.error(
-            `[ClusterManager] Health check error for cluster ${clusterId}:`,
-            error
-          );
+        } catch (error: any) {
+          // Check if container no longer exists (404 error)
+          const isContainerNotFound =
+            error?.statusCode === 404 ||
+            error?.message?.includes("no such container") ||
+            error?.message?.includes("No such container");
+
+          if (isContainerNotFound) {
+            logger.error(
+              `[ClusterManager] Cluster ${clusterId} container not found - recreating cluster...`
+            );
+
+            // Mark as being recreated
+            recreatingClusters.add(clusterId);
+
+            // Recreate the cluster with the same configuration
+            const shards = cluster.shards;
+            const oldContainerId = cluster.containerId;
+
+            try {
+              // Clean up the old cluster entry
+              this.clusters.delete(clusterId);
+              if (oldContainerId) {
+                this.containers.delete(clusterId);
+              }
+
+              // Recreate the cluster
+              logger.info(
+                `[ClusterManager] Recreating cluster ${clusterId} with shards [${shards.join(
+                  ", "
+                )}]`
+              );
+              await this.createCluster(clusterId, shards);
+
+              logger.info(
+                `[ClusterManager] Successfully recreated cluster ${clusterId}`
+              );
+            } catch (recreateError) {
+              logger.error(
+                `[ClusterManager] Failed to recreate cluster ${clusterId}:`,
+                recreateError
+              );
+            } finally {
+              // Remove from recreating set
+              recreatingClusters.delete(clusterId);
+            }
+          } else {
+            logger.error(
+              `[ClusterManager] Health check error for cluster ${clusterId}:`,
+              error
+            );
+          }
         }
       }
     }, this.healthCheckInterval);
@@ -653,10 +743,6 @@ export class ClusterManager {
     if (!this.currentDistribution) {
       throw new Error("No shard distribution available");
     }
-
-    // Get max concurrency from Discord API
-    const gatewayInfo = await this.discordGateway.getGatewayInfo();
-    const maxConcurrency = gatewayInfo.session_start_limit.max_concurrency;
 
     for (
       let clusterId = 0;
@@ -755,9 +841,19 @@ export class ClusterManager {
       // Continue with creation attempt
     }
 
-    logger.info(`[ClusterManager] Creating Docker container ${containerName} for cluster ${clusterId} with ${shards.length} shards`);
-    logger.debug(`[ClusterManager] Container ${containerName} - shards: [${shards.join(", ")}], network: ${DOCKER_NETWORK_NAME}`);
-    logger.debug(`[ClusterManager] API_BASE_URL for container: ${process.env.API_BASE_URL || "http://api:3000"}`);
+    logger.info(
+      `[ClusterManager] Creating Docker container ${containerName} for cluster ${clusterId} with ${shards.length} shards`
+    );
+    logger.debug(
+      `[ClusterManager] Container ${containerName} - shards: [${shards.join(
+        ", "
+      )}], network: ${DOCKER_NETWORK_NAME}`
+    );
+    logger.debug(
+      `[ClusterManager] API_BASE_URL for container: ${
+        process.env.API_BASE_URL || "http://api:3000"
+      }`
+    );
 
     const env = [
       `CLUSTER_ID=${clusterId}`,
@@ -773,6 +869,7 @@ export class ClusterManager {
       `RABBITMQ_URL=${process.env.RABBITMQ_URL || "amqp://rabbitmq:5672"}`,
       `RABBITMQ_USERNAME=${process.env.RABBITMQ_USERNAME || "bot"}`,
       `RABBITMQ_PASSWORD=${process.env.RABBITMQ_PASSWORD || "bot_password"}`,
+      `DISCORD_CLIENT_ID=${process.env.DISCORD_CLIENT_ID}`,
     ];
 
     const container = await this.docker!.createContainer({
@@ -792,7 +889,9 @@ export class ClusterManager {
       },
     });
 
-    logger.debug(`[ClusterManager] Starting container ${containerName} (id: ${container.id})...`);
+    logger.debug(
+      `[ClusterManager] Starting container ${containerName} (id: ${container.id})...`
+    );
     await container.start();
     logger.info(
       `[ClusterManager] Created and started container ${container.id} (name: ${containerName}) for cluster ${clusterId}`
@@ -801,12 +900,16 @@ export class ClusterManager {
   }
 
   private async stopDockerContainer(containerId: string): Promise<void> {
-    logger.debug(`[ClusterManager] Stopping Docker container ${containerId}...`);
+    logger.debug(
+      `[ClusterManager] Stopping Docker container ${containerId}...`
+    );
     const container = this.docker!.getContainer(containerId);
 
     try {
       await container.stop({ t: 10 });
-      logger.debug(`[ClusterManager] Container ${containerId} stopped, removing...`);
+      logger.debug(
+        `[ClusterManager] Container ${containerId} stopped, removing...`
+      );
       await container.remove();
       logger.info(
         `[ClusterManager] Stopped and removed container ${containerId}`
@@ -829,6 +932,7 @@ export class ClusterManager {
       `CLUSTER_ID=${clusterId}`,
       `SHARD_LIST=${JSON.stringify(shards)}`,
       `TOTAL_SHARDS=${process.env.TOTAL_SHARDS!}`,
+      `DISCORD_MAX_CONCURRENCY=${process.env.DISCORD_MAX_CONCURRENCY || "16"}`,
       `BOT_TOKEN=${process.env.BOT_TOKEN}`,
       `NODE_ENV=${process.env.NODE_ENV || "production"}`,
       `API_BASE_URL=${process.env.API_BASE_URL || "http://api:3000"}`,
@@ -867,12 +971,12 @@ export class ClusterManager {
         },
         Resources: {
           Limits: {
-            NanoCPUs: 500000000, // 0.5 CPU
-            MemoryBytes: 536870912, // 512MB
+            NanoCPUs: 1000000000, // 1 CPU
+            MemoryBytes: 1073741824, // 1GB per bot cluster (scaled for 13M servers)
           },
           Reservations: {
-            NanoCPUs: 250000000, // 0.25 CPU
-            MemoryBytes: 268435456, // 256MB
+            NanoCPUs: 500000000, // 0.5 CPU
+            MemoryBytes: 536870912, // 512MB
           },
         },
       },
@@ -931,10 +1035,14 @@ export class ClusterManager {
 
     try {
       if (this.useSwarm) {
-        logger.debug(`[ClusterManager] Getting swarm service status for cluster ${clusterId}`);
+        logger.debug(
+          `[ClusterManager] Getting swarm service status for cluster ${clusterId}`
+        );
         return this.getSwarmServiceStatus(clusterId);
       } else {
-        logger.debug(`[ClusterManager] Getting Docker container status for cluster ${clusterId} (containerId: ${containerId})`);
+        logger.debug(
+          `[ClusterManager] Getting Docker container status for cluster ${clusterId} (containerId: ${containerId})`
+        );
         const container = this.docker!.getContainer(containerId);
         const containerInfo = await container.inspect();
 
@@ -942,19 +1050,19 @@ export class ClusterManager {
         // Bot containers don't have HTTP health checks, so we check if container is running
         const isRunning = containerInfo.State.Running;
         cluster.status.isRunning = isRunning;
-        
+
         // If container is running, consider it healthy and ready
-        // Bot will send RabbitMQ events for metrics, but container status determines readiness
+        // Bot will send RabbitMQ events for cluster lifecycle, but container status determines readiness
         const health = isRunning ? "healthy" : "unhealthy";
         cluster.status.health = health;
         cluster.status.isReady = isRunning;
-        
+
         cluster.status.uptime = Date.now() - cluster.startTime.getTime();
-        
+
         logger.debug(
           `[ClusterManager] Cluster ${clusterId} status - running: ${isRunning}, ready: ${cluster.status.isReady}, health: ${health}, uptime: ${cluster.status.uptime}ms`
         );
-        
+
         return cluster.status;
       }
     } catch (error) {
@@ -1082,11 +1190,13 @@ export class ClusterManager {
   // RabbitMQ and metrics setup
   private async setupRabbitMQHandlers(): Promise<void> {
     logger.info("[ClusterManager] Setting up RabbitMQ handlers...");
-    
+
     await this.rabbitMQ.consumeTasks("cluster.start", async (task) => {
       try {
         const { clusterId, type } = task.data;
-        logger.debug(`[ClusterManager] Received cluster.start task ${task.id} for cluster ${clusterId}, type: ${type}`);
+        logger.debug(
+          `[ClusterManager] Received cluster.start task ${task.id} for cluster ${clusterId}, type: ${type}`
+        );
 
         if (type === CLUSTER_EVENTS.START) {
           logger.info(
@@ -1099,17 +1209,25 @@ export class ClusterManager {
             cluster.status.isReady = true;
             cluster.status.health = "healthy";
             cluster.lastHealthCheck = new Date();
-            
+
             if (!wasReady) {
-              logger.info(`[ClusterManager] Cluster ${clusterId} status updated: isReady=true, health=healthy`);
+              logger.info(
+                `[ClusterManager] Cluster ${clusterId} status updated: isReady=true, health=healthy`
+              );
             } else {
-              logger.debug(`[ClusterManager] Cluster ${clusterId} already marked as ready (RabbitMQ event received)`);
+              logger.debug(
+                `[ClusterManager] Cluster ${clusterId} already marked as ready (RabbitMQ event received)`
+              );
             }
           } else {
-            logger.warn(`[ClusterManager] Received cluster.start event for unknown cluster ${clusterId}`);
+            logger.warn(
+              `[ClusterManager] Received cluster.start event for unknown cluster ${clusterId}`
+            );
           }
         } else {
-          logger.debug(`[ClusterManager] Received cluster.start task with unexpected type: ${type}`);
+          logger.debug(
+            `[ClusterManager] Received cluster.start task with unexpected type: ${type}`
+          );
         }
       } catch (error) {
         logger.error(
@@ -1118,13 +1236,17 @@ export class ClusterManager {
         );
       }
     });
-    
-    logger.debug("[ClusterManager] RabbitMQ handler for cluster.start registered");
+
+    logger.debug(
+      "[ClusterManager] RabbitMQ handler for cluster.start registered"
+    );
 
     await this.rabbitMQ.consumeTasks("cluster.stop", async (task) => {
       try {
         const { clusterId, type } = task.data;
-        logger.debug(`[ClusterManager] Received cluster.stop task ${task.id} for cluster ${clusterId}, type: ${type}`);
+        logger.debug(
+          `[ClusterManager] Received cluster.stop task ${task.id} for cluster ${clusterId}, type: ${type}`
+        );
 
         if (type === CLUSTER_EVENTS.STOP) {
           logger.info(
@@ -1137,9 +1259,13 @@ export class ClusterManager {
             cluster.status.isReady = false;
             cluster.status.health = "unhealthy";
             cluster.lastHealthCheck = new Date();
-            logger.debug(`[ClusterManager] Cluster ${clusterId} status updated: isRunning=false, isReady=false, health=unhealthy`);
+            logger.debug(
+              `[ClusterManager] Cluster ${clusterId} status updated: isRunning=false, isReady=false, health=unhealthy`
+            );
           } else {
-            logger.warn(`[ClusterManager] Received cluster.stop event for unknown cluster ${clusterId}`);
+            logger.warn(
+              `[ClusterManager] Received cluster.stop event for unknown cluster ${clusterId}`
+            );
           }
         }
       } catch (error) {
@@ -1149,93 +1275,11 @@ export class ClusterManager {
         );
       }
     });
-    
-    logger.debug("[ClusterManager] RabbitMQ handler for cluster.stop registered");
 
-    await this.rabbitMQ.consumeTasks("metrics.cluster", async (task) => {
-      try {
-        const { clusterId, metrics } = task.data;
-        this.clusterMetrics.set(clusterId, metrics);
-        logger.debug(
-          `[ClusterManager] Received metrics from cluster ${clusterId} (task ${task.id}, metrics length: ${metrics?.length || 0} chars)`
-        );
-      } catch (error) {
-        logger.error(
-          `[ClusterManager] Error processing metrics task ${task.id}:`,
-          error
-        );
-      }
-    });
-    
-    logger.debug("[ClusterManager] RabbitMQ handler for metrics.cluster registered");
+    logger.debug(
+      "[ClusterManager] RabbitMQ handler for cluster.stop registered"
+    );
     logger.info("[ClusterManager] All RabbitMQ handlers set up successfully");
-  }
-
-  private async setupMetricsServer(): Promise<any> {
-    const port = parseInt(process.env.METRICS_PORT || "3001");
-
-    const app = new Elysia()
-      .get("/metrics", async ({ set }) => {
-        try {
-          const { register } = await import("./utils/metrics");
-          let aggregatedMetrics = await register.metrics();
-
-          // Add cluster manager metrics
-          aggregatedMetrics += "\n# Cluster manager metrics\n";
-          aggregatedMetrics += `cluster_manager_clusters_total{status="running"} ${this.clusters.size}\n`;
-
-          for (const [clusterId, metrics] of this.clusterMetrics) {
-            try {
-              const lines = metrics.split("\n");
-              for (const line of lines) {
-                if (line.startsWith("#") || line.trim() === "") continue;
-
-                const metricName = line.split(/[{\s]/)[0];
-                if (metricName.startsWith("bot_")) {
-                  let processedLine = line;
-                  if (
-                    metricName.startsWith("bot_cluster_") &&
-                    !line.includes("cluster_id=")
-                  ) {
-                    const spaceIndex = line.indexOf(" ");
-                    if (spaceIndex > 0) {
-                      const metric = line.substring(0, spaceIndex);
-                      const value = line.substring(spaceIndex);
-
-                      if (metric.includes("{")) {
-                        processedLine =
-                          metric.replace("}", `,cluster_id="${clusterId}"}`) +
-                          value;
-                      } else {
-                        processedLine = `${metric}{cluster_id="${clusterId}"}${value}`;
-                      }
-                    }
-                  }
-                  aggregatedMetrics += "\n" + processedLine;
-                }
-              }
-            } catch (error) {
-              logger.warn(
-                `[ClusterManager] Failed to process metrics from cluster ${clusterId}:`,
-                error
-              );
-            }
-          }
-
-          set.headers["Content-Type"] = register.contentType;
-          return aggregatedMetrics;
-        } catch (error) {
-          logger.error("[ClusterManager] Error serving metrics:", error);
-          set.status = 500;
-          return String(error);
-        }
-      })
-      .listen(port);
-
-    // Log server startup - listen() starts the server synchronously
-    logger.info(`[ClusterManager] Metrics server listening on port ${port}`);
-
-    return app;
   }
 
   /**

@@ -41,6 +41,15 @@ const dataSourceConfig: DataSourceOptions = {
   entities: [CommandCategory, DefaultCommand],
   migrations: ['src/migrations/*.ts'],
   subscribers: ['src/subscriber/*.ts'],
+  // Connection pool settings optimized for 13M servers
+  extra: {
+    max: 50, // Maximum number of connections in pool
+    min: 10, // Minimum number of connections in pool
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    statement_timeout: 30000,
+    query_timeout: 30000,
+  },
   // When using url with sslmode parameter, we can omit the ssl property
   // The sslmode in the URL will control SSL behavior
 };

@@ -17,7 +17,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - FEATURE_METRICS=true
+      - NODE_OPTIONS=--max-old-space-size=1024
     env_file:
       - .env
     healthcheck:
@@ -31,11 +31,13 @@ services:
       - monitoring
     volumes:
       - api_logs:/app/logs
-    labels:
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=3000"
-      - "prometheus.io/path=/metrics"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
   cluster-manager:
     image: ${REGISTRY_HOST:-localhost:5000}/cluster-manager:latest
@@ -45,14 +47,12 @@ services:
       - api
       - nirn-proxy
       - rabbitmq
-    ports:
-      - "3001:3001"    # Metrics aggregation port
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - cluster_manager_logs:/app/logs
     environment:
       - NODE_ENV=production
-      - METRICS_PORT=3001
+      - NODE_OPTIONS=--max-old-space-size=512
       - DOCKER_SWARM_MODE=true
       - DOCKER_IMAGE_NAME=${REGISTRY_HOST:-localhost:5000}/bot:latest
       - DOCKER_SOCKET_PATH=/var/run/docker.sock
@@ -69,11 +69,13 @@ services:
     networks:
       - app-network
       - monitoring
-    labels:
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=3001"
-      - "prometheus.io/path=/metrics"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   dashboard:
     build:
@@ -87,17 +89,37 @@ services:
       - "80:80"
     environment:
       - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=512
     env_file:
       - .env
     restart: unless-stopped
     networks:
       - app-network
       - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 512M
 
   redis:
     image: redis:8.2-alpine
     ports:
       - "6379:6379"
+    command:
+      - redis-server
+      - --maxmemory 2gb
+      - --maxmemory-policy allkeys-lru
+      - --save "900 1"
+      - --save "300 10"
+      - --save "60 10000"
+      - --appendonly yes
+      - --appendfsync everysec
+      - --tcp-backlog 511
+      - --timeout 300
+      - --tcp-keepalive 300
+      - --hz 10
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -107,14 +129,37 @@ services:
     networks:
       - app-network
       - monitoring
-    labels:
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=6379"
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 1G
 
   postgres:
     image: postgres:18-alpine
     env_file:
       - .env
+    environment:
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    command:
+      - postgres
+      - -cshared_buffers=512MB
+      - -ceffective_cache_size=2GB
+      - -cmaintenance_work_mem=256MB
+      - -ccheckpoint_completion_target=0.9
+      - -cwal_buffers=16MB
+      - -cdefault_statistics_target=100
+      - -crandom_page_cost=1.1
+      - -ceffective_io_concurrency=200
+      - -cwork_mem=16MB
+      - -cmin_wal_size=1GB
+      - -cmax_wal_size=4GB
+      - -cmax_connections=200
+      - -cmax_worker_processes=8
+      - -cmax_parallel_workers_per_gather=4
+      - -cmax_parallel_workers=8
+      - -cmax_parallel_maintenance_workers=4
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -128,9 +173,12 @@ services:
     networks:
       - app-network
       - monitoring
-    labels:
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=5432"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
 
   prometheus:
     image: prom/prometheus:latest
@@ -139,22 +187,28 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./monitoring/prometheus/rules:/etc/prometheus/rules
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--storage.tsdb.wal-compression'
       - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
+      - '--query.max-concurrency=40'
+      - '--query.max-samples=100000000'
+      - '--storage.tsdb.max-block-duration=2h'
     restart: unless-stopped
     networks:
       - monitoring
     depends_on:
-      - redis
-      - postgres
+      - nirn-proxy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
 
   grafana:
     image: grafana/grafana:latest
@@ -169,120 +223,22 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin123
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+      - GF_DATABASE_TYPE=sqlite3
+      - GF_SESSION_PROVIDER=memory
+      - GF_ALERTING_ENABLED=false
+      - GF_EXPLORE_ENABLED=true
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/nirn-proxy.json
     restart: unless-stopped
     networks:
       - monitoring
     depends_on:
       - prometheus
-      - loki
-
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
-      - loki_data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    restart: unless-stopped
-    networks:
-      - monitoring
-
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
-    volumes:
-      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
-      - api_logs:/logs/api:ro
-      - bot_logs:/logs/bot:ro
-      - cluster_manager_logs:/logs/cluster-manager:ro
-      - /var/log:/var/log:ro
-    command: -config.file=/etc/promtail/config.yml
-    restart: unless-stopped
-    networks:
-      - monitoring
-    depends_on:
-      - loki
-
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node-exporter
-    ports:
-      - "9100:9100"
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    restart: unless-stopped
-    networks:
-      - monitoring
-
-  redis-exporter:
-    image: oliver006/redis_exporter:latest
-    container_name: redis-exporter
-    ports:
-      - "9121:9121"
-    environment:
-      - REDIS_ADDR=redis://redis:6379
-    restart: unless-stopped
-    networks:
-      - monitoring
-    depends_on:
-      - redis
-
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
-    container_name: postgres-exporter
-    ports:
-      - "9187:9187"
-    environment:
-      - DATA_SOURCE_NAME=postgresql://postgres:password1234@postgres:5432/public?sslmode=disable
-    restart: unless-stopped
-    networks:
-      - monitoring
-    depends_on:
-      - postgres
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor
-    ports:
-      - "8080:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    privileged: true
-    devices:
-      - /dev/kmsg
-    restart: unless-stopped
-    networks:
-      - monitoring
-
-  alertmanager:
-    image: prom/alertmanager:latest
-    container_name: alertmanager
-    ports:
-      - "9093:9093"
-    volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-      - alertmanager_data:/alertmanager
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--web.external-url=http://localhost:9093'
-    restart: unless-stopped
-    networks:
-      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
   nirn-proxy:
     image: ghcr.io/germanoeich/nirn-proxy:latest
@@ -295,14 +251,10 @@ services:
       - app-network
       - monitoring
     environment:
-      - ENABLE_METRICS=true
       - PORT=8081
+      - ENABLE_METRICS=true
     volumes:
       - nirn_proxy_data:/app/data
-    labels:
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=9000"
-      - "prometheus.io/path=/metrics"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/nirn/healthz"]
       interval: 30s
@@ -333,6 +285,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
   registry:
     image: registry:2
@@ -358,8 +316,6 @@ volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
-  loki_data:
-  alertmanager_data:
   api_logs:
   bot_logs:
   cluster_manager_logs:

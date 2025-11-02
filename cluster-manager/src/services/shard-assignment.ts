@@ -11,14 +11,8 @@ export class ShardAssignmentService {
   /**
    * Calculate shard distribution across clusters
    */
-  calculateShardDistribution(totalShards: number, shardsPerCluster?: number, maxConcurrency?: number): ShardDistribution {
+  calculateShardDistribution(totalShards: number, shardsPerCluster?: number): ShardDistribution {
     let effectiveShardsPerCluster = shardsPerCluster || this.shardsPerCluster;
-    
-    // Respect Discord's max concurrency if provided
-    if (maxConcurrency) {
-      effectiveShardsPerCluster = Math.min(effectiveShardsPerCluster, maxConcurrency);
-      logger.info(`[ShardAssignmentService] Adjusted shards per cluster to ${effectiveShardsPerCluster} based on Discord max concurrency (${maxConcurrency})`);
-    }
     
     const totalClusters = Math.ceil(totalShards / effectiveShardsPerCluster);
     const clusterShards = new Map<number, number[]>();

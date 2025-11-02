@@ -54,11 +54,9 @@ export interface RabbitMQConfig {
 export const QUEUE_NAMES = {
   CLUSTER_START: 'cluster.start',
   CLUSTER_STOP: 'cluster.stop',
-  METRICS_CLUSTER: 'metrics.cluster',
 } as const;
 
 // Predefined exchange names
 export const EXCHANGE_NAMES = {
   CLUSTER_EVENTS: 'cluster.events',
-  METRICS: 'metrics',
 } as const;

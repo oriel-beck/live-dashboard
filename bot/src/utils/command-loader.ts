@@ -2,7 +2,6 @@ import { join } from "path";
 import { readdir } from "fs/promises";
 import { BaseCommand } from "../types/command";
 import logger from "./logger";
-import { ApiClient } from "./api-client";
 
 export class CommandLoader {
   /**
@@ -50,6 +49,9 @@ export class CommandLoader {
     }
   }
 
+  /**
+   * Load a single command from a file path
+   */
   static async loadCommandFromFile(
     filePath: string
   ): Promise<BaseCommand | null> {
@@ -104,61 +106,6 @@ export class CommandLoader {
     }
   }
 
-  /**
-   * Load commands from API based on their file paths
-   */
-  static async loadCommandsFromAPI(): Promise<BaseCommand[]> {
-    const commands: BaseCommand[] = [];
-    const apiClient = new ApiClient();
-
-    try {
-      logger.debug("[CommandLoader] Fetching commands from API...");
-      const response = await apiClient.fetchCommands();
-
-      if (!response.success || !response.data) {
-        logger.error(
-          "[CommandLoader] Failed to fetch commands from API:",
-          response.error
-        );
-        return [];
-      }
-
-      // Load each command based on its file path
-      for (const commandData of response.data) {
-        if (!commandData.filePath) {
-          logger.warn(
-            `[CommandLoader] Command ${commandData.name} has no file path, skipping`
-          );
-          continue;
-        }
-
-        // Convert relative path to absolute path
-        // __dirname is /app/src/utils in compiled JS, so we need to go up 2 levels to get to /app
-        // then use the filePath which already includes 'src/'
-        const absolutePath = join(__dirname, "..", "..", commandData.filePath);
-        const command = await this.loadCommandFromFile(absolutePath);
-
-        if (command) {
-          commands.push(command);
-          logger.debug(
-            `[CommandLoader] Loaded command ${commandData.name} from ${commandData.filePath}`
-          );
-        } else {
-          logger.warn(
-            `[CommandLoader] Failed to load command ${commandData.name} from ${commandData.filePath}`
-          );
-        }
-      }
-
-      logger.debug(
-        `[CommandLoader] Successfully loaded ${commands.length} commands from API`
-      );
-      return commands;
-    } catch (error) {
-      logger.error("[CommandLoader] Error loading commands from API:", error);
-      return [];
-    }
-  }
 
   /**
    * Validate that a command is properly configured

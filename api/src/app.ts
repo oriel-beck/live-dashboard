@@ -1,7 +1,6 @@
 import { cookie } from "@elysiajs/cookie";
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
-import prometheusPlugin from "elysia-prometheus";
 import { config } from "./config";
 import { DatabaseService } from "./services/database";
 import { RedisService } from "./services/redis";
@@ -43,46 +42,15 @@ export const app = new Elysia()
     })
   )
 
-  // Add Prometheus metrics plugin
-  .use(
-    prometheusPlugin({
-      metricsPath: "/metrics",
-      staticLabels: { service: "discord-bot-api" },
-      durationBuckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
-    })
-  )
-  .state('startTime', 0)
-
-  // Add request logging and metrics middleware
-  .onRequest(({ request, set, store }) => {
+  // Add request logging middleware
+  .onRequest(({ request, set }) => {
     const requestId = crypto.randomUUID();
     logger.info(
       `[API] ${request.method} ${request.url} - Request ID: ${requestId}`
     );
     set.headers["X-Request-ID"] = requestId;
-
-    // Store start time for metrics
-    store.startTime = Date.now();
   })
 
-  // Add response metrics middleware
-  .onAfterResponse(({ request, set, store }) => {
-    const startTime = store.startTime;
-    if (startTime) {
-      const duration = (Date.now() - startTime) / 1000; // Convert to seconds
-      const url = new URL(request.url);
-      const statusCode = typeof set.status === "number" ? set.status : 200;
-
-      // Import metrics function dynamically to avoid circular deps
-      import("./middleware/metrics")
-        .then(({ recordApiRequest }) => {
-          recordApiRequest(request.method, url.pathname, statusCode, duration);
-        })
-        .catch((error) => {
-          logger.warn("[API] Failed to record metrics:", error);
-        });
-    }
-  })
 
   // Health check endpoint - returns empty 204 for monitoring
   .get("/health", ({ set }) => {
@@ -98,32 +66,8 @@ export const app = new Elysia()
   .use(eventRoutes)
 
   // Global error handler
-  .onError(({ error, set, request }) => {
+  .onError(({ error, set }) => {
     logger.error("[API] Unhandled error:", error);
-
-    // Record error in metrics
-    const startTime = (request as any).startTime;
-    if (startTime) {
-      const duration = (Date.now() - startTime) / 1000;
-      const url = new URL(request.url);
-      const statusCode = typeof set.status === "number" ? set.status : 500;
-
-      import("./middleware/metrics")
-        .then(({ recordApiRequest }) => {
-          const standardError =
-            error instanceof Error ? error : new Error(String(error));
-          recordApiRequest(
-            request.method,
-            url.pathname,
-            statusCode,
-            duration,
-            standardError
-          );
-        })
-        .catch(() => {
-          // Ignore metrics errors in error handler
-        });
-    }
 
     if (error instanceof Error && error.name === "ZodError") {
       set.status = 400;

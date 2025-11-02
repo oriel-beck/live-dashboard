@@ -24,6 +24,7 @@ BigInt.prototype.toJSON = function () {
 };
 
 import { REST, Routes, ApplicationCommand } from "discord.js";
+import { join } from "path";
 import { CommandLoader } from "./utils/command-loader";
 import { ApiClient } from "./utils/api-client";
 import logger from "./utils/logger";
@@ -204,13 +205,68 @@ async function registerSubcommands(
   }
 }
 
+/**
+ * Load commands from API based on their file paths
+ */
+async function loadCommandsFromAPI(): Promise<BaseCommand[]> {
+  const commands: BaseCommand[] = [];
+  const apiClient = new ApiClient();
+
+  try {
+    logger.debug("[Deploy] Fetching commands from API...");
+    const response = await apiClient.fetchCommands();
+
+    if (!response.success || !response.data) {
+      logger.error(
+        "[Deploy] Failed to fetch commands from API:",
+        response.error
+      );
+      return [];
+    }
+
+    // Load each command based on its file path
+    for (const commandData of response.data) {
+      if (!commandData.filePath) {
+        logger.warn(
+          `[Deploy] Command ${commandData.name} has no file path, skipping`
+        );
+        continue;
+      }
+
+      // Convert relative path to absolute path
+      // __dirname is /app/src in compiled JS, so we need to use the filePath which already includes 'src/'
+      const absolutePath = join(__dirname, "..", commandData.filePath);
+      const command = await CommandLoader.loadCommandFromFile(absolutePath);
+
+      if (command) {
+        commands.push(command);
+        logger.debug(
+          `[Deploy] Loaded command ${commandData.name} from ${commandData.filePath}`
+        );
+      } else {
+        logger.warn(
+          `[Deploy] Failed to load command ${commandData.name} from ${commandData.filePath}`
+        );
+      }
+    }
+
+    logger.debug(
+      `[Deploy] Successfully loaded ${commands.length} commands from API`
+    );
+    return commands;
+  } catch (error) {
+    logger.error("[Deploy] Error loading commands from API:", error);
+    return [];
+  }
+}
+
 async function deployCommands() {
   logger.info("[Deploy] Starting command deployment...");
 
   try {
     // Load and validate commands
     logger.debug("[Deploy] Loading commands...");
-    const commands = await CommandLoader.loadCommandsFromAPI();
+    const commands = await loadCommandsFromAPI();
 
     // Validate commands
     const validCommands: BaseCommand[] = [];

@@ -17,8 +17,6 @@
     "amqplib": "^0.10.9",
     "dockerode": "^4.0.9",
     "dotenv": "^16.4.7",
-    "elysia": "^1.4.13",
-    "prom-client": "^15.1.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {

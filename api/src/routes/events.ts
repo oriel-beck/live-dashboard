@@ -56,15 +56,6 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
 
     logger.info(`[Events] SSE connection started for guild ${guildId}`);
 
-    // Record SSE connection in metrics
-    import("../middleware/metrics")
-      .then(({ recordSseConnection }) => {
-        recordSseConnection(guildId, "connect");
-      })
-      .catch(() => {
-        // Ignore metrics errors
-      });
-
     // Use a simpler SSE approach with manual chunking
     const encoder = new TextEncoder();
     let isActive = true;
@@ -301,15 +292,6 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
             logger.error(`[Events] Error during cleanup:`, error);
           }
         });
-
-        // Record SSE disconnection in metrics
-        import("../middleware/metrics")
-          .then(({ recordSseConnection }) => {
-            recordSseConnection(guildId, "disconnect");
-          })
-          .catch(() => {
-            // Ignore metrics errors
-          });
 
         RedisService.unsubscribeFromGuildEvents(guildId).catch((error) => {
           logger.error(`[Events] Error unsubscribing:`, error);

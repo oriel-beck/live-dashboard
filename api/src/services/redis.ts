@@ -37,6 +37,7 @@ export class RedisService {
           url: config.redis.url,
           socket: {
             connectTimeout: 5000,
+            keepAlive: 30000,
             reconnectStrategy: (retries) => {
               if (retries > 10) {
                 logger.error("[Redis] Max retry attempts reached");
@@ -47,19 +48,21 @@ export class RedisService {
           },
         });
 
-        // Publisher client
+        // Publisher client (separate connection for pub/sub)
         this.publisher = createClient({
           url: config.redis.url,
           socket: {
             connectTimeout: 5000,
+            keepAlive: 30000,
           },
         });
 
-        // Subscriber client
+        // Subscriber client (separate connection for pub/sub)
         this.subscriber = createClient({
           url: config.redis.url,
           socket: {
             connectTimeout: 5000,
+            keepAlive: 30000,
           },
         });
 

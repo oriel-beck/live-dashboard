@@ -19,7 +19,6 @@
     "dotenv": "^16.4.7",
     "ioredis": "^5.7.0",
     "node-global-proxy": "^1.0.1",
-    "prom-client": "^15.1.0",
     "winston": "^3.17.0",
     "zod": "^3.23.8"
   },
