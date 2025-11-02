@@ -29,8 +29,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -96,7 +95,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "rate(http_requests_total{job=\"nirn-proxy\"}[5m]) or rate(nirn_http_requests_total{job=\"nirn-proxy\"}[5m]) or rate(requests_total{job=\"nirn-proxy\"}[5m])",
           "refId": "A",
@@ -108,8 +107,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -175,7 +173,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m])) or histogram_quantile(0.95, rate(nirn_http_request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m])) or histogram_quantile(0.95, rate(request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m]))",
           "refId": "A",
@@ -184,7 +182,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m])) or histogram_quantile(0.50, rate(nirn_http_request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m])) or histogram_quantile(0.50, rate(request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m]))",
           "refId": "B",
@@ -193,7 +191,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m])) or histogram_quantile(0.99, rate(nirn_http_request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m])) or histogram_quantile(0.99, rate(request_duration_seconds_bucket{job=\"nirn-proxy\"}[5m]))",
           "refId": "C",
@@ -213,8 +211,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -259,7 +256,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "rate(rate_limit_hits_total{job=\"nirn-proxy\"}[5m]) or rate(nirn_rate_limit_hits_total{job=\"nirn-proxy\"}[5m]) or increase(rate_limit_hits_total{job=\"nirn-proxy\"}[5m])",
           "refId": "A",
@@ -271,8 +268,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -338,7 +334,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "rate_limit_remaining{job=\"nirn-proxy\"} or nirn_rate_limit_remaining{job=\"nirn-proxy\"}",
           "refId": "A",
@@ -347,7 +343,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "rate_limit_limit{job=\"nirn-proxy\"} or nirn_rate_limit_limit{job=\"nirn-proxy\"}",
           "refId": "B",
@@ -367,8 +363,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -434,7 +429,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sum by (status) (rate(http_requests_total{job=\"nirn-proxy\"}[5m])) or sum by (status) (rate(nirn_http_requests_total{job=\"nirn-proxy\"}[5m])) or sum by (status) (rate(requests_total{job=\"nirn-proxy\"}[5m]))",
           "refId": "A",
@@ -446,8 +441,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -513,7 +507,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sum by (method) (rate(http_requests_total{job=\"nirn-proxy\"}[5m])) or sum by (method) (rate(nirn_http_requests_total{job=\"nirn-proxy\"}[5m])) or sum by (method) (rate(requests_total{job=\"nirn-proxy\"}[5m]))",
           "refId": "A",
