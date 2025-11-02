@@ -4,11 +4,11 @@ import { DefaultCommand } from './src/entities/DefaultCommand';
 
 export default new DataSource({
   type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password1234',
-  database: process.env.DB_NAME || 'public',
+  host: process.env.POSTGRES_HOST || 'localhost',
+  port: parseInt(process.env.POSTGRES_PORT || '5432'),
+  username: process.env.POSTGRES_USER || 'postgres',
+  password: process.env.POSTGRES_PASSWORD || 'password',
+  database: process.env.POSTGRES_DB || 'public',
   ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : false,
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
