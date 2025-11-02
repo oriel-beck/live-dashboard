@@ -1,11 +1,13 @@
 import { register, collectDefaultMetrics, Counter, Gauge, Histogram } from 'prom-client';
-import { Client, Status } from 'discord.js';
-import { ClusterClient } from 'discord-hybrid-sharding';
+import { Client } from 'discord.js';
 
-// Extend Client type to include cluster property
+// Extend Client type to include cluster property (custom cluster setup)
 declare module "discord.js" {
   interface Client {
-    cluster: ClusterClient;
+    cluster?: {
+      id: number;
+      shardList: number[];
+    };
   }
 }
 
@@ -162,11 +164,11 @@ export const updateShardMetrics = (client: Client) => {
   // Calculate average latency across all shards in this cluster
   if (client.cluster?.shardList) {
     const validShards = client.cluster.shardList
-      .map(shardId => client.ws.shards.get(shardId))
-      .filter(shard => shard && shard.ping !== -1);
+      .map((shardId: number) => client.ws.shards.get(shardId))
+      .filter((shard) => shard && shard.ping !== -1);
     
     if (validShards.length > 0) {
-      const avgLatency = validShards.reduce((sum, shard) => sum + (shard!.ping ?? 0), 0) / validShards.length;
+      const avgLatency = validShards.reduce((sum: number, shard) => sum + (shard!.ping ?? 0), 0) / validShards.length;
       clusterLatency.set({ cluster_id: clusterIdStr }, avgLatency);
     }
   }

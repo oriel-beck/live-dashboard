@@ -1,27 +1,25 @@
 {
-  "name": "bot",
+  "name": "cluster-manager",
   "version": "1.0.0",
+  "type": "module",
   "main": "src/index.ts",
   "scripts": {
     "build": "tsc",
-    "start": "bun --env-file=../.env run src/index.ts",
-    "dev": "bun --watch --env-file=../.env run src/index.ts",
-    "deploy-commands": "bun --env-file=../.env run src/deploy-commands.ts"
+    "start": "bun --env-file=../.env src/index.ts",
+    "start:prod": "bun dist/index.js",
+    "dev": "bun --watch --env-file=../.env src/index.ts"
   },
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Docker-based cluster manager for Discord bot",
   "dependencies": {
     "@discord-bot/shared-types": "../shared-types/",
     "amqplib": "^0.10.9",
-    "bufferutil": "^4.0.9",
-    "discord.js": "^14.21.0",
+    "dockerode": "^4.0.9",
     "dotenv": "^16.4.7",
-    "ioredis": "^5.7.0",
-    "node-global-proxy": "^1.0.1",
+    "elysia": "^1.4.13",
     "prom-client": "^15.1.0",
-    "winston": "^3.17.0",
-    "zod": "^3.23.8"
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",

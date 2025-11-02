@@ -30,7 +30,9 @@ export class ApiClient {
 
   async get<T>(endpoint: string): Promise<T> {
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      const url = `${this.baseUrl}${endpoint}`;
+      logger.debug(`[ApiClient] GET ${url}`);
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${process.env.BOT_TOKEN}`,
           "Content-Type": "application/json",
@@ -38,15 +40,17 @@ export class ApiClient {
       });
 
       if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
         throw new Error(
-          `API request failed: ${response.status} ${response.statusText}`
+          `API request failed: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
       return (await response.json()) as T;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
-        `[ApiClient] GET request failed for endpoint ${endpoint}:`,
-        error
+        `[ApiClient] GET request failed for endpoint ${endpoint} (baseUrl: ${this.baseUrl}):`,
+        errorMessage
       );
       throw error;
     }
@@ -54,20 +58,32 @@ export class ApiClient {
 
   async post<T>(endpoint: string, data: unknown): Promise<T> {
     console.log(`[ApiClient] POST ${endpoint} with data:`, JSON.stringify(data, null, 2));
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.BOT_TOKEN}`,
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      throw new Error(
-        `API request failed: ${response.status} ${response.statusText}`
+    try {
+      const url = `${this.baseUrl}${endpoint}`;
+      logger.debug(`[ApiClient] POST ${url}`);
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.BOT_TOKEN}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(
+          `API request failed: ${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+      return response.json() as Promise<T>;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(
+        `[ApiClient] POST request failed for endpoint ${endpoint} (baseUrl: ${this.baseUrl}):`,
+        errorMessage
       );
+      throw error;
     }
-    return response.json() as Promise<T>;
   }
 
   async put<T>(endpoint: string, data: unknown): Promise<T> {

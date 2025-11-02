@@ -1,0 +1,28 @@
+# Docker Compose file for building all required images
+# Usage: BUILD_TARGET=prod docker-compose -f docker-compose.build.yml build
+# After building, images should be tagged and pushed to registry
+# See scripts/build-and-push-images.sh or scripts/build-and-push-images.bat
+#
+# BUILD_TARGET can be 'dev' or 'prod' (defaults to 'prod')
+
+services:
+  # Build cluster manager image
+  cluster-manager:
+    build:
+      context: .
+      dockerfile: ./cluster-manager/Dockerfile
+      target: ${BUILD_TARGET:-prod}
+      tags:
+        - cluster-manager:latest
+    image: cluster-manager:latest
+
+  # Build bot cluster container image (used by cluster manager)
+  bot-cluster:
+    build:
+      context: .
+      dockerfile: ./bot/Dockerfile
+      target: ${BUILD_TARGET:-prod}
+      tags:
+        - bot:latest
+    image: bot:latest
+

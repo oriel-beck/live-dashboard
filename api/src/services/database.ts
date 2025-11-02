@@ -6,18 +6,40 @@ import { DefaultCommandRegistration } from '@discord-bot/shared-types';
 
 export class DatabaseService {
   static async initialize(): Promise<void> {
-    try {
-      if (!AppDataSource.isInitialized) {
-        await AppDataSource.initialize();
-        logger.info('[Database] Connected successfully');
+    const maxRetries = 10;
+    const baseDelay = 1000; // 1 second
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (!AppDataSource.isInitialized) {
+          logger.info(`[Database] Connection attempt ${attempt}/${maxRetries}...`);
+          await AppDataSource.initialize();
+          logger.info('[Database] Connected successfully');
+          
+          // Run migrations automatically on startup
+          await AppDataSource.runMigrations();
+          logger.info('[Database] Migrations completed');
+          return; // Success, exit the retry loop
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
         
-        // Run migrations automatically on startup
-        await AppDataSource.runMigrations();
-        logger.info('[Database] Migrations completed');
+        if (attempt === maxRetries) {
+          logger.error('[Database] Failed to connect after all retries:', {
+            message: errorMessage,
+            stack: errorStack,
+            error: error
+          });
+          throw error;
+        }
+        
+        logger.warn(`[Database] Connection attempt ${attempt} failed:`, errorMessage);
+        
+        // Exponential backoff with jitter
+        const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-    } catch (error) {
-      logger.error('[Database] Failed to connect:', error);
-      throw error;
     }
   }
 

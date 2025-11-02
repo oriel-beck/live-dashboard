@@ -1,3 +1,8 @@
+name: clustered-bot
+
+x-common-vars: &common-vars
+  REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
+
 services:
   api:
     build:
@@ -13,13 +18,17 @@ services:
           target: /app/package.json
           action: sync
     command: ["bun", "run", "dev"]
-    depends_on: 
-      - redis
-      - postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
+      - NODE_ENV=development
       - FEATURE_METRICS=true
+      - LOG_LEVEL=debug
     env_file:
       - .env
     healthcheck:
@@ -29,7 +38,7 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - dev-network
+      - app-network
       - monitoring
     volumes:
       - api_logs:/app/logs
@@ -39,38 +48,46 @@ services:
       - "prometheus.io/path=/metrics"
     restart: unless-stopped
 
-  bot:
-    build:
-      context: .
-      dockerfile: ./bot/Dockerfile
-      target: dev
-    develop:
-      watch:
-        - path: ./bot/src
-          target: /app/src
-          action: sync
+  cluster-manager:
+    image: ${REGISTRY_HOST:-localhost:5000}/cluster-manager:latest
     command: ["bun", "run", "dev"]
-    depends_on: 
-      - redis
-      - api
-      - nirn-proxy
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+      nirn-proxy:
+        condition: service_started
     ports:
-      - "30000:30000"  # Shard manager metrics API
+      - "3001:3001"    # Metrics aggregation port
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - cluster_manager_logs:/app/logs
     environment:
-      - METRICS_PORT=30000  # Base port for shard 0
-      - USE_SHARDING=${USE_SHARDING:-true}
-      - NIRN_HOST=nirn-proxy
-      - NIRN_PORT=8081
+      - NODE_ENV=development
+      - METRICS_PORT=3001
+      - DOCKER_SWARM_MODE=false
+      - DOCKER_IMAGE_NAME=${REGISTRY_HOST:-localhost:5000}/bot:latest
+      - DOCKER_SOCKET_PATH=/var/run/docker.sock
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-bot}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-bot_password}
+      - CLUSTER_STARTUP_DELAY=${CLUSTER_STARTUP_DELAY:-5000}
+      - CLUSTER_READY_TIMEOUT=${CLUSTER_READY_TIMEOUT:-30000}
+      - CLUSTER_HEALTH_CHECK_INTERVAL=${CLUSTER_HEALTH_CHECK_INTERVAL:-5000}
+      - SHARDS_PER_CLUSTER=${SHARDS_PER_CLUSTER:-16}
+      - HEALTH_CHECK_PORT=${HEALTH_CHECK_PORT:-8080}
+      - LOG_LEVEL=debug
     env_file:
       - .env
     networks:
-      - dev-network
+      - app-network
       - monitoring
-    volumes:
-      - bot_logs:/app/logs
     labels:
       - "prometheus.io/scrape=true"
-      - "prometheus.io/port=30000"
+      - "prometheus.io/port=3001"
       - "prometheus.io/path=/metrics"
     restart: unless-stopped
 
@@ -95,16 +112,16 @@ services:
       - .env
     restart: unless-stopped
     networks:
-      - dev-network
+      - app-network
       - monitoring
     volumes:
       - ./dashboard/src:/app/src:ro
       - ./dashboard/angular.json:/app/angular.json:ro
       - ./dashboard/tsconfig.json:/app/tsconfig.json:ro
       - ./dashboard/tsconfig.app.json:/app/tsconfig.app.json:ro
-      
+
   redis:
-    image: redis:7-alpine
+    image: redis:8.2-alpine
     ports:
       - "6379:6379"
     healthcheck:
@@ -114,14 +131,14 @@ services:
       retries: 3
     restart: unless-stopped
     networks:
-      - dev-network
+      - app-network
       - monitoring
     labels:
       - "prometheus.io/scrape=true"
       - "prometheus.io/port=6379"
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     env_file:
       - .env
     volumes:
@@ -135,13 +152,12 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - dev-network
+      - app-network
       - monitoring
     labels:
       - "prometheus.io/scrape=true"
       - "prometheus.io/port=5432"
 
-  # Monitoring Stack Services
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -170,7 +186,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3001:3000"
+      - "3002:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
@@ -207,6 +223,7 @@ services:
       - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
       - api_logs:/logs/api:ro
       - bot_logs:/logs/bot:ro
+      - cluster_manager_logs:/logs/cluster-manager:ro
       - /var/log:/var/log:ro
     command: -config.file=/etc/promtail/config.yml
     restart: unless-stopped
@@ -297,11 +314,11 @@ services:
     image: ghcr.io/germanoeich/nirn-proxy:latest
     container_name: nirn-proxy
     ports:
-      - "8081:8081"  # Main proxy port
-      - "9000:9000"  # Metrics port
+      - "8081:8081"
+      - "9000:9000"
     restart: unless-stopped
     networks:
-      - dev-network
+      - app-network
       - monitoring
     environment:
       - ENABLE_METRICS=true
@@ -319,6 +336,50 @@ services:
       retries: 3
       start_period: 30s
 
+  rabbitmq:
+    image: rabbitmq:4.2-management
+    container_name: bot-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-bot}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-bot_password}
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./monitoring/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks:
+      - app-network
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  registry:
+    image: registry:2
+    container_name: docker-registry
+    ports:
+      - "${REGISTRY_PORT:-5000}:5000"
+    environment:
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+    volumes:
+      - registry_data:/var/lib/registry
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/v2/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+
 volumes:
   postgres_data:
   prometheus_data:
@@ -327,10 +388,13 @@ volumes:
   alertmanager_data:
   api_logs:
   bot_logs:
+  cluster_manager_logs:
   nirn_proxy_data:
+  rabbitmq_data:
+  registry_data:
 
 networks:
-  dev-network:
+  app-network:
     driver: bridge
   monitoring:
     driver: bridge

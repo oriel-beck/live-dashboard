@@ -7,9 +7,16 @@
  */
 
 // Load environment variables
-import { config } from "dotenv";
-import { resolve } from "path";
-config({ path: resolve(__dirname, "../../.env") });
+// In Docker, env_file provides vars, so only load .env if BOT_TOKEN is not set
+if (!process.env.BOT_TOKEN) {
+  try {
+    const { config } = require("dotenv");
+    const { resolve } = require("path");
+    config({ path: resolve(__dirname, "../../.env") });
+  } catch (error) {
+    // dotenv not available or .env not found - assume we're in Docker with env vars
+  }
+}
 
 // @ts-expect-error Add BigInt JSON serialization support
 BigInt.prototype.toJSON = function () {
@@ -203,10 +210,10 @@ async function deployCommands() {
   try {
     // Load and validate commands
     logger.debug("[Deploy] Loading commands...");
-    const commands = await CommandLoader.loadAllCommands();
+    const commands = await CommandLoader.loadCommandsFromAPI();
 
     // Validate commands
-    const validCommands = [];
+    const validCommands: BaseCommand[] = [];
     for (const command of commands) {
       if (CommandLoader.validateCommand(command)) {
         validCommands.push(command);

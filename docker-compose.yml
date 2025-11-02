@@ -1,86 +1,374 @@
-services:
-  bot:
-    build:
-      context: ./bot
-    # Override the environment variables from the .env file
-    environment:
-      - NODE_ENV=production
-      - USE_SHARDING=${USE_SHARDING:-true}
-    env_file:
-      - .env
-    depends_on:
-      - api
-      - redis
-    restart: unless-stopped
-    ports:
-      - "3001:3001" # Metrics port
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+name: clustered-bot
 
+x-common-vars: &common-vars
+  REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
+
+services:
   api:
     build:
-      context: ./api
-    # Override the environment variables from the .env file
-    environment:
-      - NODE_ENV=production
-      - CORS_ORIGIN=http://localhost:4200
-    env_file:
-      - .env
-    ports:
-      - 3000
-    depends_on:
+      context: .
+      dockerfile: ./api/Dockerfile
+      target: prod
+    command: ["bun", "run", "start"]
+    depends_on: 
       - redis
       - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - FEATURE_METRICS=true
+    env_file:
+      - .env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 40s
+      start_period: 30s
+    networks:
+      - app-network
+      - monitoring
+    volumes:
+      - api_logs:/app/logs
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=3000"
+      - "prometheus.io/path=/metrics"
+    restart: unless-stopped
+
+  cluster-manager:
+    image: ${REGISTRY_HOST:-localhost:5000}/cluster-manager:latest
+    command: ["bun", "dist/index.js"]
+    depends_on: 
+      - redis
+      - api
+      - nirn-proxy
+      - rabbitmq
+    ports:
+      - "3001:3001"    # Metrics aggregation port
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - cluster_manager_logs:/app/logs
+    environment:
+      - NODE_ENV=production
+      - METRICS_PORT=3001
+      - DOCKER_SWARM_MODE=true
+      - DOCKER_IMAGE_NAME=${REGISTRY_HOST:-localhost:5000}/bot:latest
+      - DOCKER_SOCKET_PATH=/var/run/docker.sock
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-bot}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-bot_password}
+      - CLUSTER_STARTUP_DELAY=${CLUSTER_STARTUP_DELAY:-5000}
+      - CLUSTER_READY_TIMEOUT=${CLUSTER_READY_TIMEOUT:-30000}
+      - CLUSTER_HEALTH_CHECK_INTERVAL=${CLUSTER_HEALTH_CHECK_INTERVAL:-5000}
+      - SHARDS_PER_CLUSTER=${SHARDS_PER_CLUSTER:-16}
+      - HEALTH_CHECK_PORT=${HEALTH_CHECK_PORT:-8080}
+    env_file:
+      - .env
+    networks:
+      - app-network
+      - monitoring
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=3001"
+      - "prometheus.io/path=/metrics"
     restart: unless-stopped
 
   dashboard:
     build:
-      context: ./dashboard
-    environment:
-      - NODE_ENV=production
+      context: .
+      dockerfile: ./dashboard/Dockerfile
+      target: ${BUILD_TARGET:-prod}
+    command: ["npm", "run", "start", "--", "--host", "0.0.0.0", "--port", "80"]
+    depends_on: 
+      - api
     ports:
       - "80:80"
+    environment:
+      - NODE_ENV=production
     env_file:
       - .env
-    depends_on:
-      - api
     restart: unless-stopped
+    networks:
+      - app-network
+      - monitoring
 
   redis:
-    image: redis:7-alpine
+    image: redis:8.2-alpine
     ports:
-      - 6379
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    networks:
+      - app-network
+      - monitoring
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=6379"
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     env_file:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - 5432
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d public"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - app-network
+      - monitoring
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=5432"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - redis
+      - postgres
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3002:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
+      - api_logs:/logs/api:ro
+      - bot_logs:/logs/bot:ro
+      - cluster_manager_logs:/logs/cluster-manager:ro
+      - /var/log:/var/log:ro
+    command: -config.file=/etc/promtail/config.yml
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - redis
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://postgres:password1234@postgres:5432/public?sslmode=disable
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - postgres
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  nirn-proxy:
+    image: ghcr.io/germanoeich/nirn-proxy:latest
+    container_name: nirn-proxy
+    ports:
+      - "8081:8081"
+      - "9000:9000"
+    restart: unless-stopped
+    networks:
+      - app-network
+      - monitoring
+    environment:
+      - ENABLE_METRICS=true
+      - PORT=8081
+    volumes:
+      - nirn_proxy_data:/app/data
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9000"
+      - "prometheus.io/path=/metrics"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/nirn/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:4.2-management
+    container_name: bot-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-bot}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-bot_password}
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./monitoring/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks:
+      - app-network
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  registry:
+    image: registry:2
+    container_name: docker-registry
+    ports:
+      - "${REGISTRY_PORT:-5000}:5000"
+    environment:
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+    volumes:
+      - registry_data:/var/lib/registry
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/v2/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  alertmanager_data:
+  api_logs:
+  bot_logs:
+  cluster_manager_logs:
+  nirn_proxy_data:
+  rabbitmq_data:
+  registry_data:
+
+networks:
+  app-network:
+    driver: bridge
+  monitoring:
+    driver: bridge

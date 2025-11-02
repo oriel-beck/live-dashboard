@@ -46,32 +46,75 @@ See [DEV_SETUP.md](./DEV_SETUP.md) for detailed development instructions.
 ### Production Mode
 
 ```bash
-docker-compose up --build
+# Option 1: Use the automated script (recommended)
+./scripts/build-and-push-images.sh    # Linux/Mac
+scripts\build-and-push-images.bat      # Windows
+
+# Option 2: Manual steps
+# 1. Start registry
+docker-compose up -d registry
+
+# 2. Build images
+docker-compose -f docker-compose.build.yml build
+
+# 3. Tag and push to registry
+docker tag cluster-manager:latest localhost:5000/cluster-manager:latest
+docker tag bot:latest localhost:5000/bot:latest
+docker push localhost:5000/cluster-manager:latest
+docker push localhost:5000/bot:latest
+
+# 4. Start all services (pulls from registry)
+docker-compose up -d
 ```
+
+**Note:** 
+- The script automatically starts the registry, builds images, pushes them to the registry, and starts all services.
+- Docker Compose is configured to pull images from the registry (`localhost:5000` by default).
+- Set `REGISTRY_HOST` environment variable to use a different registry (e.g., for Docker Swarm across nodes).
+- For Docker Swarm deployments, ensure the registry is accessible by all nodes.
+- The bot can ONLY run in cluster mode - it requires CLUSTER_ID, SHARD_LIST, and TOTAL_SHARDS environment variables.
 
 ## 🏗️ Project Architecture
 
 ```
 project
-├── api/          # REST API service (Express.js + TypeScript)
+├── api/          # REST API service (Elysia + TypeScript)
 ├── bot/          # Discord bot service (Discord.js + TypeScript)
+│   └── Cluster Manager with Docker-based cluster orchestration
 ├── dashboard/    # Angular frontend dashboard
-└── docker-compose.yml  # Container orchestration
+├── docker-compose.yml       # Production configuration
+└── docker-compose.dev.yml   # Development configuration
 ```
+
+### Cluster Management System
+
+The bot uses a custom Docker-based cluster management system:
+- **Cluster Manager**: Orchestrates bot clusters dynamically
+- **Docker Containers**: Each cluster runs in its own container
+- **RabbitMQ**: Inter-cluster communication and metrics aggregation
+- **Dynamic Sharding**: Automatically adjusts based on Discord recommendations
+- **Health Checks**: Built-in health monitoring for all clusters
 
 ## 📋 Services Overview
 
 ### 🤖 Bot Service (`/bot`)
 
-**Technology Stack:** Node.js, TypeScript, Discord.js v14, Redis
+**Technology Stack:** Bun, TypeScript, Discord.js v14, Docker, RabbitMQ
 
-The Discord bot service is responsible for:
-- **Discord Integration**: Connects to Discord using Discord.js with optimized memory usage
+The Discord bot service provides:
+- **Cluster Management**: Custom Docker-based cluster orchestrator
+- **Dynamic Sharding**: Automatically scales based on Discord API recommendations
+- **Container Orchestration**: Manages bot clusters as Docker containers
+- **Health Monitoring**: Built-in health checks and metrics aggregation
 - **Real-time Data Sync**: Monitors Discord events and syncs guild data to Redis
-- **Event Broadcasting**: Publishes changes via Redis pub/sub for real-time updates
 - **Memory Optimization**: Uses limited caching and sweepers to maintain low RAM usage
 
 **Key Features:**
+- Dynamic cluster creation and management
+- Automatic shard distribution
+- Rolling restart capabilities
+- Centralized metrics via RabbitMQ
+- Health check endpoints for container orchestration
 - Syncs guild basics (name, icon, owner)
 - Tracks roles and channels in real-time
 - Monitors member permission changes
@@ -79,12 +122,15 @@ The Discord bot service is responsible for:
 
 **Dependencies:**
 - `discord.js`: Discord API integration
+- `dockerode`: Docker API client for cluster management
+- `amqplib`: RabbitMQ client for inter-cluster communication
+- `elysia`: Fast web framework for health checks and metrics
 - `ioredis`: Redis client for caching and pub/sub
 - `bufferutil`: WebSocket performance optimization
 
 ### 🌐 API Service (`/api`)
 
-**Technology Stack:** Node.js, TypeScript, Express.js, Redis
+**Technology Stack:** Bun, TypeScript, Elysia, Redis
 
 The REST API service provides:
 - **Dashboard Data Access**: Endpoints for retrieving guild, role, and channel data
@@ -100,9 +146,9 @@ The REST API service provides:
 - `GET /events/:guildId` - SSE stream for real-time updates
 
 **Dependencies:**
-- `express`: Web framework
+- `elysia`: Fast web framework
 - `ioredis`: Redis client
-- `cors`: Cross-origin resource sharing
+- `@elysiajs/cors`: Cross-origin resource sharing
 
 ### 🎨 Dashboard Service (`/dashboard`)
 

@@ -1,12 +1,11 @@
 // API Types and Interfaces - Using shared types where available
-import { Request } from "express";
 import {
   User,
   UserGuild,
   GuildRole,
   GuildChannel,
   ApiResponse,
-} from '@discord-bot/shared-types';
+} from "@discord-bot/shared-types";
 
 // Cached types for Redis storage
 export interface CachedGuildRole {
@@ -32,10 +31,4 @@ export interface CachedGuildInfo {
 }
 
 // Re-export shared types for convenience
-export {
-  User,
-  UserGuild,
-  GuildRole,
-  GuildChannel,
-  ApiResponse,
-};
+export { User, UserGuild, GuildRole, GuildChannel, ApiResponse };
