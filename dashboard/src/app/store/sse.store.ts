@@ -405,7 +405,8 @@ export const CacheStore = signalStore(
   withComputed((store) => {
     return {
       commandsCategories: computed(() => {
-        return Array.from(store.commands().values()).reduce((acc, command) => {
+        const commands = store.commands();
+        return Array.from(commands.values()).reduce((acc, command) => {
           // Check if command has category information
           if (command.categoryId && command.category) {
             let data = acc.get(command.categoryId) ?? { ...command.category };

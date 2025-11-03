@@ -14,7 +14,14 @@ import { SidebarNavigationComponent } from '../sidebar-navigation/sidebar-naviga
 
 @Component({
   selector: 'app-layout',
-  imports: [CommonModule, RouterOutlet, SidebarNavigationComponent, MenuModule, BadgeModule, RippleModule],
+  imports: [
+    CommonModule,
+    RouterOutlet,
+    SidebarNavigationComponent,
+    MenuModule,
+    BadgeModule,
+    RippleModule,
+  ],
   templateUrl: './layout.html',
   styleUrl: './layout.scss',
   providers: [CacheStore],
@@ -27,6 +34,9 @@ export class Layout {
     optional: true,
   });
 
+  // Track current serverId to avoid unnecessary reconnections
+  private currentServerId = signal<string | null>(null);
+
   // Page information signals
   pageInformation = signal<{
     title: string;
@@ -38,16 +48,16 @@ export class Layout {
     {
       label: 'Servers',
       icon: 'pi pi-server',
-      command: () => this.navigateToServers()
+      command: () => this.navigateToServers(),
     },
     {
-      separator: true
+      separator: true,
     },
     {
       label: 'Logout',
       icon: 'pi pi-sign-out',
-      command: () => this.logout()
-    }
+      command: () => this.logout(),
+    },
   ];
 
   // Computed property to determine if sidebar should be shown
@@ -82,8 +92,7 @@ export class Layout {
         }
 
         // Handle SSE connection based on route
-        this.handleSSEConnection(route);
-        console.log('route', route);
+        this.handleSSEConnection();
       });
 
     // Listen for SSE connection errors and redirect if max retries reached
@@ -99,16 +108,36 @@ export class Layout {
       }
     });
   }
-// Will probably need to save the serverId so we won't reconnect to the same server if we navigate to a different child route
-  private handleSSEConnection(route: any) {
-    const serverId = route.params?.['serverId'];
-    console.log('serverId', serverId);
 
-    // Check if we're on a server dashboard route
+  private handleSSEConnection() {
+    // Extract serverId from URL (most efficient and reliable)
+    const url = this.router.url;
+    const match = url.match(/\/servers\/([^\/]+)/);
+    const serverId = match ? match[1] : null;
+
+    this.handleSSEConnectionFromParams(serverId);
+  }
+
+  private handleSSEConnectionFromParams(serverId: string | null) {
+    const currentServerId = this.currentServerId();
+
+    // If serverId hasn't changed, don't do anything
+    if (serverId === currentServerId) {
+      return;
+    }
+
+    // Update the tracked serverId
+    this.currentServerId.set(serverId);
+
     if (serverId) {
-      // Connect to SSE for this server
-      console.log(`[Layout] Connecting to SSE for server: ${serverId}`);
-      this.store.connect(serverId);
+      // Check if we're already connected to this server
+      const storeGuildId = this.store.guildId();
+      if (storeGuildId !== serverId) {
+        // Connect to SSE for this server (or reconnect if different server)
+        console.log(`[Layout] Connecting to SSE for server: ${serverId}`);
+        this.store.connect(serverId);
+      }
+      // If already connected to this serverId, no action needed
     } else {
       // Disconnect SSE when not on a server dashboard
       console.log('[Layout] Disconnecting SSE - not on server dashboard');
