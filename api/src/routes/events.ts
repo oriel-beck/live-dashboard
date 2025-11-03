@@ -4,9 +4,8 @@ import { combinedAuth } from "../middleware/auth";
 import { DatabaseService } from "../services/database";
 import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
-import { logger } from "../utils/logger";
 import { withAbort } from "../utils/request-utils";
-import { SSE_EVENT_TYPES, SSEEvent } from "@discord-bot/shared-types";
+import { SSE_EVENT_TYPES, SSEEvent, logger } from "@discord-bot/shared-types";
 
 // Helper function to get command permissions with caching
 async function getCommandPermissions(guildId: string, signal?: AbortSignal) {

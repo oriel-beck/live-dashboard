@@ -1,4 +1,4 @@
-import winston from 'winston';
+import winston from "winston";
 
 // Define log levels
 const levels = {
@@ -11,11 +11,11 @@ const levels = {
 
 // Define colors for each level
 const colors = {
-  error: 'red',
-  warn: 'yellow',
-  info: 'green',
-  http: 'magenta',
-  debug: 'white',
+  error: "red",
+  warn: "yellow",
+  info: "green",
+  http: "magenta",
+  debug: "white",
 };
 
 // Tell winston that you want to link the colors
@@ -23,28 +23,28 @@ winston.addColors(colors);
 
 // Define which level to log based on environment
 const level = () => {
-  const env = process.env.NODE_ENV || 'development';
-  const isDevelopment = env === 'development';
-  return isDevelopment ? 'debug' : 'warn';
+  const env = process.env.NODE_ENV || "development";
+  const isDevelopment = env === "development";
+  return isDevelopment ? "debug" : "warn";
 };
 
 // Define different log formats
 const format = winston.format.combine(
   // Add timestamp
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
   // Add colors to the logs
   winston.format.colorize({ all: true }),
   // Define the format of the message showing the timestamp, the level and the message
   winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`,
-  ),
+    (info) => `${info.timestamp} ${info.level}: ${info.message}`
+  )
 );
 
 // Define different log formats for production (JSON)
 const productionFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),
-  winston.format.json(),
+  winston.format.json()
 );
 
 // Define which transports the logger must use to print out messages
@@ -53,19 +53,19 @@ const transports = [
   new winston.transports.Console(),
   // Allow to print all the error level messages inside the error.log file
   new winston.transports.File({
-    filename: 'logs/error.log',
-    level: 'error',
+    filename: "logs/error.log",
+    level: "error",
   }),
   // Allow to print all the messages inside the all.log file
-  new winston.transports.File({ filename: 'logs/all.log' }),
+  new winston.transports.File({ filename: "logs/all.log" }),
 ];
 
 // Create the logger instance
 const logger = winston.createLogger({
   level: level(),
   levels,
-  format: process.env.NODE_ENV === 'production' ? productionFormat : format,
+  format: process.env.NODE_ENV === "production" ? productionFormat : format,
   transports,
 });
 
-export default logger;
+export { logger };

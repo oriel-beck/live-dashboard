@@ -1,4 +1,4 @@
-import logger from "./logger";
+import { logger } from "@discord-bot/shared-types";
 
 export interface ClusterConfig {
   clusterId: number;
@@ -35,7 +35,9 @@ export function loadClusterConfig(): ClusterConfig {
   }
 
   logger.info(
-    `[Cluster ${clusterId}] Starting cluster with shards ${shardList.join(", ")} (${shardList.length}/${totalShards})`
+    `[Cluster ${clusterId}] Starting cluster with shards ${shardList.join(
+      ", "
+    )} (${shardList.length}/${totalShards})`
   );
 
   return { clusterId, shardList, totalShards };

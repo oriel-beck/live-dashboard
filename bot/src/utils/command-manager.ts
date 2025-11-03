@@ -4,13 +4,11 @@ import {
   Collection,
   Events,
 } from "discord.js";
-import {
-  BaseCommand,
-} from "../types/command";
+import { BaseCommand } from "../types/command";
 
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
-import logger from "./logger";
+import { logger } from "@discord-bot/shared-types";
 
 export class CommandManager {
   private client: Client;
@@ -39,7 +37,6 @@ export class CommandManager {
   getCommands(): Collection<string, BaseCommand> {
     return this.commands;
   }
-
 
   /**
    * Check cooldown for a command locally
@@ -107,7 +104,7 @@ export class CommandManager {
       if (!commandConfig || !commandConfig.enabled) {
         await interaction.reply({
           content: "This command is currently disabled.",
-          flags: ['Ephemeral'],
+          flags: ["Ephemeral"],
         });
         return;
       }
@@ -155,13 +152,15 @@ export class CommandManager {
 
       try {
         await command.execute(interaction);
-        
+
         // Calculate execution duration
         const duration = (Date.now() - startTime) / 1000; // Convert to seconds
-        
+
         // Log command usage
         logger.debug(
-          `[CommandManager] ${interaction.user.tag} used ${commandName} in ${interaction.guild?.name || 'DM'} (${duration.toFixed(3)}s)`
+          `[CommandManager] ${interaction.user.tag} used ${commandName} in ${
+            interaction.guild?.name || "DM"
+          } (${duration.toFixed(3)}s)`
         );
       } catch (error) {
         logger.error(`[CommandManager] Error executing ${commandName}:`, error);
@@ -184,6 +183,4 @@ export class CommandManager {
       }
     }
   }
-
-
 }

@@ -1,10 +1,9 @@
-import { CommandPermissionsUpdateSchema } from "@discord-bot/shared-types";
+import { CommandPermissionsUpdateSchema, logger } from "@discord-bot/shared-types";
 import { Elysia } from "elysia";
 import { combinedAuth } from "../middleware/auth";
 import { DatabaseService } from "../services/database";
 import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
-import { logger } from "../utils/logger";
 import { withAbort } from "../utils/request-utils";
 
 export const guildPlugin = new Elysia({ name: "guild", prefix: "/guilds" })

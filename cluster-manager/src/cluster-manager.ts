@@ -1,9 +1,16 @@
-import { CLUSTER_EVENTS, ClusterConfig, ClusterInfo, ClusterInstance, ClusterStatus, ShardDistribution } from "@discord-bot/shared-types";
+import {
+  CLUSTER_EVENTS,
+  ClusterConfig,
+  ClusterInfo,
+  ClusterInstance,
+  ClusterStatus,
+  ShardDistribution,
+  logger,
+  RabbitMQService,
+} from "@discord-bot/shared-types";
 import Docker from "dockerode";
 import { DiscordGatewayService } from "./services/discord-gateway";
-import { RabbitMQService } from "./services/rabbitmq";
 import { ShardAssignmentService } from "./services/shard-assignment";
-import logger from "./utils/logger";
 
 // Docker configuration constants
 const DOCKER_PROJECT_PREFIX =
@@ -139,10 +146,7 @@ export class ClusterManager {
 
       // Calculate shard distribution with Discord max concurrency
       this.currentDistribution =
-        this.shardAssignment.calculateShardDistribution(
-          totalShards,
-          16
-        );
+        this.shardAssignment.calculateShardDistribution(totalShards, 16);
 
       // Validate distribution
       if (
@@ -239,7 +243,7 @@ export class ClusterManager {
       // Calculate new distribution with Discord max concurrency
       const newDistribution = this.shardAssignment.calculateShardDistribution(
         newTotalShards,
-        16,
+        16
       );
 
       // Get current clusters

@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { DiscordService } from "../services/discord";
 import { SessionService } from "../services/session";
-import { logger } from "../utils/logger";
+import { logger } from "@discord-bot/shared-types";
 
 // Auth middleware for bot authentication
 export const botAuth = new Elysia({ name: "botAuth" }).derive(
@@ -46,7 +46,6 @@ export const botAuth = new Elysia({ name: "botAuth" }).derive(
     }
   }
 );
-
 
 // Combined authentication middleware - supports both session and Bearer token
 export const combinedAuth = new Elysia({ name: "combinedAuth" }).derive(

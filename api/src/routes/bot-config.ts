@@ -1,13 +1,13 @@
 import {
   BotConfigUpdateRequestSchema,
   BotConfigResponseSchema,
-  SSE_EVENT_TYPES
+  SSE_EVENT_TYPES,
+  logger
 } from "@discord-bot/shared-types";
 import { Elysia } from "elysia";
 import { combinedAuth } from "../middleware/auth";
 import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
-import { logger } from "../utils/logger";
 import { withAbort } from "../utils/request-utils";
 
 export const botConfigPlugin = new Elysia({

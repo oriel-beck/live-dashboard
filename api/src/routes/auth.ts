@@ -3,14 +3,14 @@ import {
   DiscordTokenResponse,
   DiscordUser,
   UserGuildSchema,
-  UserSchema
+  UserSchema,
+  logger
 } from '@discord-bot/shared-types';
 import { Elysia } from 'elysia';
 import { config } from '../config';
 import { sessionMiddleware } from '../middleware/session';
 import { DiscordService } from '../services/discord';
 import { SessionService } from '../services/session';
-import { logger } from '../utils/logger';
 import { withAbort } from '../utils/request-utils';
 
 export const authPlugin = new Elysia({ name: 'auth', prefix: '/auth' })

@@ -3,8 +3,8 @@ import {
   CommandConfigResult,
   DefaultCommandRegistration,
   DefaultCommandRegistrationResponse,
+  logger,
 } from "@discord-bot/shared-types";
-import logger from "./logger";
 
 // Type for command registration request (what we send to API)
 type CommandRegistrationRequest = Omit<
@@ -40,14 +40,15 @@ export class ApiClient {
       });
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
+        const errorText = await response.text().catch(() => "");
         throw new Error(
           `API request failed: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
       return (await response.json()) as T;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(
         `[ApiClient] GET request failed for endpoint ${endpoint} (baseUrl: ${this.baseUrl}):`,
         errorMessage
@@ -57,7 +58,10 @@ export class ApiClient {
   }
 
   async post<T>(endpoint: string, data: unknown): Promise<T> {
-    console.log(`[ApiClient] POST ${endpoint} with data:`, JSON.stringify(data, null, 2));
+    console.log(
+      `[ApiClient] POST ${endpoint} with data:`,
+      JSON.stringify(data, null, 2)
+    );
     try {
       const url = `${this.baseUrl}${endpoint}`;
       logger.debug(`[ApiClient] POST ${url}`);
@@ -70,14 +74,15 @@ export class ApiClient {
         body: JSON.stringify(data),
       });
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
+        const errorText = await response.text().catch(() => "");
         throw new Error(
           `API request failed: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
       return response.json() as Promise<T>;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(
         `[ApiClient] POST request failed for endpoint ${endpoint} (baseUrl: ${this.baseUrl}):`,
         errorMessage

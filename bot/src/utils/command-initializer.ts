@@ -3,7 +3,7 @@ import { CommandLoader } from "./command-loader";
 import { CommandManager } from "./command-manager";
 import { BaseCommand } from "../types/command";
 import { deployAndSyncCommands } from "./command-deployment";
-import logger from "./logger";
+import { logger } from "@discord-bot/shared-types";
 import type { ClusterConfig } from "./cluster-config";
 
 /**
@@ -36,7 +36,9 @@ export async function initializeCommands(
         validCommands.push(command);
       } else {
         logger.error(
-          `[Cluster ${config.clusterId}, Shard ${shardId}] Failed to validate command: ${
+          `[Cluster ${
+            config.clusterId
+          }, Shard ${shardId}] Failed to validate command: ${
             command.data?.name || "unknown"
           }`
         );

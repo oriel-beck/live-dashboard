@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction } from 'discord.js';
+import { ChatInputCommandInteraction } from "discord.js";
 
 // Local type definition for permission check result
 interface PermissionCheckResult {
@@ -16,12 +16,12 @@ export class PermissionChecker {
     commandEnabled: boolean
   ): Promise<PermissionCheckResult> {
     if (!interaction.guild || !interaction.member) {
-      return { allowed: false, reason: 'Command can only be used in servers' };
+      return { allowed: false, reason: "Command can only be used in servers" };
     }
 
     // Only check if command is enabled - Discord handles the rest
     if (!commandEnabled) {
-      return { allowed: false, reason: 'This command is currently disabled' };
+      return { allowed: false, reason: "This command is currently disabled" };
     }
 
     return { allowed: true };

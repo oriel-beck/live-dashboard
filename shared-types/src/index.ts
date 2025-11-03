@@ -18,6 +18,10 @@ export * from "./types/shard";
 export * from "./types/gateway";
 export * from "./types/rabbitmq";
 
+// Export services
+export * from "./services/logger";
+export * from "./services/rabbitmq";
+
 // Re-export Discord API types for convenience
 export type {
   APIUser,

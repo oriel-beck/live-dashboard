@@ -1,4 +1,4 @@
-import amqp, { Channel, ChannelModel } from "amqplib";
+import * as amqp from "amqplib";
 import {
   Task,
   Message,
@@ -10,11 +10,11 @@ import {
   QUEUE_NAMES,
   EXCHANGE_NAMES,
 } from "@discord-bot/shared-types";
-import logger from "../utils/logger";
+import { logger } from "./logger";
 
 export class RabbitMQService {
-  private connection: ChannelModel | null = null;
-  private channel: Channel | null = null;
+  private connection: amqp.ChannelModel | null = null;
+  private channel: amqp.Channel | null = null;
   private config: RabbitMQConfig;
   private isConnected = false;
   private reconnectAttempts = 0;
@@ -45,6 +45,7 @@ export class RabbitMQService {
   async connect(): Promise<void> {
     try {
       // Build connection URL with credentials if provided
+      // Embedding credentials in URL is more reliable than passing as options
       let connectionUrl = this.config.url;
 
       // Parse the URL to extract host/port
@@ -82,16 +83,7 @@ export class RabbitMQService {
       };
 
       this.connection = await amqp.connect(connectionUrl, connectionOptions);
-
-      if (!this.connection) {
-        throw new Error("Failed to establish connection");
-      }
-
       this.channel = await this.connection.createChannel();
-
-      if (!this.channel) {
-        throw new Error("Failed to create channel");
-      }
 
       // Set up connection event handlers
       this.connection.on("error", (error: Error) => {
@@ -128,11 +120,7 @@ export class RabbitMQService {
       }
 
       if (this.connection) {
-        try {
-          await (this.connection as any).close();
-        } catch (error) {
-          logger.warn("[RabbitMQService] Error closing connection:", error);
-        }
+        await this.connection.close();
         this.connection = null;
       }
 

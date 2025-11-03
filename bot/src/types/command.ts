@@ -1,9 +1,9 @@
 import {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
-  SlashCommandSubcommandsOnlyBuilder
+  SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
-import logger from "../utils/logger";
+import { logger } from "@discord-bot/shared-types";
 
 // ===== BASE COMMAND CLASS =====
 // Abstract base class that all commands must extend

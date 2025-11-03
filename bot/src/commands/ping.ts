@@ -1,14 +1,11 @@
-import {
-  SlashCommandBuilder,
-  ChatInputCommandInteraction,
-} from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { BaseCommand } from "../types/command";
 
 export class PingCommand extends BaseCommand {
   data = new SlashCommandBuilder()
     .setName("ping")
     .setDescription("Replies with Pong!");
-  
+
   // Set a 5-second cooldown for this command
   cooldown = 5;
 
@@ -17,7 +14,8 @@ export class PingCommand extends BaseCommand {
       content: "Pinging...",
       withResponse: true,
     });
-    const latency = sent.interaction.createdTimestamp - interaction.createdTimestamp;
+    const latency =
+      sent.interaction.createdTimestamp - interaction.createdTimestamp;
     const apiLatency = Math.round(interaction.client.ws.ping);
 
     await interaction.editReply(

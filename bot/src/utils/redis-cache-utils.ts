@@ -16,4 +16,3 @@ export async function publishGuildEvent(guildId: string, evt: unknown) {
 export async function publishUserEvent(userId: string, evt: unknown) {
   await redis.publish(REDIS_KEYS.USER_EVENTS(userId), JSON.stringify(evt));
 }
-

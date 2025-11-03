@@ -1,7 +1,7 @@
 import { join } from "path";
 import { readdir } from "fs/promises";
 import { BaseCommand } from "../types/command";
-import logger from "./logger";
+import { logger } from "@discord-bot/shared-types";
 
 export class CommandLoader {
   /**
@@ -29,9 +29,12 @@ export class CommandLoader {
         if (command) {
           // Store the relative file path for syncing to API
           // Path will be like "src/commands/ping.ts"
-          const relativePath = join("src", "commands", file).replace(/\\/g, "/");
+          const relativePath = join("src", "commands", file).replace(
+            /\\/g,
+            "/"
+          );
           (command as any).filePath = relativePath;
-          
+
           commands.push(command);
           logger.debug(
             `[CommandLoader] Loaded command ${command.data.name} from ${file} (${relativePath})`
@@ -105,7 +108,6 @@ export class CommandLoader {
       return null;
     }
   }
-
 
   /**
    * Validate that a command is properly configured

@@ -1,7 +1,7 @@
 import { REST, Routes, ApplicationCommand } from "discord.js";
 import { BaseCommand } from "../types/command";
 import { ApiClient } from "./api-client";
-import logger from "./logger";
+import { logger } from "@discord-bot/shared-types";
 import type { ClusterConfig } from "./cluster-config";
 
 /**
@@ -62,8 +62,7 @@ export async function deployAndSyncCommands(
     }
 
     const filePath =
-      (localCommand as any).filePath ||
-      `src/commands/${deployedCmd.name}.ts`;
+      (localCommand as any).filePath || `src/commands/${deployedCmd.name}.ts`;
 
     try {
       await apiClient.registerDefaultCommand({

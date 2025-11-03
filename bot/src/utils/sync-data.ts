@@ -1,8 +1,4 @@
-import {
-  ChannelType,
-  type Client,
-  Events,
-} from "discord.js";
+import { ChannelType, type Client, Events } from "discord.js";
 import redis from "../redis";
 import {
   hdel,
@@ -14,12 +10,11 @@ import {
   REDIS_KEYS,
   CACHE_TTL,
   SSE_EVENT_TYPES,
+  GuildApplicationCommandPermissions,
+  logger,
 } from "@discord-bot/shared-types";
-import logger from "./logger";
-import { GuildApplicationCommandPermissions } from "@discord-bot/shared-types";
 
 let initiated = false;
-
 
 export function startDataSync(client: Client) {
   if (initiated) throw new Error("[SyncData]: Listeners are already set up");
@@ -32,7 +27,7 @@ export function startDataSync(client: Client) {
     // Only add guild IDs to the set for O(1) lookups
     // Don't load guild data - it will be loaded on-demand when dashboard requests it
     const guildIds = Array.from(client.guilds.cache.keys());
-    
+
     // Add all guild IDs to the set at once
     if (guildIds.length > 0) {
       await redis.sadd(REDIS_KEYS.GUILD_SET, ...guildIds);

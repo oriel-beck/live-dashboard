@@ -1,19 +1,20 @@
-import logger from '../utils/logger';
-import { GatewayInfo } from '@discord-bot/shared-types';
+import { logger, GatewayInfo } from "@discord-bot/shared-types";
 
 export class DiscordGatewayService {
   private readonly botToken: string;
-  private readonly apiBaseUrl = 'https://discord.com/api/v10';
+  private readonly apiBaseUrl = "https://discord.com/api/v10";
   private lastCheckTime: number = 0;
   private cachedGatewayInfo: GatewayInfo | null = null;
   private readonly checkInterval: number;
 
   constructor() {
     this.botToken = process.env.BOT_TOKEN!;
-    this.checkInterval = parseInt(process.env.DISCORD_API_CHECK_INTERVAL || '86400000'); // 24 hours default
-    
+    this.checkInterval = parseInt(
+      process.env.DISCORD_API_CHECK_INTERVAL || "86400000"
+    ); // 24 hours default
+
     if (!this.botToken) {
-      throw new Error('BOT_TOKEN environment variable is required');
+      throw new Error("BOT_TOKEN environment variable is required");
     }
   }
 
@@ -38,32 +39,39 @@ export class DiscordGatewayService {
    */
   async getGatewayInfo(): Promise<GatewayInfo> {
     const now = Date.now();
-    
+
     // Return cached info if it's still fresh (within check interval)
-    if (this.cachedGatewayInfo && (now - this.lastCheckTime) < this.checkInterval) {
-      logger.debug('[DiscordGatewayService] Using cached gateway info');
+    if (
+      this.cachedGatewayInfo &&
+      now - this.lastCheckTime < this.checkInterval
+    ) {
+      logger.debug("[DiscordGatewayService] Using cached gateway info");
       return this.cachedGatewayInfo;
     }
 
     try {
-      logger.info('[DiscordGatewayService] Fetching gateway info from Discord API...');
-      
+      logger.info(
+        "[DiscordGatewayService] Fetching gateway info from Discord API..."
+      );
+
       const response = await fetch(`${this.apiBaseUrl}/gateway/bot`, {
         headers: {
-          'Authorization': `Bot ${this.botToken}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bot ${this.botToken}`,
+          "Content-Type": "application/json",
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Discord API returned ${response.status}: ${response.statusText}`);
+        throw new Error(
+          `Discord API returned ${response.status}: ${response.statusText}`
+        );
       }
 
-      const data = await response.json() as GatewayInfo;
-      
+      const data = (await response.json()) as GatewayInfo;
+
       // Validate the response structure
       if (!data.shards || !data.session_start_limit?.max_concurrency) {
-        throw new Error('Invalid gateway response structure');
+        throw new Error("Invalid gateway response structure");
       }
 
       this.cachedGatewayInfo = {
@@ -78,19 +86,26 @@ export class DiscordGatewayService {
       };
 
       this.lastCheckTime = now;
-      
-      logger.info(`[DiscordGatewayService] Gateway info updated - Shards: ${data.shards}, Max Concurrency: ${data.session_start_limit.max_concurrency}`);
-      
+
+      logger.info(
+        `[DiscordGatewayService] Gateway info updated - Shards: ${data.shards}, Max Concurrency: ${data.session_start_limit.max_concurrency}`
+      );
+
       return this.cachedGatewayInfo;
     } catch (error) {
-      logger.error('[DiscordGatewayService] Failed to fetch gateway info:', error);
-      
+      logger.error(
+        "[DiscordGatewayService] Failed to fetch gateway info:",
+        error
+      );
+
       // Return cached info if available, otherwise throw
       if (this.cachedGatewayInfo) {
-        logger.warn('[DiscordGatewayService] Using stale cached gateway info due to API error');
+        logger.warn(
+          "[DiscordGatewayService] Using stale cached gateway info due to API error"
+        );
         return this.cachedGatewayInfo;
       }
-      
+
       throw error;
     }
   }

@@ -15,9 +15,8 @@ declare module "discord.js" {
 
 import { Events } from "discord.js";
 import { CommandManager } from "./utils/command-manager";
-import logger from "./utils/logger";
 import { startDataSync } from "./utils/sync-data";
-import { RabbitMQService } from "./services/rabbitmq";
+import { RabbitMQService, logger } from "@discord-bot/shared-types";
 import { loadClusterConfig } from "./utils/cluster-config";
 import { createDiscordClient } from "./utils/client-factory";
 import { initializeCommands } from "./utils/command-initializer";
@@ -54,18 +53,28 @@ initializeRabbitMQ(rabbitMQ, config.clusterId);
 client.once(Events.ClientReady, async () => {
   const shardIds = client.cluster?.shardList;
   logger.info(
-    `[Cluster ${config.clusterId}] Bot ready as ${client.user?.tag} (Shards: ${shardIds?.join(", ")})`
+    `[Cluster ${config.clusterId}] Bot ready as ${
+      client.user?.tag
+    } (Shards: ${shardIds?.join(", ")})`
   );
 
   await sendClusterStartEvent(rabbitMQ, config);
 
-  const commandsLoaded = await initializeCommands(client, commandManager, config);
+  const commandsLoaded = await initializeCommands(
+    client,
+    commandManager,
+    config
+  );
   if (!commandsLoaded) {
-    logger.error(`[Cluster ${config.clusterId}] Failed to load commands, exiting...`);
+    logger.error(
+      `[Cluster ${config.clusterId}] Failed to load commands, exiting...`
+    );
     process.exit(1);
   }
 
-  logger.debug(`[Cluster ${config.clusterId}] Command framework initialized successfully!`);
+  logger.debug(
+    `[Cluster ${config.clusterId}] Command framework initialized successfully!`
+  );
 });
 
 client.on("error", (error) => {
@@ -74,7 +83,9 @@ client.on("error", (error) => {
 
 // Handle process exit - send stop event
 const handleShutdown = async () => {
-  logger.info(`[Cluster ${config.clusterId}] Received shutdown signal, sending stop event...`);
+  logger.info(
+    `[Cluster ${config.clusterId}] Received shutdown signal, sending stop event...`
+  );
   await sendClusterStopEvent(rabbitMQ, config);
   process.exit(0);
 };
