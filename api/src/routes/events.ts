@@ -6,6 +6,7 @@ import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
 import { withAbort } from "../utils/request-utils";
 import { SSE_EVENT_TYPES, SSEEvent, logger } from "@discord-bot/shared-types";
+import { sseRegistry, type SSEConnection } from "../services/sse-registry";
 
 // Helper function to get command permissions with caching
 async function getCommandPermissions(guildId: string, signal?: AbortSignal) {
@@ -60,9 +61,29 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
     let isActive = true;
     let heartbeatInterval: NodeJS.Timeout | null = null;
     const cleanup: (() => void)[] = []; // Store cleanup functions
+    const connectionId = crypto.randomUUID();
+
+    // Create SSE connection wrapper
+    const sseConnection: SSEConnection = {
+      connectionId,
+      guildId,
+      send(event: SSEEvent) {
+        if (!isActive) return;
+        controller.enqueue(
+          encoder.encode(`event: message\ndata: ${JSON.stringify(event)}\n\n`)
+        );
+      },
+      isActive() {
+        return isActive;
+      },
+    };
+
+    let controller: ReadableStreamDefaultController<Uint8Array>;
 
     const stream = new ReadableStream({
-      async start(controller) {
+      async start(streamController) {
+        controller = streamController;
+        
         // AbortController to cancel ongoing requests when stream closes
         const abortController = new AbortController();
         const { signal } = abortController;
@@ -254,16 +275,10 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
             if (isActive) controller.enqueue(encoder.encode(":keep-alive\n\n"));
           }, 15000);
 
-          // Redis subscription
-          await RedisService.subscribeToGuildEvents(guildId, (message) => {
-            if (!isActive) return;
-            try {
-              // Parse the message from Redis and send it as a proper SSE event
-              const event = JSON.parse(message);
-              sendDataEvent(event as SSEEvent);
-            } catch (error) {
-              logger.error("[Events] Error parsing Redis message:", error);
-            }
+          // Register SSE connection with registry
+          // The registry will handle broadcasting events from RabbitMQ consumer
+          sseRegistry.register(guildId, sseConnection, () => {
+            logger.debug(`[Events] Last connection removed for guild ${guildId}`);
           });
         } catch (error) {
           console.error(
@@ -292,9 +307,8 @@ export const eventRoutes = new Elysia({ prefix: "/guilds" })
           }
         });
 
-        RedisService.unsubscribeFromGuildEvents(guildId).catch((error) => {
-          logger.error(`[Events] Error unsubscribing:`, error);
-        });
+        // Unregister SSE connection from registry
+        sseRegistry.unregister(guildId, connectionId);
         if (heartbeatInterval) {
           clearInterval(heartbeatInterval);
         }

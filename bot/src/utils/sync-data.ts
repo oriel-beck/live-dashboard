@@ -1,22 +1,18 @@
 import { ChannelType, type Client, Events } from "discord.js";
 import redis from "../redis";
 import {
-  hdel,
-  hsetJson,
-  publishGuildEvent,
-  publishUserEvent,
-} from "./redis-cache-utils";
-import {
+  RabbitMQService,
+  EXCHANGE_NAMES,
   REDIS_KEYS,
-  CACHE_TTL,
   SSE_EVENT_TYPES,
-  GuildApplicationCommandPermissions,
   logger,
 } from "@discord-bot/shared-types";
 
+// Note: REDIS_KEYS is still needed for guild set operations (GUILD_SET)
+
 let initiated = false;
 
-export function startDataSync(client: Client) {
+export function startDataSync(client: Client, rabbitMQ: RabbitMQService) {
   if (initiated) throw new Error("[SyncData]: Listeners are already set up");
   initiated = true;
 
@@ -49,8 +45,6 @@ export function startDataSync(client: Client) {
   });
 
   client.on(Events.GuildUpdate, async (_oldGuild, newGuild) => {
-    // Update cached guild info
-    const key = REDIS_KEYS.GUILD_INFO(newGuild.id);
     const guildInfo = {
       id: newGuild.id,
       name: newGuild.name,
@@ -58,14 +52,25 @@ export function startDataSync(client: Client) {
       owner_id: newGuild.ownerId,
     };
 
-    await redis.hset(key, guildInfo);
-    await redis.expire(key, CACHE_TTL.GUILD_BASICS);
-
-    await publishGuildEvent(newGuild.id, {
-      type: SSE_EVENT_TYPES.GUILD_UPDATE,
-      guildId: newGuild.id,
-      data: guildInfo,
-    });
+    // Publish to RabbitMQ for API to process
+    try {
+      await rabbitMQ.publishMessage(
+        EXCHANGE_NAMES.DISCORD_EVENTS,
+        {
+          id: `guild-update-${newGuild.id}-${Date.now()}`,
+          type: SSE_EVENT_TYPES.GUILD_UPDATE,
+          payload: {
+            guildId: newGuild.id,
+            data: guildInfo,
+          },
+          timestamp: new Date(),
+          source: "bot",
+        },
+        `guild.${newGuild.id}`
+      );
+    } catch (error) {
+      logger.warn(`[SyncData] Failed to publish guild update event:`, error);
+    }
   });
 
   client.on(Events.GuildDelete, async (guild) => {
@@ -75,21 +80,23 @@ export function startDataSync(client: Client) {
       `[SyncData] Removed guild ${guild.id} (${guild.name}) from guild set`
     );
 
-    // Remove cached data if it exists
-    await redis.del(
-      REDIS_KEYS.GUILD_INFO(guild.id),
-      REDIS_KEYS.GUILD_ROLES(guild.id),
-      REDIS_KEYS.GUILD_CHANNELS(guild.id)
+    // Publish to RabbitMQ for API to process (cache cleanup)
+    await rabbitMQ.publishMessage(
+      EXCHANGE_NAMES.DISCORD_EVENTS,
+      {
+        id: `guild-delete-${guild.id}-${Date.now()}`,
+        type: SSE_EVENT_TYPES.GUILD_DELETE,
+        payload: {
+          guildId: guild.id,
+        },
+        timestamp: new Date(),
+        source: "bot",
+      },
+      `guild.${guild.id}`
     );
-
-    await publishGuildEvent(guild.id, {
-      type: SSE_EVENT_TYPES.GUILD_DELETE,
-      guildId: guild.id,
-    });
   });
 
   client.on(Events.GuildRoleCreate, async (role) => {
-    const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     const data = {
       id: role.id,
       name: role.name,
@@ -97,22 +104,25 @@ export function startDataSync(client: Client) {
       permissions: role.permissions.bitfield.toString(),
     };
 
-    // Only update cache if it already exists (roles are cached on-demand)
-    const cacheExists = await redis.exists(key);
-    if (cacheExists) {
-      await hsetJson(key, role.id, data);
-    }
-
-    // Always publish the event for frontend updates
-    await publishGuildEvent(role.guild.id, {
-      type: SSE_EVENT_TYPES.ROLE_CREATE,
-      roleId: role.id,
-      data,
-    });
+    // Publish to RabbitMQ for API to process
+    await rabbitMQ.publishMessage(
+      EXCHANGE_NAMES.DISCORD_EVENTS,
+      {
+        id: `role-create-${role.id}-${Date.now()}`,
+        type: SSE_EVENT_TYPES.ROLE_CREATE,
+        payload: {
+          guildId: role.guild.id,
+          roleId: role.id,
+          data,
+        },
+        timestamp: new Date(),
+        source: "bot",
+      },
+      `guild.${role.guild.id}`
+    );
   });
 
   client.on(Events.GuildRoleUpdate, async (_oldRole, role) => {
-    const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
     const data = {
       id: role.id,
       name: role.name,
@@ -120,34 +130,40 @@ export function startDataSync(client: Client) {
       permissions: role.permissions.bitfield.toString(),
     };
 
-    // Only update cache if it already exists (roles are cached on-demand)
-    const cacheExists = await redis.exists(key);
-    if (cacheExists) {
-      await hsetJson(key, role.id, data);
-    }
-
-    // Always publish the event for frontend updates
-    await publishGuildEvent(role.guild.id, {
-      type: SSE_EVENT_TYPES.ROLE_UPDATE,
-      roleId: role.id,
-      data,
-    });
+    // Publish to RabbitMQ for API to process
+    await rabbitMQ.publishMessage(
+      EXCHANGE_NAMES.DISCORD_EVENTS,
+      {
+        id: `role-update-${role.id}-${Date.now()}`,
+        type: SSE_EVENT_TYPES.ROLE_UPDATE,
+        payload: {
+          guildId: role.guild.id,
+          roleId: role.id,
+          data,
+        },
+        timestamp: new Date(),
+        source: "bot",
+      },
+      `guild.${role.guild.id}`
+    );
   });
 
   client.on(Events.GuildRoleDelete, async (role) => {
-    const key = REDIS_KEYS.GUILD_ROLES(role.guild.id);
-
-    // Only update cache if it already exists (roles are cached on-demand)
-    const cacheExists = await redis.exists(key);
-    if (cacheExists) {
-      await hdel(key, role.id);
-    }
-
-    // Always publish the event for frontend updates
-    await publishGuildEvent(role.guild.id, {
-      type: SSE_EVENT_TYPES.ROLE_DELETE,
-      roleId: role.id,
-    });
+    // Publish to RabbitMQ for API to process
+    await rabbitMQ.publishMessage(
+      EXCHANGE_NAMES.DISCORD_EVENTS,
+      {
+        id: `role-delete-${role.id}-${Date.now()}`,
+        type: SSE_EVENT_TYPES.ROLE_DELETE,
+        payload: {
+          guildId: role.guild.id,
+          roleId: role.id,
+        },
+        timestamp: new Date(),
+        source: "bot",
+      },
+      `guild.${role.guild.id}`
+    );
   });
 
   client.on(Events.ChannelCreate, async (ch) => {
@@ -160,8 +176,6 @@ export function startDataSync(client: Client) {
       ].includes(ch.type)
     )
       return;
-
-    const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
 
     // Get bot permissions in this channel
     const botMember = await ch.guild.members.fetchMe();
@@ -197,26 +211,28 @@ export function startDataSync(client: Client) {
       botPermissions,
     };
 
-    // Only update cache if it already exists (channels are cached on-demand)
-    const cacheExists = await redis.exists(key);
-    if (cacheExists) {
-      await hsetJson(key, ch.id, data);
-    }
-
-    // Always publish the event for frontend updates
-    await publishGuildEvent(ch.guild.id, {
-      type: SSE_EVENT_TYPES.CHANNEL_CREATE,
-      channelId: ch.id,
-      data,
-    });
+    // Publish to RabbitMQ for API to process
+    await rabbitMQ.publishMessage(
+      EXCHANGE_NAMES.DISCORD_EVENTS,
+      {
+        id: `channel-create-${ch.id}-${Date.now()}`,
+        type: SSE_EVENT_TYPES.CHANNEL_CREATE,
+        payload: {
+          guildId: ch.guild.id,
+          channelId: ch.id,
+          data,
+        },
+        timestamp: new Date(),
+        source: "bot",
+      },
+      `guild.${ch.guild.id}`
+    );
   });
 
   client.on(Events.ChannelUpdate, async (_oldCh, ch) => {
     if (ch.isDMBased()) return;
     // Skip non-text/announcement/voice channels
     if (![0, 2, 5].includes(ch.type)) return;
-
-    const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
 
     // Get bot permissions in this channel
     const botMember = ch.guild.members.me;
@@ -242,46 +258,64 @@ export function startDataSync(client: Client) {
       botPermissions,
     };
 
-    // Only update cache if it already exists (channels are cached on-demand)
-    const cacheExists = await redis.exists(key);
-    if (cacheExists) {
-      await hsetJson(key, ch.id, data);
-    }
-
-    // Always publish the event for frontend updates
-    await publishGuildEvent(ch.guild.id, {
-      type: SSE_EVENT_TYPES.CHANNEL_UPDATE,
-      channelId: ch.id,
-      data,
-    });
+    // Publish to RabbitMQ for API to process
+    await rabbitMQ.publishMessage(
+      EXCHANGE_NAMES.DISCORD_EVENTS,
+      {
+        id: `channel-update-${ch.id}-${Date.now()}`,
+        type: SSE_EVENT_TYPES.CHANNEL_UPDATE,
+        payload: {
+          guildId: ch.guild.id,
+          channelId: ch.id,
+          data,
+        },
+        timestamp: new Date(),
+        source: "bot",
+      },
+      `guild.${ch.guild.id}`
+    );
   });
 
   client.on(Events.ChannelDelete, async (ch) => {
     if (ch.isDMBased()) return;
 
-    const key = REDIS_KEYS.GUILD_CHANNELS(ch.guild.id);
-
-    // Only update cache if it already exists (channels are cached on-demand)
-    const cacheExists = await redis.exists(key);
-    if (cacheExists) {
-      await hdel(key, ch.id);
-    }
-
-    // Always publish the event for frontend updates
-    await publishGuildEvent(ch.guild.id, {
-      type: SSE_EVENT_TYPES.CHANNEL_DELETE,
-      channelId: ch.id,
-    });
+    // Publish to RabbitMQ for API to process
+    await rabbitMQ.publishMessage(
+      EXCHANGE_NAMES.DISCORD_EVENTS,
+      {
+        id: `channel-delete-${ch.id}-${Date.now()}`,
+        type: SSE_EVENT_TYPES.CHANNEL_DELETE,
+        payload: {
+          guildId: ch.guild.id,
+          channelId: ch.id,
+        },
+        timestamp: new Date(),
+        source: "bot",
+      },
+      `guild.${ch.guild.id}`
+    );
   });
 
   // TODO: track on a different event stream as this is unique for each connecting user
   client.on(Events.GuildMemberUpdate, async (_oldM, newM) => {
     const perms = newM.permissions?.bitfield?.toString() ?? "0";
-    await publishUserEvent(newM.id, {
-      type: SSE_EVENT_TYPES.MEMBER_PERMS_UPDATE,
-      guildId: newM.guild.id,
-      perms,
-    });
+    
+    // Publish to RabbitMQ for API to process
+    await rabbitMQ.publishMessage(
+      EXCHANGE_NAMES.DISCORD_EVENTS,
+      {
+        id: `member-perms-update-${newM.id}-${Date.now()}`,
+        type: SSE_EVENT_TYPES.MEMBER_PERMS_UPDATE,
+        payload: {
+          userId: newM.id,
+          guildId: newM.guild.id,
+          perms,
+        },
+        timestamp: new Date(),
+        source: "bot",
+      },
+      `user.${newM.id}`
+    );
   });
 
   // This event is triggered when the permissions for a command are updated
@@ -297,45 +331,22 @@ export function startDataSync(client: Client) {
         return;
       }
 
-      // Update the cached permissions if they are already cached
-      const cacheKey = REDIS_KEYS.GUILD_COMMAND_PERMISSIONS(data.guildId);
-
-      const guildPermissions = await redis.get(cacheKey);
-      if (guildPermissions) {
-        // Update the permissions for the command
-        const parsedPermissions = JSON.parse(
-          guildPermissions
-        ) as GuildApplicationCommandPermissions[];
-
-        const updatedPermissions = parsedPermissions.map((permission) => {
-          if (permission.id === data.id) {
-            return data.permissions;
-          }
-          return permission;
-        });
-
-        await redis.setex(
-          cacheKey,
-          CACHE_TTL.COMMAND_PERMISSIONS,
-          JSON.stringify(updatedPermissions)
-        );
-
-        logger.debug(
-          `[SyncData] Updated command permissions cache for guild ${data.guildId}`
-        );
-      } else {
-        logger.debug(
-          `[SyncData] Command permissions cache for guild ${data.guildId} does not exist, will be re-fetched from Discord API when needed`
-        );
-      }
-
-      // Always publish the event for frontend updates
-      await publishGuildEvent(data.guildId, {
-        type: SSE_EVENT_TYPES.COMMAND_PERMISSIONS_UPDATE,
-        guildId: data.guildId,
-        commandId: data.id,
-        permissions: data.permissions,
-      });
+      // Publish to RabbitMQ for API to process (cache update)
+      await rabbitMQ.publishMessage(
+        EXCHANGE_NAMES.DISCORD_EVENTS,
+        {
+          id: `command-permissions-update-${data.guildId}-${data.id}-${Date.now()}`,
+          type: SSE_EVENT_TYPES.COMMAND_PERMISSIONS_UPDATE,
+          payload: {
+            guildId: data.guildId,
+            commandId: data.id,
+            permissions: data.permissions,
+          },
+          timestamp: new Date(),
+          source: "bot",
+        },
+        `guild.${data.guildId}`
+      );
     } catch (error) {
       logger.error(
         `[SyncData] Error handling command permissions update:`,

@@ -23,12 +23,5 @@ export interface CachedGuildChannel {
   botPermissions: string;
 }
 
-export interface CachedGuildInfo {
-  id: string;
-  name: string;
-  icon: string | null;
-  owner_id: string;
-}
-
 // Re-export shared types for convenience
 export { User, UserGuild, GuildRole, GuildChannel, ApiResponse };

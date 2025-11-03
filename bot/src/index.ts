@@ -43,11 +43,19 @@ const commandManager = new CommandManager(client);
 // Initialize RabbitMQ service
 const rabbitMQ = new RabbitMQService();
 
-// Start data sync
-startDataSync(client);
+// Initialize RabbitMQ connection (must happen before startDataSync)
+// We need to wait for connection, but if it fails, bot can still run without SSE events
+initializeRabbitMQ(rabbitMQ, config.clusterId)
+  .then(() => {
+    logger.info(`[Cluster ${config.clusterId}] RabbitMQ initialized successfully`);
+  })
+  .catch((error) => {
+    logger.error(`[Cluster ${config.clusterId}] Failed to initialize RabbitMQ:`, error);
+    logger.warn(`[Cluster ${config.clusterId}] Bot will continue but SSE events may not work`);
+  });
 
-// Initialize RabbitMQ connection
-initializeRabbitMQ(rabbitMQ, config.clusterId);
+// Start data sync (RabbitMQ connection is async, but publishing will retry if not ready)
+startDataSync(client, rabbitMQ);
 
 // Setup event handlers
 client.once(Events.ClientReady, async () => {

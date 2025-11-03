@@ -2,12 +2,14 @@ import {
   BotConfigUpdateRequestSchema,
   BotConfigResponseSchema,
   SSE_EVENT_TYPES,
-  logger
+  RabbitMQService,
+  EXCHANGE_NAMES,
+  logger,
 } from "@discord-bot/shared-types";
 import { Elysia } from "elysia";
 import { combinedAuth } from "../middleware/auth";
 import { DiscordService } from "../services/discord";
-import { RedisService } from "../services/redis";
+import { sseRegistry } from "../services/sse-registry";
 import { withAbort } from "../utils/request-utils";
 
 export const botConfigPlugin = new Elysia({
@@ -92,12 +94,35 @@ export const botConfigPlugin = new Elysia({
         updateData
       );
 
-      // Publish SSE update for real-time dashboard updates
+      // Broadcast SSE update for real-time dashboard updates
       try {
-        await RedisService.publishGuildEvent(guildId, {
+        const sseEvent = {
           type: SSE_EVENT_TYPES.BOT_PROFILE_UPDATE,
           data: updatedProfile,
-        });
+        } as const;
+        
+        // Broadcast directly to SSE connections if any exist
+        sseRegistry.broadcast(guildId, sseEvent);
+        
+        // Also publish to RabbitMQ for other instances (if using multiple API instances)
+        const rabbitMQ = (global as any).rabbitMQ as RabbitMQService | undefined;
+        if (rabbitMQ) {
+          await rabbitMQ.publishMessage(
+            EXCHANGE_NAMES.DISCORD_EVENTS,
+            {
+              id: `bot-profile-update-${guildId}-${Date.now()}`,
+              type: SSE_EVENT_TYPES.BOT_PROFILE_UPDATE,
+              payload: {
+                guildId,
+                data: updatedProfile,
+              },
+              timestamp: new Date(),
+              source: "api",
+            },
+            `guild.${guildId}`
+          );
+        }
+        
         logger.info(
           `[BotConfig] Published bot profile update event for guild ${guildId}`
         );
@@ -157,12 +182,35 @@ export const botConfigPlugin = new Elysia({
 
       // Cache is automatically refreshed by DiscordService.updateBotProfile
 
-      // Publish SSE update for real-time dashboard updates
+      // Broadcast SSE update for real-time dashboard updates
       try {
-        await RedisService.publishGuildEvent(guildId, {
+        const sseEvent = {
           type: SSE_EVENT_TYPES.BOT_PROFILE_UPDATE,
           data: resetProfile,
-        });
+        } as const;
+        
+        // Broadcast directly to SSE connections if any exist
+        sseRegistry.broadcast(guildId, sseEvent);
+        
+        // Also publish to RabbitMQ for other instances (if using multiple API instances)
+        const rabbitMQ = (global as any).rabbitMQ as RabbitMQService | undefined;
+        if (rabbitMQ) {
+          await rabbitMQ.publishMessage(
+            EXCHANGE_NAMES.DISCORD_EVENTS,
+            {
+              id: `bot-profile-reset-${guildId}-${Date.now()}`,
+              type: SSE_EVENT_TYPES.BOT_PROFILE_UPDATE,
+              payload: {
+                guildId,
+                data: resetProfile,
+              },
+              timestamp: new Date(),
+              source: "api",
+            },
+            `guild.${guildId}`
+          );
+        }
+        
         logger.info(
           `[BotConfig] Published bot profile reset event for guild ${guildId}`
         );

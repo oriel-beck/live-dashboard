@@ -59,5 +59,6 @@ export const QUEUE_NAMES = {
 // Predefined exchange names
 export const EXCHANGE_NAMES = {
   CLUSTER_EVENTS: 'cluster.events',
+  DISCORD_EVENTS: 'discord.events',
 } as const;
 

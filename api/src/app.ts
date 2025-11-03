@@ -4,6 +4,8 @@ import { Elysia } from "elysia";
 import { config } from "./config";
 import { DatabaseService } from "./services/database";
 import { RedisService } from "./services/redis";
+import { RabbitMQService } from "@discord-bot/shared-types";
+import { DiscordEventsConsumer } from "./services/discord-events-consumer";
 import { logger } from "@discord-bot/shared-types";
 
 // Import route plugins
@@ -94,6 +96,18 @@ export async function startServer() {
     await DatabaseService.initialize();
     await RedisService.initialize();
 
+    // Initialize RabbitMQ and Discord events consumer
+    const rabbitMQ = new RabbitMQService();
+    await rabbitMQ.connect();
+    await rabbitMQ.initializeDefaults();
+
+    const discordEventsConsumer = new DiscordEventsConsumer(rabbitMQ);
+    await discordEventsConsumer.initialize();
+
+    // Store for cleanup
+    (global as any).rabbitMQ = rabbitMQ;
+    (global as any).discordEventsConsumer = discordEventsConsumer;
+
     // Start the server
     app.listen(config.port);
 
@@ -104,6 +118,17 @@ export async function startServer() {
     // Graceful shutdown handlers
     const gracefulShutdown = async (signal: string) => {
       logger.info(`[API] Received ${signal}, shutting down gracefully...`);
+
+      // Close RabbitMQ connection
+      const rabbitMQ = (global as any).rabbitMQ as RabbitMQService | undefined;
+      if (rabbitMQ) {
+        try {
+          await rabbitMQ.disconnect();
+          logger.info("[API] RabbitMQ connections closed");
+        } catch (error) {
+          logger.error("[API] Error closing RabbitMQ:", error);
+        }
+      }
 
       // Close database connections
       await DatabaseService.close();

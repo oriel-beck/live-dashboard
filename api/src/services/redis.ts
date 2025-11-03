@@ -4,25 +4,17 @@ import {
   REDIS_KEYS,
   GuildInfo,
   ChannelType,
-  SSEEvent,
+  logger
 } from "@discord-bot/shared-types";
 import { config } from "../config";
-import { logger } from "../utils/logger";
 import {
   CachedGuildChannel,
-  CachedGuildInfo,
   CachedGuildRole,
-  GuildChannel,
-  GuildRole,
-  UserGuild,
 } from "../types";
-import { makeRequestWithRetry } from "../utils/request-utils";
 import { DiscordService } from "./discord";
 
 export class RedisService {
   private static client: ReturnType<typeof createClient> | null = null;
-  private static publisher: ReturnType<typeof createClient> | null = null;
-  private static subscriber: ReturnType<typeof createClient> | null = null;
 
   static async initialize(): Promise<void> {
     const maxRetries = 10;
@@ -48,40 +40,12 @@ export class RedisService {
           },
         });
 
-        // Publisher client (separate connection for pub/sub)
-        this.publisher = createClient({
-          url: config.redis.url,
-          socket: {
-            connectTimeout: 5000,
-            keepAlive: 30000,
-          },
-        });
-
-        // Subscriber client (separate connection for pub/sub)
-        this.subscriber = createClient({
-          url: config.redis.url,
-          socket: {
-            connectTimeout: 5000,
-            keepAlive: 30000,
-          },
-        });
-
-        // Connect all clients
-        await Promise.all([
-          this.client.connect(),
-          this.publisher.connect(),
-          this.subscriber.connect(),
-        ]);
+        // Connect client
+        await this.client.connect();
 
         // Set up error handlers
         this.client.on("error", (err) =>
           logger.error("[Redis] Client error:", err)
-        );
-        this.publisher.on("error", (err) =>
-          logger.error("[Redis] Publisher error:", err)
-        );
-        this.subscriber.on("error", (err) =>
-          logger.error("[Redis] Subscriber error:", err)
         );
 
         // Test connection
@@ -111,44 +75,12 @@ export class RedisService {
     return this.client;
   }
 
-  static getPublisher() {
-    if (!this.publisher) {
-      throw new Error(
-        "Redis publisher not initialized. Call initialize() first."
-      );
-    }
-    return this.publisher;
-  }
-
-  static getSubscriber() {
-    if (!this.subscriber) {
-      throw new Error(
-        "Redis subscriber not initialized. Call initialize() first."
-      );
-    }
-    return this.subscriber;
-  }
-
   static async close(): Promise<void> {
-    const promises = [];
-
     if (this.client) {
-      promises.push(this.client.quit());
+      await this.client.quit();
       this.client = null;
     }
-
-    if (this.publisher) {
-      promises.push(this.publisher.quit());
-      this.publisher = null;
-    }
-
-    if (this.subscriber) {
-      promises.push(this.subscriber.quit());
-      this.subscriber = null;
-    }
-
-    await Promise.all(promises);
-    logger.info("[Redis] Connections closed");
+    logger.info("[Redis] Connection closed");
   }
 
   static async getGuildRoles(guildId: string): Promise<CachedGuildRole[]> {
@@ -388,26 +320,6 @@ export class RedisService {
     }
   }
 
-  static async publishGuildEvent<T extends SSEEvent>(guildId: string, event: T) {
-    const publisher = this.getPublisher();
-    await publisher.publish(
-      REDIS_KEYS.GUILD_EVENTS(guildId),
-      JSON.stringify(event)
-    );
-  }
-
-  static async subscribeToGuildEvents(
-    guildId: string,
-    callback: (message: string) => void
-  ) {
-    const subscriber = this.getSubscriber();
-    await subscriber.subscribe(REDIS_KEYS.GUILD_EVENTS(guildId), callback);
-  }
-
-  static async unsubscribeFromGuildEvents(guildId: string) {
-    const subscriber = this.getSubscriber();
-    await subscriber.unsubscribe(REDIS_KEYS.GUILD_EVENTS(guildId));
-  }
 
   // Helper method to check if a guild is accessible
   static async isGuildAccessible(guildId: string): Promise<boolean> {
