@@ -7,8 +7,10 @@ import {
   ChannelType,
 } from "discord.js";
 import { BaseCommand } from "../types/command";
+import { CATEGORIES } from "@discord-bot/shared-types";
 
 export class MiscCommand extends BaseCommand {
+  category = CATEGORIES.MISC;
   data = new SlashCommandBuilder()
     .setName("misc")
     .setDescription("Miscellaneous utility commands")

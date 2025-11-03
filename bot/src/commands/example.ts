@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import { BaseCommand } from "../types/command";
+import { CATEGORIES } from "@discord-bot/shared-types";
 
 export default class ExampleCommand extends BaseCommand {
   data = new SlashCommandBuilder()
@@ -10,6 +11,7 @@ export default class ExampleCommand extends BaseCommand {
 
   // Set Discord permission requirements for this command
   defaultPermissions = PermissionFlagsBits.ManageGuild; // Requires "Manage Server" permission
+  category = CATEGORIES.GENERAL;
 
   async run(interaction: any) {
     await interaction.reply({

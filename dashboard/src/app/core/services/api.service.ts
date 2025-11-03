@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ApiResponse } from '@discord-bot/shared-types';
+import { ApiResponse } from '../../../types/schemas/api';
 
 @Injectable({
   providedIn: 'root'

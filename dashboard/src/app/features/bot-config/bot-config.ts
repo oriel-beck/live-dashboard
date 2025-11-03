@@ -1,35 +1,26 @@
-import {
-  Component,
-  computed,
-  inject,
-  signal,
-  OnInit,
-  effect,
-} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  ReactiveFormsModule,
-  FormBuilder,
-  FormGroup,
-  Validators,
-  FormControl,
-} from '@angular/forms';
-import { CacheStore } from '../../store/sse.store';
+  Component,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { BotConfig as BotConfigType } from "../../../types/schemas/bot-config";
 import { ApiService } from '../../core/services/api.service';
-import {
-  BotConfig as BotConfigType,
-  BotConfigUpdateRequest,
-} from '@discord-bot/shared-types';
+import { CacheStore } from '../../store/sse.store';
 
 // PrimeNG Imports
+import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { FileUploadModule } from 'primeng/fileupload';
 import { CardModule } from 'primeng/card';
 import { DividerModule } from 'primeng/divider';
-import { ToastModule } from 'primeng/toast';
-import { MessageService } from 'primeng/api';
+import { FileUploadModule } from 'primeng/fileupload';
+import { InputTextModule } from 'primeng/inputtext';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { ToastModule } from 'primeng/toast';
 
 @Component({
   selector: 'app-bot-config',
@@ -112,14 +103,18 @@ export class BotConfig implements OnInit {
     const formValue = this.botConfigSignal().avatar;
     const sseProfile = this.store.botProfile();
     const globalProfile = this.store.globalBotProfile();
-    
+
     // If form has a custom value, show it
     if (formValue) {
       return formValue;
     }
 
     // Otherwise show the current guild avatar or default to global avatar
-    return sseProfile?.avatar || globalProfile?.avatar || '/assets/default-avatar.png';
+    return (
+      sseProfile?.avatar ||
+      globalProfile?.avatar ||
+      '/assets/default-avatar.png'
+    );
   });
 
   currentBannerUrl = computed(() => {
@@ -139,12 +134,12 @@ export class BotConfig implements OnInit {
   hasAvatarChanges = computed(() => {
     const formValue = this.botConfigSignal().avatar;
     const sseProfile = this.store.botProfile();
-    
+
     // Only detect changes if form has a value
     if (formValue) {
       return formValue !== sseProfile?.avatar;
     }
-    
+
     // If form is undefined, no changes
     return false;
   });
@@ -152,12 +147,12 @@ export class BotConfig implements OnInit {
   hasBannerChanges = computed(() => {
     const formValue = this.botConfigSignal().banner;
     const sseProfile = this.store.botProfile();
-    
+
     // Only detect changes if form has a value
     if (formValue) {
       return formValue !== sseProfile?.banner;
     }
-    
+
     // If form is undefined, no changes
     return false;
   });
@@ -165,12 +160,12 @@ export class BotConfig implements OnInit {
   hasNicknameChanges = computed(() => {
     const formValue = this.botConfigSignal().nickname;
     const sseProfile = this.store.botProfile();
-    
+
     // Only detect changes if form has a value
     if (formValue) {
       return formValue !== sseProfile?.nickname;
     }
-    
+
     // If form is undefined, no changes
     return false;
   });
@@ -186,7 +181,7 @@ export class BotConfig implements OnInit {
   // Show reset button when there's a custom avatar to reset
   showAvatarReset = computed(() => {
     const formValue = this.botConfigSignal().avatar;
-    
+
     // Only show reset button if form has a custom value
     return formValue != null;
   });
@@ -194,7 +189,7 @@ export class BotConfig implements OnInit {
   // Show reset button when there's a custom banner to reset
   showBannerReset = computed(() => {
     const formValue = this.botConfigSignal().banner;
-    
+
     // Only show reset button if form has a custom value
     return formValue != null;
   });
@@ -202,7 +197,7 @@ export class BotConfig implements OnInit {
   // Show reset button when there's a custom nickname to reset
   showNicknameReset = computed(() => {
     const formValue = this.botConfigSignal().nickname;
-    
+
     // Only show reset button if form has a custom value
     return formValue != null;
   });

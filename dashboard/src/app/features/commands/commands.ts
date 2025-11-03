@@ -17,14 +17,15 @@ import { MessageModule } from 'primeng/message';
 import { DialogService } from 'primeng/dynamicdialog';
 import { injectParams } from 'ngxtension/inject-params';
 import {
-  CommandCategory,
-  CommandConfigResultWithCategory,
+  CATEGORIES,
+  CommandConfigResultWithSubcommands,
   GuildApplicationCommandPermissions,
   GuildChannel,
   GuildRole,
-} from '@discord-bot/shared-types';
+} from '../../../types';
 import { CacheStore } from '../../store/sse.store';
 import { CommandConfigDialog } from '../command-config-dialog/command-config-dialog';
+import { CommandCategory } from '../../types/command';
 //
 @Component({
   selector: 'app-commands',
@@ -47,7 +48,7 @@ export class Commands implements OnInit {
   private params = injectParams();
 
   // Computed properties from store
-  commandsCategories: Signal<Map<number, CommandCategory>> =
+  commandsCategories: Signal<Map<CATEGORIES, CommandCategory>> =
     this.store.commandsCategories;
   isCommandsLoading: Signal<boolean> = this.store.isCommandsLoading;
   isCommandsConfigLoading: Signal<boolean> = this.store.isCommandsConfigLoading;
@@ -87,7 +88,7 @@ export class Commands implements OnInit {
   }
 
   // Helper method to get permission text for a command
-  getPermissionText(command: CommandConfigResultWithCategory): string {
+  getPermissionText(command: CommandConfigResultWithSubcommands): string {
     if (!command.permissions || command.permissions === '0') {
       return 'None required';
     }
@@ -111,7 +112,7 @@ export class Commands implements OnInit {
   }
 
   // Helper method to get tooltip text for multiple permissions
-  getPermissionTooltip(command: CommandConfigResultWithCategory): string {
+  getPermissionTooltip(command: CommandConfigResultWithSubcommands): string {
     if (!command.permissions || command.permissions === '0') {
       return 'No permissions required';
     }
@@ -163,7 +164,7 @@ export class Commands implements OnInit {
   }
 
   // Open command configuration dialog
-  openCommandConfig(command: CommandConfigResultWithCategory) {
+  openCommandConfig(command: CommandConfigResultWithSubcommands) {
     if (!command.discordId) {
       console.error('Command not registered with Discord');
       return;

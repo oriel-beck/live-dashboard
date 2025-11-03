@@ -207,3 +207,4 @@ export type SSEEvent =
   | CommandPermissionsUpdateEvent
   | MemberPermsUpdateEvent
   | BotProfileUpdateEvent;
+
