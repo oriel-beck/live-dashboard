@@ -3,8 +3,7 @@ import { CommandLoader } from "./command-loader";
 import { CommandManager } from "./command-manager";
 import { BaseCommand } from "../types/command";
 import { deployAndSyncCommands } from "./command-deployment";
-import { logger } from "@discord-bot/shared-types";
-import type { ClusterConfig } from "./cluster-config";
+import { logger, BotClusterConfig } from "@discord-bot/shared-types";
 
 /**
  * Initialize commands: load, validate, deploy (if cluster 0), and register locally
@@ -12,7 +11,7 @@ import type { ClusterConfig } from "./cluster-config";
 export async function initializeCommands(
   client: Client,
   commandManager: CommandManager,
-  config: ClusterConfig
+  config: BotClusterConfig
 ): Promise<boolean> {
   try {
     const shardId = client.cluster?.shardList[0] || 0;

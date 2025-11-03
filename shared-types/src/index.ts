@@ -18,6 +18,9 @@ export * from "./types/shard";
 export * from "./types/gateway";
 export * from "./types/rabbitmq";
 
+// Export bot-specific runtime config
+export type { BotClusterConfig } from "./types/shard";
+
 // Export services
 export * from "./services/logger";
 export * from "./services/rabbitmq";

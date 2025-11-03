@@ -1,16 +1,10 @@
-import { logger } from "@discord-bot/shared-types";
-
-export interface ClusterConfig {
-  clusterId: number;
-  shardList: number[];
-  totalShards: number;
-}
+import { logger, BotClusterConfig } from "@discord-bot/shared-types";
 
 /**
  * Validate and parse cluster configuration from environment variables
  * Exits process if configuration is invalid
  */
-export function loadClusterConfig(): ClusterConfig {
+export function loadClusterConfig(): BotClusterConfig {
   const clusterId = parseInt(process.env.CLUSTER_ID || "0");
   const shardListEnv = process.env.SHARD_LIST;
   const totalShards = parseInt(process.env.TOTAL_SHARDS || "0");

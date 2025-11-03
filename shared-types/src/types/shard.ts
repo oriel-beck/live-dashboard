@@ -20,3 +20,13 @@ export interface ClusterStartupConfig {
   startupDelay: number;
   readyTimeout: number;
 }
+
+/**
+ * Runtime cluster configuration used by bot instances
+ * This represents the configuration of a running bot cluster instance
+ */
+export interface BotClusterConfig {
+  clusterId: number;
+  shardList: number[];
+  totalShards: number;
+}

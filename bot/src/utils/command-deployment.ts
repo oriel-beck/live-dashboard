@@ -1,15 +1,14 @@
 import { REST, Routes, ApplicationCommand } from "discord.js";
 import { BaseCommand } from "../types/command";
 import { ApiClient } from "./api-client";
-import { logger } from "@discord-bot/shared-types";
-import type { ClusterConfig } from "./cluster-config";
+import { logger, BotClusterConfig } from "@discord-bot/shared-types";
 
 /**
  * Deploy commands to Discord and sync to API database
  */
 export async function deployAndSyncCommands(
   commands: BaseCommand[],
-  config: ClusterConfig
+  config: BotClusterConfig
 ): Promise<void> {
   const BOT_TOKEN = process.env.BOT_TOKEN!;
   const API_BASE_URL = process.env.API_BASE_URL || "http://api:3000";

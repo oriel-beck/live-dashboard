@@ -4,13 +4,11 @@ import {
   REDIS_KEYS,
   GuildInfo,
   ChannelType,
+  GuildChannel,
+  GuildRole,
   logger
 } from "@discord-bot/shared-types";
 import { config } from "../config";
-import {
-  CachedGuildChannel,
-  CachedGuildRole,
-} from "../types";
 import { DiscordService } from "./discord";
 
 export class RedisService {
@@ -83,7 +81,7 @@ export class RedisService {
     logger.info("[Redis] Connection closed");
   }
 
-  static async getGuildRoles(guildId: string): Promise<CachedGuildRole[]> {
+  static async getGuildRoles(guildId: string): Promise<GuildRole[]> {
     const client = this.getClient();
     const key = REDIS_KEYS.GUILD_ROLES(guildId);
 
@@ -158,7 +156,7 @@ export class RedisService {
 
   static async getGuildChannels(
     guildId: string
-  ): Promise<CachedGuildChannel[]> {
+  ): Promise<GuildChannel[]> {
     const client = this.getClient();
     const key = REDIS_KEYS.GUILD_CHANNELS(guildId);
 

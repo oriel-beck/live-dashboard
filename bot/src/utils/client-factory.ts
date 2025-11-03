@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, Options } from "discord.js";
-import type { ClusterConfig } from "./cluster-config";
+import type { BotClusterConfig } from "@discord-bot/shared-types";
 
 /**
  * Create a Discord client with optimized memory settings
@@ -7,7 +7,7 @@ import type { ClusterConfig } from "./cluster-config";
  * The maxConcurrency is used by Discord.js to limit concurrent gateway connections
  */
 export function createDiscordClient(
-  config: ClusterConfig,
+  config: BotClusterConfig,
   restProxyUrl: string
 ): Client {
   const clientId = process.env.DISCORD_CLIENT_ID!;

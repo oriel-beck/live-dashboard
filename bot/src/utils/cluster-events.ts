@@ -4,16 +4,16 @@ import {
   CLUSTER_EVENTS,
   ClusterStartEventData,
   ClusterStopEventData,
+  BotClusterConfig,
   logger,
 } from "@discord-bot/shared-types";
-import type { ClusterConfig } from "./cluster-config";
 
 /**
  * Send cluster start event to manager via RabbitMQ
  */
 export async function sendClusterStartEvent(
   rabbitMQ: RabbitMQService,
-  config: ClusterConfig
+  config: BotClusterConfig
 ): Promise<void> {
   try {
     const eventData: ClusterStartEventData = {
@@ -45,7 +45,7 @@ export async function sendClusterStartEvent(
  */
 export async function sendClusterStopEvent(
   rabbitMQ: RabbitMQService,
-  config: ClusterConfig
+  config: BotClusterConfig
 ): Promise<void> {
   try {
     const eventData: ClusterStopEventData = {
