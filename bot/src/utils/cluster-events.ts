@@ -1,5 +1,5 @@
 import { RabbitMQService } from "../services/rabbitmq";
-import { QUEUE_NAMES } from "../types/rabbitmq";
+import { QUEUE_NAMES } from "@discord-bot/shared-types";
 import { CLUSTER_EVENTS, ClusterStartEventData, ClusterStopEventData } from "@discord-bot/shared-types";
 import logger from "./logger";
 import type { ClusterConfig } from "./cluster-config";

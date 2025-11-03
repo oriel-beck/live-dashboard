@@ -12,6 +12,12 @@ export * from "./schemas/sse-events";
 export * from "./constants/redis-contstants";
 export * from "./constants/cluster-events";
 
+// Export all types
+export * from "./types/cluster";
+export * from "./types/shard";
+export * from "./types/gateway";
+export * from "./types/rabbitmq";
+
 // Re-export Discord API types for convenience
 export type {
   APIUser,

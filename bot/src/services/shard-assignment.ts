@@ -1,4 +1,4 @@
-import { ShardDistribution, ShardAssignment } from '../types/shard';
+import { ShardDistribution, ShardAssignment } from '@discord-bot/shared-types';
 import logger from '../utils/logger';
 
 export class ShardAssignmentService {

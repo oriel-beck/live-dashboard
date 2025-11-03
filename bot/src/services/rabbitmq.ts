@@ -9,7 +9,7 @@ import {
   RabbitMQConfig,
   QUEUE_NAMES,
   EXCHANGE_NAMES
-} from '../types/rabbitmq';
+} from '@discord-bot/shared-types';
 import logger from '../utils/logger';
 
 export class RabbitMQService {

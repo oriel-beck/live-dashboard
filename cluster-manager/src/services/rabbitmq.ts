@@ -1,16 +1,16 @@
-import amqp, { Channel, ChannelModel } from 'amqplib';
-import { 
-  Task, 
-  Message, 
-  TaskHandler, 
-  MessageHandler, 
-  QueueConfig, 
-  ExchangeConfig, 
+import amqp, { Channel, ChannelModel } from "amqplib";
+import {
+  Task,
+  Message,
+  TaskHandler,
+  MessageHandler,
+  QueueConfig,
+  ExchangeConfig,
   RabbitMQConfig,
   QUEUE_NAMES,
   EXCHANGE_NAMES,
-} from '../types/rabbitmq';
-import logger from '../utils/logger';
+} from "@discord-bot/shared-types";
+import logger from "../utils/logger";
 
 export class RabbitMQService {
   private connection: ChannelModel | null = null;
@@ -25,7 +25,7 @@ export class RabbitMQService {
 
   constructor(config?: Partial<RabbitMQConfig>) {
     this.config = {
-      url: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
+      url: process.env.RABBITMQ_URL || "amqp://localhost:5672",
       username: process.env.RABBITMQ_USERNAME,
       password: process.env.RABBITMQ_PASSWORD,
       heartbeat: 60,
@@ -34,7 +34,7 @@ export class RabbitMQService {
       maxReconnectAttempts: 10,
       ...config,
     };
-    
+
     this.maxReconnectAttempts = this.config.maxReconnectAttempts!;
     this.reconnectDelay = this.config.reconnectDelay!;
   }
@@ -46,33 +46,35 @@ export class RabbitMQService {
     try {
       // Build connection URL with credentials if provided
       let connectionUrl = this.config.url;
-      
+
       // Parse the URL to extract host/port
       let urlObj: URL;
       try {
         urlObj = new URL(connectionUrl);
       } catch (error) {
         // If URL parsing fails, construct a new one
-        const hostPort = connectionUrl.replace(/^amqp:\/\//, '').split('/')[0];
+        const hostPort = connectionUrl.replace(/^amqp:\/\//, "").split("/")[0];
         urlObj = new URL(`amqp://${hostPort}`);
       }
-      
+
       // Set credentials if provided
       if (this.config.username && this.config.password) {
         urlObj.username = this.config.username;
         urlObj.password = this.config.password;
         connectionUrl = urlObj.toString();
       }
-      
-      logger.info('[RabbitMQService] Connecting to RabbitMQ...', {
-        url: connectionUrl.replace(/:[^:@]*@/, ':****@'), // Hide password in logs
+
+      logger.info("[RabbitMQService] Connecting to RabbitMQ...", {
+        url: connectionUrl.replace(/:[^:@]*@/, ":****@"), // Hide password in logs
         host: urlObj.hostname,
-        port: urlObj.port || '5672',
-        username: this.config.username || 'not set'
+        port: urlObj.port || "5672",
+        username: this.config.username || "not set",
       });
-      
+
       if (!this.config.username || !this.config.password) {
-        logger.warn('[RabbitMQService] No username/password provided - using default or URL credentials');
+        logger.warn(
+          "[RabbitMQService] No username/password provided - using default or URL credentials"
+        );
       }
 
       const connectionOptions: amqp.Options.Connect = {
@@ -80,36 +82,36 @@ export class RabbitMQService {
       };
 
       this.connection = await amqp.connect(connectionUrl, connectionOptions);
-      
+
       if (!this.connection) {
-        throw new Error('Failed to establish connection');
+        throw new Error("Failed to establish connection");
       }
-      
+
       this.channel = await this.connection.createChannel();
-      
+
       if (!this.channel) {
-        throw new Error('Failed to create channel');
+        throw new Error("Failed to create channel");
       }
-      
+
       // Set up connection event handlers
-      this.connection.on('error', (error: Error) => {
-        logger.error('[RabbitMQService] Connection error:', error);
+      this.connection.on("error", (error: Error) => {
+        logger.error("[RabbitMQService] Connection error:", error);
         this.isConnected = false;
         this.handleReconnect();
       });
 
-      this.connection.on('close', () => {
-        logger.warn('[RabbitMQService] Connection closed');
+      this.connection.on("close", () => {
+        logger.warn("[RabbitMQService] Connection closed");
         this.isConnected = false;
         this.handleReconnect();
       });
 
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      
-      logger.info('[RabbitMQService] Connected to RabbitMQ successfully');
+
+      logger.info("[RabbitMQService] Connected to RabbitMQ successfully");
     } catch (error) {
-      logger.error('[RabbitMQService] Failed to connect to RabbitMQ:', error);
+      logger.error("[RabbitMQService] Failed to connect to RabbitMQ:", error);
       this.isConnected = false;
       throw error;
     }
@@ -124,20 +126,23 @@ export class RabbitMQService {
         await this.channel.close();
         this.channel = null;
       }
-      
+
       if (this.connection) {
         try {
           await (this.connection as any).close();
         } catch (error) {
-          logger.warn('[RabbitMQService] Error closing connection:', error);
+          logger.warn("[RabbitMQService] Error closing connection:", error);
         }
         this.connection = null;
       }
-      
+
       this.isConnected = false;
-      logger.info('[RabbitMQService] Disconnected from RabbitMQ');
+      logger.info("[RabbitMQService] Disconnected from RabbitMQ");
     } catch (error) {
-      logger.error('[RabbitMQService] Error disconnecting from RabbitMQ:', error);
+      logger.error(
+        "[RabbitMQService] Error disconnecting from RabbitMQ:",
+        error
+      );
     }
   }
 
@@ -146,16 +151,18 @@ export class RabbitMQService {
    */
   async publishTask(queueName: string, task: Task): Promise<void> {
     if (!this.isConnected || !this.channel) {
-      throw new Error('RabbitMQ not connected');
+      throw new Error("RabbitMQ not connected");
     }
 
     try {
       await this.channel.assertQueue(queueName, { durable: true });
-      
-      const message = Buffer.from(JSON.stringify({
-        ...task,
-        timestamp: task.timestamp.toISOString(),
-      }));
+
+      const message = Buffer.from(
+        JSON.stringify({
+          ...task,
+          timestamp: task.timestamp.toISOString(),
+        })
+      );
 
       const published = this.channel.sendToQueue(queueName, message, {
         persistent: true,
@@ -164,12 +171,17 @@ export class RabbitMQService {
       });
 
       if (!published) {
-        throw new Error('Failed to publish task to queue');
+        throw new Error("Failed to publish task to queue");
       }
 
-      logger.debug(`[RabbitMQService] Published task ${task.id} to queue ${queueName}`);
+      logger.debug(
+        `[RabbitMQService] Published task ${task.id} to queue ${queueName}`
+      );
     } catch (error) {
-      logger.error(`[RabbitMQService] Failed to publish task to queue ${queueName}:`, error);
+      logger.error(
+        `[RabbitMQService] Failed to publish task to queue ${queueName}:`,
+        error
+      );
       throw error;
     }
   }
@@ -179,42 +191,56 @@ export class RabbitMQService {
    */
   async consumeTasks(queueName: string, handler: TaskHandler): Promise<void> {
     if (!this.isConnected || !this.channel) {
-      throw new Error('RabbitMQ not connected');
+      throw new Error("RabbitMQ not connected");
     }
 
     try {
       await this.channel.assertQueue(queueName, { durable: true });
-      
+
       // Store handler for reconnection
       this.taskHandlers.set(queueName, handler);
 
-      await this.channel.consume(queueName, async (msg) => {
-        if (!msg) return;
+      await this.channel.consume(
+        queueName,
+        async (msg) => {
+          if (!msg) return;
 
-        try {
-          const taskData = JSON.parse(msg.content.toString());
-          const task: Task = {
-            ...taskData,
-            timestamp: new Date(taskData.timestamp),
-          };
+          try {
+            const taskData = JSON.parse(msg.content.toString());
+            const task: Task = {
+              ...taskData,
+              timestamp: new Date(taskData.timestamp),
+            };
 
-          await handler(task);
-          
-          // Acknowledge the message
-          this.channel!.ack(msg);
-          
-          logger.debug(`[RabbitMQService] Processed task ${task.id} from queue ${queueName}`);
-        } catch (error) {
-          logger.error(`[RabbitMQService] Error processing task from queue ${queueName}:`, error);
-          
-          // Reject and requeue the message
-          this.channel!.nack(msg, false, true);
-        }
-      }, { noAck: false });
+            await handler(task);
 
-      logger.info(`[RabbitMQService] Started consuming tasks from queue ${queueName}`);
+            // Acknowledge the message
+            this.channel!.ack(msg);
+
+            logger.debug(
+              `[RabbitMQService] Processed task ${task.id} from queue ${queueName}`
+            );
+          } catch (error) {
+            logger.error(
+              `[RabbitMQService] Error processing task from queue ${queueName}:`,
+              error
+            );
+
+            // Reject and requeue the message
+            this.channel!.nack(msg, false, true);
+          }
+        },
+        { noAck: false }
+      );
+
+      logger.info(
+        `[RabbitMQService] Started consuming tasks from queue ${queueName}`
+      );
     } catch (error) {
-      logger.error(`[RabbitMQService] Failed to consume tasks from queue ${queueName}:`, error);
+      logger.error(
+        `[RabbitMQService] Failed to consume tasks from queue ${queueName}:`,
+        error
+      );
       throw error;
     }
   }
@@ -222,32 +248,50 @@ export class RabbitMQService {
   /**
    * Publish a message to an exchange
    */
-  async publishMessage(exchangeName: string, message: Message, routingKey?: string): Promise<void> {
+  async publishMessage(
+    exchangeName: string,
+    message: Message,
+    routingKey?: string
+  ): Promise<void> {
     if (!this.isConnected || !this.channel) {
-      throw new Error('RabbitMQ not connected');
+      throw new Error("RabbitMQ not connected");
     }
 
     try {
-      await this.channel.assertExchange(exchangeName, 'topic', { durable: true });
-      
-      const messageBuffer = Buffer.from(JSON.stringify({
-        ...message,
-        timestamp: message.timestamp.toISOString(),
-      }));
-
-      const published = this.channel.publish(exchangeName, routingKey || '', messageBuffer, {
-        persistent: true,
-        messageId: message.id,
-        timestamp: message.timestamp.getTime(),
+      await this.channel.assertExchange(exchangeName, "topic", {
+        durable: true,
       });
 
+      const messageBuffer = Buffer.from(
+        JSON.stringify({
+          ...message,
+          timestamp: message.timestamp.toISOString(),
+        })
+      );
+
+      const published = this.channel.publish(
+        exchangeName,
+        routingKey || "",
+        messageBuffer,
+        {
+          persistent: true,
+          messageId: message.id,
+          timestamp: message.timestamp.getTime(),
+        }
+      );
+
       if (!published) {
-        throw new Error('Failed to publish message to exchange');
+        throw new Error("Failed to publish message to exchange");
       }
 
-      logger.debug(`[RabbitMQService] Published message ${message.id} to exchange ${exchangeName}`);
+      logger.debug(
+        `[RabbitMQService] Published message ${message.id} to exchange ${exchangeName}`
+      );
     } catch (error) {
-      logger.error(`[RabbitMQService] Failed to publish message to exchange ${exchangeName}:`, error);
+      logger.error(
+        `[RabbitMQService] Failed to publish message to exchange ${exchangeName}:`,
+        error
+      );
       throw error;
     }
   }
@@ -255,51 +299,75 @@ export class RabbitMQService {
   /**
    * Subscribe to messages from an exchange
    */
-  async subscribeToMessages(exchangeName: string, handler: MessageHandler, routingKey?: string): Promise<void> {
+  async subscribeToMessages(
+    exchangeName: string,
+    handler: MessageHandler,
+    routingKey?: string
+  ): Promise<void> {
     if (!this.isConnected || !this.channel) {
-      throw new Error('RabbitMQ not connected');
+      throw new Error("RabbitMQ not connected");
     }
 
     try {
-      await this.channel.assertExchange(exchangeName, 'topic', { durable: true });
-      
+      await this.channel.assertExchange(exchangeName, "topic", {
+        durable: true,
+      });
+
       // Create a temporary queue for this subscription
-      const queueResult = await this.channel.assertQueue('', { exclusive: true });
+      const queueResult = await this.channel.assertQueue("", {
+        exclusive: true,
+      });
       const queueName = queueResult.queue;
-      
+
       // Bind the queue to the exchange
-      await this.channel.bindQueue(queueName, exchangeName, routingKey || '#');
-      
+      await this.channel.bindQueue(queueName, exchangeName, routingKey || "#");
+
       // Store handler for reconnection
-      this.messageHandlers.set(`${exchangeName}:${routingKey || '#'}`, handler);
+      this.messageHandlers.set(`${exchangeName}:${routingKey || "#"}`, handler);
 
-      await this.channel.consume(queueName, async (msg) => {
-        if (!msg) return;
+      await this.channel.consume(
+        queueName,
+        async (msg) => {
+          if (!msg) return;
 
-        try {
-          const messageData = JSON.parse(msg.content.toString());
-          const message: Message = {
-            ...messageData,
-            timestamp: new Date(messageData.timestamp),
-          };
+          try {
+            const messageData = JSON.parse(msg.content.toString());
+            const message: Message = {
+              ...messageData,
+              timestamp: new Date(messageData.timestamp),
+            };
 
-          await handler(message);
-          
-          // Acknowledge the message
-          this.channel!.ack(msg);
-          
-          logger.debug(`[RabbitMQService] Processed message ${message.id} from exchange ${exchangeName}`);
-        } catch (error) {
-          logger.error(`[RabbitMQService] Error processing message from exchange ${exchangeName}:`, error);
-          
-          // Reject and requeue the message
-          this.channel!.nack(msg, false, true);
-        }
-      }, { noAck: false });
+            await handler(message);
 
-      logger.info(`[RabbitMQService] Subscribed to messages from exchange ${exchangeName} with routing key ${routingKey || '#'}`);
+            // Acknowledge the message
+            this.channel!.ack(msg);
+
+            logger.debug(
+              `[RabbitMQService] Processed message ${message.id} from exchange ${exchangeName}`
+            );
+          } catch (error) {
+            logger.error(
+              `[RabbitMQService] Error processing message from exchange ${exchangeName}:`,
+              error
+            );
+
+            // Reject and requeue the message
+            this.channel!.nack(msg, false, true);
+          }
+        },
+        { noAck: false }
+      );
+
+      logger.info(
+        `[RabbitMQService] Subscribed to messages from exchange ${exchangeName} with routing key ${
+          routingKey || "#"
+        }`
+      );
     } catch (error) {
-      logger.error(`[RabbitMQService] Failed to subscribe to messages from exchange ${exchangeName}:`, error);
+      logger.error(
+        `[RabbitMQService] Failed to subscribe to messages from exchange ${exchangeName}:`,
+        error
+      );
       throw error;
     }
   }
@@ -309,7 +377,7 @@ export class RabbitMQService {
    */
   async createQueue(config: QueueConfig): Promise<void> {
     if (!this.isConnected || !this.channel) {
-      throw new Error('RabbitMQ not connected');
+      throw new Error("RabbitMQ not connected");
     }
 
     try {
@@ -319,10 +387,13 @@ export class RabbitMQService {
         autoDelete: config.autoDelete,
         arguments: config.arguments,
       });
-      
+
       logger.info(`[RabbitMQService] Created queue ${config.name}`);
     } catch (error) {
-      logger.error(`[RabbitMQService] Failed to create queue ${config.name}:`, error);
+      logger.error(
+        `[RabbitMQService] Failed to create queue ${config.name}:`,
+        error
+      );
       throw error;
     }
   }
@@ -332,7 +403,7 @@ export class RabbitMQService {
    */
   async createExchange(config: ExchangeConfig): Promise<void> {
     if (!this.isConnected || !this.channel) {
-      throw new Error('RabbitMQ not connected');
+      throw new Error("RabbitMQ not connected");
     }
 
     try {
@@ -341,10 +412,15 @@ export class RabbitMQService {
         autoDelete: config.autoDelete,
         arguments: config.arguments,
       });
-      
-      logger.info(`[RabbitMQService] Created exchange ${config.name} of type ${config.type}`);
+
+      logger.info(
+        `[RabbitMQService] Created exchange ${config.name} of type ${config.type}`
+      );
     } catch (error) {
-      logger.error(`[RabbitMQService] Failed to create exchange ${config.name}:`, error);
+      logger.error(
+        `[RabbitMQService] Failed to create exchange ${config.name}:`,
+        error
+      );
       throw error;
     }
   }
@@ -353,7 +429,9 @@ export class RabbitMQService {
    * Get connection status
    */
   isConnectionHealthy(): boolean {
-    return this.isConnected && this.connection !== null && this.channel !== null;
+    return (
+      this.isConnected && this.connection !== null && this.channel !== null
+    );
   }
 
   /**
@@ -361,20 +439,24 @@ export class RabbitMQService {
    */
   private async handleReconnect(): Promise<void> {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      logger.error('[RabbitMQService] Max reconnection attempts reached, giving up');
+      logger.error(
+        "[RabbitMQService] Max reconnection attempts reached, giving up"
+      );
       return;
     }
 
     this.reconnectAttempts++;
-    logger.info(`[RabbitMQService] Attempting to reconnect (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+    logger.info(
+      `[RabbitMQService] Attempting to reconnect (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
+    );
 
     setTimeout(async () => {
       try {
         await this.connect();
         await this.reestablishConsumers();
-        logger.info('[RabbitMQService] Reconnected successfully');
+        logger.info("[RabbitMQService] Reconnected successfully");
       } catch (error) {
-        logger.error('[RabbitMQService] Reconnection failed:', error);
+        logger.error("[RabbitMQService] Reconnection failed:", error);
         this.handleReconnect();
       }
     }, this.reconnectDelay);
@@ -389,17 +471,27 @@ export class RabbitMQService {
       try {
         await this.consumeTasks(queueName, handler);
       } catch (error) {
-        logger.error(`[RabbitMQService] Failed to reestablish consumer for queue ${queueName}:`, error);
+        logger.error(
+          `[RabbitMQService] Failed to reestablish consumer for queue ${queueName}:`,
+          error
+        );
       }
     }
 
     // Reestablish message consumers
     for (const [key, handler] of this.messageHandlers) {
       try {
-        const [exchangeName, routingKey] = key.split(':');
-        await this.subscribeToMessages(exchangeName, handler, routingKey === '#' ? undefined : routingKey);
+        const [exchangeName, routingKey] = key.split(":");
+        await this.subscribeToMessages(
+          exchangeName,
+          handler,
+          routingKey === "#" ? undefined : routingKey
+        );
       } catch (error) {
-        logger.error(`[RabbitMQService] Failed to reestablish consumer for exchange ${key}:`, error);
+        logger.error(
+          `[RabbitMQService] Failed to reestablish consumer for exchange ${key}:`,
+          error
+        );
       }
     }
   }
@@ -409,7 +501,7 @@ export class RabbitMQService {
    */
   async initializeDefaults(): Promise<void> {
     if (!this.isConnected || !this.channel) {
-      throw new Error('RabbitMQ not connected');
+      throw new Error("RabbitMQ not connected");
     }
 
     try {
@@ -418,7 +510,7 @@ export class RabbitMQService {
       for (const exchangeName of exchanges) {
         await this.createExchange({
           name: exchangeName,
-          type: 'topic',
+          type: "topic",
           durable: true,
           autoDelete: false,
         });
@@ -435,9 +527,9 @@ export class RabbitMQService {
         });
       }
 
-      logger.info('[RabbitMQService] Initialized default queues and exchanges');
+      logger.info("[RabbitMQService] Initialized default queues and exchanges");
     } catch (error) {
-      logger.error('[RabbitMQService] Failed to initialize defaults:', error);
+      logger.error("[RabbitMQService] Failed to initialize defaults:", error);
       throw error;
     }
   }

@@ -1,15 +1,8 @@
-import { CLUSTER_EVENTS } from "@discord-bot/shared-types";
+import { CLUSTER_EVENTS, ClusterConfig, ClusterInfo, ClusterInstance, ClusterStatus, ShardDistribution } from "@discord-bot/shared-types";
 import Docker from "dockerode";
 import { DiscordGatewayService } from "./services/discord-gateway";
 import { RabbitMQService } from "./services/rabbitmq";
 import { ShardAssignmentService } from "./services/shard-assignment";
-import {
-  ClusterConfig,
-  ClusterInfo,
-  ClusterInstance,
-  ClusterStatus,
-} from "./types/cluster";
-import { ShardDistribution } from "./types/shard";
 import logger from "./utils/logger";
 
 // Docker configuration constants
@@ -161,7 +154,7 @@ export class ClusterManager {
       }
 
       logger.info(
-        `[ClusterManager] Calculated distribution: ${this.currentDistribution.totalClusters} clusters, ${this.currentDistribution.shardsPerCluster} shards per cluster`
+        `[ClusterManager] Calculated distribution: ${this.currentDistribution?.totalClusters} clusters, ${this.currentDistribution?.shardsPerCluster} shards per cluster`
       );
 
       // Start clusters with proper timing
