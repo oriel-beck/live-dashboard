@@ -53,9 +53,9 @@ echo ✅ Images pushed to registry!
 echo.
 echo 🚀 Starting all services...
 if "%BUILD_TARGET%"=="dev" (
-  docker-compose -f docker-compose.dev.yml up -d
+  docker-compose -f docker-compose.dev.yml up -d --build
 ) else (
-  docker-compose -f docker-compose.yml up -d
+  docker-compose -f docker-compose.yml up -d --build
 )
 
 echo.

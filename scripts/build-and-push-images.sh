@@ -57,7 +57,11 @@ docker push ${REGISTRY_HOST}/bot:latest || {
 echo "✅ Images pushed to registry!"
 echo ""
 echo "🚀 Starting all services..."
-docker-compose up -d
+if [[ "$BUILD_TARGET" == "dev" ]]; then
+  docker-compose -f docker-compose.dev.yml up -d --build
+else
+  docker-compose -f docker-compose.yml up -d --build
+fi
 
 echo ""
 echo "✅ All services started!"
