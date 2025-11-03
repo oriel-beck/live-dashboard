@@ -1,16 +1,6 @@
 import * as amqp from "amqplib";
-import {
-  Task,
-  Message,
-  TaskHandler,
-  MessageHandler,
-  QueueConfig,
-  ExchangeConfig,
-  RabbitMQConfig,
-  QUEUE_NAMES,
-  EXCHANGE_NAMES,
-} from "@discord-bot/shared-types";
 import { logger } from "./logger";
+import { EXCHANGE_NAMES, ExchangeConfig, Message, MessageHandler, QUEUE_NAMES, QueueConfig, RabbitMQConfig, Task, TaskHandler } from "../types/rabbitmq";
 
 export class RabbitMQService {
   private connection: amqp.ChannelModel | null = null;
