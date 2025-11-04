@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { GuildChannel } from '../../../types';
+import { GuildChannel } from '@discord-bot/shared-types';
 import { ButtonModule } from 'primeng/button';
 import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
 import { SelectModule } from 'primeng/select';
@@ -57,8 +57,7 @@ import { SelectModule } from 'primeng/select';
         padding: 20px;
         background: #36393f;
         color: #ffffff;
-        font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial,
-          sans-serif;
+        font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
         .form-field {
           display: flex;

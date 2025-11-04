@@ -2,17 +2,16 @@ import { computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   BotProfile,
-  CATEGORY_DESCRIPTIONS,
-  CATEGORY_NAMES,
+  CommandCategory,
   CommandConfigResult,
-  CommandConfigResultWithSubcommands,
+  CommandConfigResultWithCategory,
   GuildApplicationCommandPermissions,
   GuildChannel,
   GuildInfo,
   GuildRole,
   SSEEvent,
   SSE_EVENT_TYPES,
-} from '../../types';
+} from '@discord-bot/shared-types';
 import {
   patchState,
   signalStore,
@@ -23,13 +22,12 @@ import {
 } from '@ngrx/signals';
 import { environment } from '../../environments/environment';
 import { SERVER_CONTEXT_PROVIDER } from '../shared/interfaces/server-context.interface';
-import { CommandCategory } from '../types/command';
 
 interface CacheStore {
   source: EventSource | null;
   guildId: string | null;
   retryCount: number;
-  commands: Map<number, CommandConfigResultWithSubcommands>;
+  commands: Map<number, CommandConfigResultWithCategory>;
   commandPermissions: Map<string, GuildApplicationCommandPermissions>;
   roles: GuildRole[];
   channels: GuildChannel[];
@@ -44,7 +42,7 @@ const initialState: CacheStore = {
   source: null,
   guildId: null,
   retryCount: 0,
-  commands: new Map<number, CommandConfigResultWithSubcommands>(),
+  commands: new Map<number, CommandConfigResultWithCategory>(),
   commandPermissions: new Map<string, GuildApplicationCommandPermissions>(),
   roles: [],
   channels: [],
@@ -178,7 +176,7 @@ export const CacheStore = signalStore(
                   commands: event.data.reduce((acc, command) => {
                     acc.set(command.id, command);
                     return acc;
-                  }, new Map<number, CommandConfigResultWithSubcommands>()),
+                  }, new Map<number, CommandConfigResultWithCategory>()),
                 });
                 break;
 
@@ -410,22 +408,22 @@ export const CacheStore = signalStore(
         const commands = store.commands();
         return Array.from(commands.values()).reduce((acc, command) => {
           // Check if command has category information
-          if (command.categoryId) {
-            let data = acc.get(command.categoryId) ?? {
-              commands: [],
-              name: CATEGORY_NAMES[command.categoryId],
-              description: CATEGORY_DESCRIPTIONS[command.categoryId],
-              id: command.categoryId,
-            };
-
+          if (command.categoryId && command.category) {
+            let data = acc.get(command.categoryId) ?? { ...command.category };
+            // Ensure commands array exists
+            if (!data.commands) {
+              data.commands = [];
+            }
             const existingCommand = data.commands.find(
               (c: CommandConfigResult) => c.id === command.id
             );
-
             if (!existingCommand) {
               data.commands.push(command);
+            } else {
+              data.commands = data.commands.map((c: CommandConfigResult) =>
+                c.id === command.id ? command : c
+              );
             }
-            
             acc.set(command.categoryId, data);
           }
           return acc;

@@ -107,7 +107,7 @@ async function registerCommandsInDatabase(
       permissions: localCommand.defaultPermissions?.toString() || "0",
       enabled: true,
       parentId: null,
-      categoryId: localCommand.category,
+      categoryId: null,
       filePath: (localCommand as any).filePath || null,
     });
 
@@ -154,7 +154,7 @@ async function registerSubcommands(
         enabled: true,
         parentId: parentId,
         discordId: null,
-        categoryId: parentCommand.category,
+        categoryId: null,
         filePath: null,
       });
 
@@ -176,7 +176,7 @@ async function registerSubcommands(
               enabled: true,
               parentId: groupId,
               discordId: null,
-              categoryId: parentCommand.category,
+              categoryId: null,
               filePath: null,
             });
             logger.debug(
@@ -197,7 +197,7 @@ async function registerSubcommands(
         enabled: true,
         parentId: parentId,
         discordId: null,
-        categoryId: parentCommand.category,
+        categoryId: null,
         filePath: null,
       });
       logger.debug(`[Deploy] Registered subcommand: ${option.name}`);

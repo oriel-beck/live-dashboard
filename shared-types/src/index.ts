@@ -11,7 +11,6 @@ export * from "./schemas/sse-events";
 // Export all constants
 export * from "./constants/redis-contstants";
 export * from "./constants/cluster-events";
-export * from "./constants/categories";
 
 // Export all types
 export * from "./types/cluster";

@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { GuildInfo } from '../../../types/schemas/guild';
+import { GuildInfo } from '@discord-bot/shared-types';
 import { catchError, map, Observable, of } from 'rxjs';
 import { ApiService } from './api.service';
 

@@ -1,4 +1,4 @@
-import { CommandConfigResultWithSubcommands } from './command';
+import { CommandConfigResultWithCategory } from './command';
 import { ApplicationCommandPermission, GuildApplicationCommandPermissions } from './discord';
 import { BotProfile, GuildChannel, GuildInfo, GuildRole } from './guild';
 
@@ -77,7 +77,7 @@ export interface ChannelsFailedEvent extends BaseSSEEvent {
 
 export interface CommandsLoadedEvent extends BaseSSEEvent {
   type: typeof SSE_EVENT_TYPES.COMMANDS_LOADED;
-  data: CommandConfigResultWithSubcommands[];
+  data: CommandConfigResultWithCategory[];
 }
 
 export interface CommandsFailedEvent extends BaseSSEEvent {

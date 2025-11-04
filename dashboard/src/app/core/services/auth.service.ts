@@ -3,11 +3,11 @@ import { Router } from '@angular/router';
 import { Observable, catchError, of, tap, map } from 'rxjs';
 import { ApiService } from './api.service';
 import {
+  ApiResponse,
   AuthState,
   User,
   UserGuild,
-} from '../../../types/schemas/auth';
-import { ApiResponse } from '../../../types/schemas/api';
+} from '@discord-bot/shared-types';
 
 @Injectable({
   providedIn: 'root',

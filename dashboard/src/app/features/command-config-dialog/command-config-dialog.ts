@@ -3,13 +3,13 @@ import { Component, computed, inject, Signal, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   ApplicationCommandPermission,
-  CommandConfigResultWithSubcommands,
+  CommandConfigResultWithCategory,
   CommandPermissionsResponse,
   DISCORD_PERMISSION_TYPES,
   GuildApplicationCommandPermissions,
   GuildChannel,
   GuildRole,
-} from '../../../types';
+} from '@discord-bot/shared-types';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
@@ -67,7 +67,7 @@ export class CommandConfigDialog {
   confirmationService = inject(ConfirmationService);
 
   // Get data from dialog config
-  command: Signal<CommandConfigResultWithSubcommands> = signal(
+  command: Signal<CommandConfigResultWithCategory> = signal(
     this.config.data.command
   );
   guildId: Signal<string> = signal(this.config.data.guildId);

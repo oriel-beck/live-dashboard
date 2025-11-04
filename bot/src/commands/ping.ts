@@ -1,9 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { BaseCommand } from "../types/command";
-import { CATEGORIES } from "@discord-bot/shared-types";
 
 export class PingCommand extends BaseCommand {
-  category = CATEGORIES.GENERAL;
   data = new SlashCommandBuilder()
     .setName("ping")
     .setDescription("Replies with Pong!");

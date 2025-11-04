@@ -3,7 +3,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
-import { logger, CATEGORIES } from "@discord-bot/shared-types";
+import { logger } from "@discord-bot/shared-types";
 
 // ===== BASE COMMAND CLASS =====
 // Abstract base class that all commands must extend
@@ -15,7 +15,6 @@ export abstract class BaseCommand {
   // These will be sent to the backend and used to set default_member_permissions
   defaultPermissions: bigint = 0n; // Discord permission bits (e.g., PermissionFlagsBits.ManageGuild)
   cooldown: number = 0;
-  abstract category: CATEGORIES;
 
   // Main execution method that routes to appropriate handler
   async execute(interaction: ChatInputCommandInteraction): Promise<void> {
