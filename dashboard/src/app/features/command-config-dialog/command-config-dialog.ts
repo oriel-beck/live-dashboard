@@ -9,7 +9,7 @@ import {
   GuildApplicationCommandPermissions,
   GuildChannel,
   GuildRole,
-} from '@discord-bot/shared-types';
+} from '@discord-bot/shared';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';

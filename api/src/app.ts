@@ -4,9 +4,8 @@ import { Elysia } from "elysia";
 import { config } from "./config";
 import { DatabaseService } from "./services/database";
 import { RedisService } from "./services/redis";
-import { RabbitMQService } from "@discord-bot/shared-types";
+import { RabbitMQService, logger } from "@discord-bot/services";
 import { DiscordEventsConsumer } from "./services/discord-events-consumer";
-import { logger } from "@discord-bot/shared-types";
 
 // Import route plugins
 import { authPlugin } from "./routes/auth";

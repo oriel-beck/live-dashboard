@@ -1,4 +1,5 @@
-import { logger, GatewayInfo } from "@discord-bot/shared-types";
+import { GatewayInfo } from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 
 export class DiscordGatewayService {
   private readonly botToken: string;

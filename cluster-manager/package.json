@@ -13,7 +13,8 @@
   "license": "ISC",
   "description": "Docker-based cluster manager for Discord bot",
   "dependencies": {
-    "@discord-bot/shared-types": "../shared-types/",
+    "@discord-bot/shared": "../shared/",
+    "@discord-bot/services": "../services/",
     "amqplib": "^0.10.9",
     "dockerode": "^4.0.9",
     "dotenv": "^16.4.7",

@@ -1,5 +1,5 @@
 import { ClusterManager } from "./cluster-manager";
-import { logger } from "@discord-bot/shared-types";
+import { logger } from "@discord-bot/services";
 
 // Create and start cluster manager
 const manager = new ClusterManager();

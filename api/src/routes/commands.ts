@@ -3,8 +3,8 @@ import { DatabaseService } from '../services/database';
 import { botAuth } from '../middleware/auth';
 import { 
   DefaultCommandRegistrationSchema,
-  logger
-} from '@discord-bot/shared-types';
+} from '@discord-bot/shared';
+import { logger } from '@discord-bot/services';
 
 export const commandPlugin = new Elysia({ name: 'command' })
   // Bot-only command registration routes

@@ -21,10 +21,6 @@ export * from "./types/rabbitmq";
 // Export bot-specific runtime config
 export type { BotClusterConfig } from "./types/shard";
 
-// Export services
-export * from "./services/logger";
-export * from "./services/rabbitmq";
-
 // Re-export Discord API types for convenience
 export type {
   APIUser,
@@ -35,3 +31,4 @@ export type {
 export {
   ChannelType,
 } from "discord-api-types/payloads/v10";
+

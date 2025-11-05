@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, Options } from "discord.js";
-import type { BotClusterConfig } from "@discord-bot/shared-types";
+import type { BotClusterConfig } from "@discord-bot/shared";
 
 /**
  * Create a Discord client with optimized memory settings

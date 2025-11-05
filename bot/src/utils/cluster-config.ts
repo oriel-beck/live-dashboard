@@ -1,4 +1,5 @@
-import { logger, BotClusterConfig } from "@discord-bot/shared-types";
+import { BotClusterConfig } from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 
 /**
  * Validate and parse cluster configuration from environment variables

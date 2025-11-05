@@ -22,7 +22,7 @@ import {
   GuildApplicationCommandPermissions,
   GuildChannel,
   GuildRole,
-} from '@discord-bot/shared-types';
+} from '@discord-bot/shared';
 import { CacheStore } from '../../store/sse.store';
 import { CommandConfigDialog } from '../command-config-dialog/command-config-dialog';
 //

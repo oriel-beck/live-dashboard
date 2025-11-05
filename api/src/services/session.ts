@@ -1,6 +1,7 @@
 import { RedisService } from "./redis";
 import { DiscordService } from "./discord";
-import { User, logger } from "@discord-bot/shared-types";
+import { User } from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 
 export class SessionService {
   // Store user session data with partial data only

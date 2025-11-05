@@ -27,7 +27,7 @@ import { REST, Routes, ApplicationCommand } from "discord.js";
 import { join } from "path";
 import { CommandLoader } from "./utils/command-loader";
 import { ApiClient } from "./utils/api-client";
-import { logger } from "@discord-bot/shared-types";
+import { logger } from "@discord-bot/services";
 import { BaseCommand } from "./types/command";
 
 async function deployGlobalCommands(

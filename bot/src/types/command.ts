@@ -3,7 +3,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
-import { logger } from "@discord-bot/shared-types";
+import { logger } from "@discord-bot/services";
 
 // ===== BASE COMMAND CLASS =====
 // Abstract base class that all commands must extend

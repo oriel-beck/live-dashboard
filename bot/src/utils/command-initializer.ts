@@ -3,7 +3,8 @@ import { CommandLoader } from "./command-loader";
 import { CommandManager } from "./command-manager";
 import { BaseCommand } from "../types/command";
 import { deployAndSyncCommands } from "./command-deployment";
-import { logger, BotClusterConfig } from "@discord-bot/shared-types";
+import { BotClusterConfig } from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 
 /**
  * Initialize commands: load, validate, deploy (if cluster 0), and register locally

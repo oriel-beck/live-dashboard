@@ -2,10 +2,9 @@ import {
   BotConfigUpdateRequestSchema,
   BotConfigResponseSchema,
   SSE_EVENT_TYPES,
-  RabbitMQService,
   EXCHANGE_NAMES,
-  logger,
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
+import { RabbitMQService, logger } from "@discord-bot/services";
 import { Elysia } from "elysia";
 import { combinedAuth } from "../middleware/auth";
 import { DiscordService } from "../services/discord";

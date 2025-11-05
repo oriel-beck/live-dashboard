@@ -12,7 +12,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@discord-bot/shared-types": "../shared-types/",
+    "@discord-bot/shared": "../shared/",
+    "@discord-bot/services": "../services/",
     "amqplib": "^0.10.9",
     "bufferutil": "^4.0.9",
     "discord.js": "^14.21.0",

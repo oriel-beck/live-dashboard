@@ -5,9 +5,8 @@ import {
   ClusterInstance,
   ClusterStatus,
   ShardDistribution,
-  logger,
-  RabbitMQService,
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
+import { RabbitMQService, logger } from "@discord-bot/services";
 import Docker from "dockerode";
 import { DiscordGatewayService } from "./services/discord-gateway";
 import { ShardAssignmentService } from "./services/shard-assignment";

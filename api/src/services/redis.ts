@@ -6,8 +6,8 @@ import {
   ChannelType,
   GuildChannel,
   GuildRole,
-  logger
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 import { config } from "../config";
 import { DiscordService } from "./discord";
 

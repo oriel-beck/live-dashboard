@@ -11,7 +11,7 @@ import {
   GuildRole,
   SSEEvent,
   SSE_EVENT_TYPES,
-} from '@discord-bot/shared-types';
+} from '@discord-bot/shared';
 import {
   patchState,
   signalStore,

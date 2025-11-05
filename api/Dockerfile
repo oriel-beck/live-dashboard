@@ -1,35 +1,32 @@
+# Pull base images from registry
+ARG REGISTRY_HOST=localhost:5000
+FROM ${REGISTRY_HOST}/shared-base:latest AS shared-source
+FROM ${REGISTRY_HOST}/services-base:latest AS services-source
+
 FROM oven/bun:1.2-alpine AS base
-WORKDIR /app
+WORKDIR /workspace
 
-# Copy shared-types to parent directory
-COPY shared-types ../shared-types
-# Install shared-types dependencies and build it (needed for module resolution)
-RUN cd ../shared-types && rm -f bun.lock && bun install && bun run build
+# Copy built shared and services from registry images (no node_modules, just artifacts)
+# Place them as siblings so workspace dependencies resolve correctly
+COPY --from=shared-source /shared ./shared
+COPY --from=services-source /services ./services
 
-# Copy API files
-COPY api/package*.json ./
+# Install dependencies for shared (needed at runtime)
+# Then install dependencies for services (needed at runtime)
+RUN cd /workspace/shared && rm -f bun.lock && bun install && \
+    cd /workspace/services && rm -f bun.lock && bun install
 
-# Install all dependencies (including shared-types as local file)
-# Remove node_modules first to ensure fresh install with updated shared-types package.json
-RUN rm -rf node_modules && bun install
+# Copy api package.json and install dependencies
+COPY api/package*.json ./api/
+RUN cd /workspace/api && bun install
 
-# Development stage - no compilation, Bun runs TypeScript directly!
 FROM base AS dev
-# Copy source code
+WORKDIR /workspace/api
 COPY api/ ./
-# Copy shared-types (includes built dist/ for module resolution)
-COPY --from=base /app/../shared-types ../shared-types
-# Expose port for development
 EXPOSE 3000
-# Use bun run dev - runs TypeScript directly, no compilation needed!
 CMD ["bun", "run", "dev"]
 
-# Production stage - also runs TypeScript directly with Bun, no compilation needed!
 FROM base AS prod
-WORKDIR /app
-# Copy API source files
+WORKDIR /workspace/api
 COPY api/ ./
-# Copy shared-types (includes built dist/ for module resolution)
-COPY --from=base /app/../shared-types ../shared-types
-# Bun runs TypeScript directly, no compilation needed!
 CMD ["bun", "run", "start"]

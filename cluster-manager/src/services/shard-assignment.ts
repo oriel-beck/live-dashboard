@@ -1,8 +1,8 @@
 import {
   ShardDistribution,
   ShardAssignment,
-  logger,
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 
 export class ShardAssignmentService {
   private readonly shardsPerCluster: number;

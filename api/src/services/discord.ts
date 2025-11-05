@@ -16,9 +16,9 @@ import {
   GuildSchema,
   REDIS_KEYS,
   UserGuild,
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
 import { config } from "../config";
-import { logger } from "../utils/logger";
+import { logger } from "@discord-bot/services";
 import { makeRequestWithRetry } from "../utils/request-utils";
 import { RedisService } from "./redis";
 

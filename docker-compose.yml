@@ -9,6 +9,8 @@ services:
       context: .
       dockerfile: ./api/Dockerfile
       target: prod
+      args:
+        REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
     command: ["bun", "run", "start"]
     depends_on: 
       - redis
@@ -82,6 +84,8 @@ services:
       context: .
       dockerfile: ./dashboard/Dockerfile
       target: ${BUILD_TARGET:-prod}
+      args:
+        REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
     command: ["npm", "run", "start", "--", "--host", "0.0.0.0", "--port", "80"]
     depends_on: 
       - api

@@ -5,7 +5,8 @@ import { DatabaseService } from "../services/database";
 import { DiscordService } from "../services/discord";
 import { RedisService } from "../services/redis";
 import { withAbort } from "../utils/request-utils";
-import { SSE_EVENT_TYPES, SSEEvent, logger } from "@discord-bot/shared-types";
+import { SSE_EVENT_TYPES, SSEEvent } from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 import { sseRegistry, type SSEConnection } from "../services/sse-registry";
 
 // Helper function to get command permissions with caching

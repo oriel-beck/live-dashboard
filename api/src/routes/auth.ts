@@ -4,8 +4,8 @@ import {
   DiscordUser,
   UserGuildSchema,
   UserSchema,
-  logger
-} from '@discord-bot/shared-types';
+} from '@discord-bot/shared';
+import { logger } from '@discord-bot/services';
 import { Elysia } from 'elysia';
 import { config } from '../config';
 import { sessionMiddleware } from '../middleware/session';

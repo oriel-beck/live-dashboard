@@ -1,4 +1,5 @@
-import { CommandPermissionsUpdateSchema, logger } from "@discord-bot/shared-types";
+import { CommandPermissionsUpdateSchema } from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 import { Elysia } from "elysia";
 import { combinedAuth } from "../middleware/auth";
 import { DatabaseService } from "../services/database";

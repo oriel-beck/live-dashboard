@@ -1,12 +1,11 @@
 import { ChannelType, type Client, Events } from "discord.js";
 import redis from "../redis";
 import {
-  RabbitMQService,
   EXCHANGE_NAMES,
   REDIS_KEYS,
   SSE_EVENT_TYPES,
-  logger,
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
+import { RabbitMQService, logger } from "@discord-bot/services";
 
 // Note: REDIS_KEYS is still needed for guild set operations (GUILD_SET)
 

@@ -3,8 +3,8 @@ import {
   CommandConfigResult,
   DefaultCommandRegistration,
   DefaultCommandRegistrationResponse,
-  logger,
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 
 // Type for command registration request (what we send to API)
 type CommandRegistrationRequest = Omit<

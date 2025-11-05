@@ -8,7 +8,7 @@ import { BaseCommand } from "../types/command";
 
 import { ApiClient } from "./api-client";
 import { PermissionChecker } from "./permission-checker";
-import { logger } from "@discord-bot/shared-types";
+import { logger } from "@discord-bot/services";
 
 export class CommandManager {
   private client: Client;

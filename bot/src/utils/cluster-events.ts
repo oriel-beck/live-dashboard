@@ -1,12 +1,11 @@
 import {
-  RabbitMQService,
   QUEUE_NAMES,
   CLUSTER_EVENTS,
   ClusterStartEventData,
   ClusterStopEventData,
   BotClusterConfig,
-  logger,
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
+import { RabbitMQService, logger } from "@discord-bot/services";
 
 /**
  * Send cluster start event to manager via RabbitMQ

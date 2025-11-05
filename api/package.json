@@ -18,7 +18,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@discord-bot/shared-types": "../shared-types/",
+    "@discord-bot/shared": "../shared/",
+    "@discord-bot/services": "../services/",
     "@elysiajs/cookie": "^0.8.0",
     "@elysiajs/cors": "^1.1.0",
     "@elysiajs/swagger": "^1.1.0",

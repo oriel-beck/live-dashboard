@@ -1,8 +1,8 @@
 import { AppDataSource } from '../config/database';
-import { logger } from '../utils/logger';
+import { logger } from '@discord-bot/services';
 import { DefaultCommand } from '../entities/DefaultCommand';
 import { Repository, IsNull } from 'typeorm';
-import { DefaultCommandRegistration } from '@discord-bot/shared-types';
+import { DefaultCommandRegistration } from '@discord-bot/shared';
 
 export class DatabaseService {
   static async initialize(): Promise<void> {

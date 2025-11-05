@@ -6,15 +6,47 @@
 # BUILD_TARGET can be 'dev' or 'prod' (defaults to 'prod')
 
 services:
+  # Build shared base image (used by dashboard and services)
+  shared-base:
+    build:
+      context: ./shared
+      dockerfile: ./Dockerfile
+      target: shared-base
+      tags:
+        - shared-base:latest
+        - ${REGISTRY_HOST:-localhost:5000}/shared-base:latest
+    image: ${REGISTRY_HOST:-localhost:5000}/shared-base:latest
+
+  # Build services base image (used by api, bot, cluster-manager)
+  services-base:
+    build:
+      context: ./services
+      dockerfile: ./Dockerfile
+      target: services-base
+      args:
+        REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
+      tags:
+        - services-base:latest
+        - ${REGISTRY_HOST:-localhost:5000}/services-base:latest
+    image: ${REGISTRY_HOST:-localhost:5000}/services-base:latest
+    depends_on:
+      - shared-base
+
   # Build cluster manager image
   cluster-manager:
     build:
       context: .
       dockerfile: ./cluster-manager/Dockerfile
       target: ${BUILD_TARGET:-prod}
+      args:
+        REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
       tags:
         - cluster-manager:latest
-    image: cluster-manager:latest
+        - ${REGISTRY_HOST:-localhost:5000}/cluster-manager:latest
+    image: ${REGISTRY_HOST:-localhost:5000}/cluster-manager:latest
+    depends_on:
+      - shared-base
+      - services-base
 
   # Build bot cluster container image (used by cluster manager)
   bot-cluster:
@@ -22,7 +54,13 @@ services:
       context: .
       dockerfile: ./bot/Dockerfile
       target: ${BUILD_TARGET:-prod}
+      args:
+        REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
       tags:
         - bot:latest
-    image: bot:latest
+        - ${REGISTRY_HOST:-localhost:5000}/bot:latest
+    image: ${REGISTRY_HOST:-localhost:5000}/bot:latest
+    depends_on:
+      - shared-base
+      - services-base
 

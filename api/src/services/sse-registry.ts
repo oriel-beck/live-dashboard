@@ -1,4 +1,5 @@
-import { SSEEvent, logger } from "@discord-bot/shared-types";
+import { SSEEvent } from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 
 /**
  * Interface for SSE connection that can send events

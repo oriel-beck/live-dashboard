@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia';
 import { SessionService } from '../services/session';
-import { logger } from '@discord-bot/shared-types';
+import { logger } from '@discord-bot/services';
 
 export const sessionMiddleware = new Elysia({ name: 'session' })
   .derive(async ({ cookie, set }) => {

@@ -1,5 +1,4 @@
 import {
-  RabbitMQService,
   EXCHANGE_NAMES,
   Message,
   REDIS_KEYS,
@@ -7,8 +6,8 @@ import {
   SSE_EVENT_TYPES,
   SSEEvent,
   GuildApplicationCommandPermissions,
-  logger,
-} from "@discord-bot/shared-types";
+} from "@discord-bot/shared";
+import { RabbitMQService, logger } from "@discord-bot/services";
 import { RedisService } from "./redis";
 import { sseRegistry } from "./sse-registry";
 

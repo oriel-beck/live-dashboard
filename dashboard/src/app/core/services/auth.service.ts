@@ -7,7 +7,7 @@ import {
   AuthState,
   User,
   UserGuild,
-} from '@discord-bot/shared-types';
+} from '@discord-bot/shared';
 
 @Injectable({
   providedIn: 'root',

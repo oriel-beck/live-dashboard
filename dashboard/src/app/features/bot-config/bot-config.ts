@@ -19,7 +19,7 @@ import { ApiService } from '../../core/services/api.service';
 import {
   BotConfig as BotConfigType,
   BotConfigUpdateRequest,
-} from '@discord-bot/shared-types';
+} from '@discord-bot/shared';
 
 // PrimeNG Imports
 import { ButtonModule } from 'primeng/button';

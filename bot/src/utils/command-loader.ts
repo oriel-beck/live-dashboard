@@ -1,7 +1,7 @@
 import { join } from "path";
 import { readdir } from "fs/promises";
 import { BaseCommand } from "../types/command";
-import { logger } from "@discord-bot/shared-types";
+import { logger } from "@discord-bot/services";
 
 export class CommandLoader {
   /**

@@ -9,6 +9,8 @@ services:
       context: .
       dockerfile: ./api/Dockerfile
       target: dev
+      args:
+        REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
     develop:
       watch:
         - path: ./api/src
@@ -23,12 +25,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
       - NODE_OPTIONS=--max-old-space-size=1024
       - LOG_LEVEL=debug
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-bot}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-bot_password}
     env_file:
       - .env
     healthcheck:
@@ -99,6 +106,8 @@ services:
       context: .
       dockerfile: ./dashboard/Dockerfile
       target: dev
+      args:
+        REGISTRY_HOST: ${REGISTRY_HOST:-localhost:5000}
     develop:
       watch:
         - path: ./dashboard/src
@@ -349,6 +358,7 @@ volumes:
   nirn_proxy_data:
   rabbitmq_data:
   registry_data:
+    
 
 networks:
   app-network:

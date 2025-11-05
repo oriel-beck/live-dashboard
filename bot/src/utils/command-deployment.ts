@@ -1,7 +1,8 @@
 import { REST, Routes, ApplicationCommand } from "discord.js";
 import { BaseCommand } from "../types/command";
 import { ApiClient } from "./api-client";
-import { logger, BotClusterConfig } from "@discord-bot/shared-types";
+import { BotClusterConfig } from "@discord-bot/shared";
+import { logger } from "@discord-bot/services";
 
 /**
  * Deploy commands to Discord and sync to API database

@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { DiscordService } from "../services/discord";
 import { SessionService } from "../services/session";
-import { logger } from "@discord-bot/shared-types";
+import { logger } from "@discord-bot/services";
 
 // Auth middleware for bot authentication
 export const botAuth = new Elysia({ name: "botAuth" }).derive(

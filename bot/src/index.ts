@@ -16,7 +16,7 @@ declare module "discord.js" {
 import { Events } from "discord.js";
 import { CommandManager } from "./utils/command-manager";
 import { startDataSync } from "./utils/sync-data";
-import { RabbitMQService, logger } from "@discord-bot/shared-types";
+import { RabbitMQService, logger } from "@discord-bot/services";
 import { loadClusterConfig } from "./utils/cluster-config";
 import { createDiscordClient } from "./utils/client-factory";
 import { initializeCommands } from "./utils/command-initializer";

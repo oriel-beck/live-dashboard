@@ -1,22 +1,32 @@
-FROM node:22-alpine AS base
-WORKDIR /app
-COPY dashboard/package*.json ./
-RUN npm install
+# Pull base image from registry
+ARG REGISTRY_HOST=localhost:5000
+FROM ${REGISTRY_HOST}/shared-base:latest AS shared-source
 
-COPY shared-types ./shared-types
-RUN cd shared-types && npm install && npm run build && \
-    node -e "const pkg=require('./package.json'); pkg.main='dist/index.js'; pkg.types='dist/index.d.ts'; pkg.exports={'.':{'import':'./dist/index.js','require':'./dist/index.js','types':'./dist/index.d.ts'}}; pkg.files=['dist/**/*']; require('fs').writeFileSync('./package.json',JSON.stringify(pkg,null,2));" && \
-    npm pack && cd .. && npm install ./shared-types/*.tgz
+FROM node:22-alpine AS base
+WORKDIR /workspace
+
+# Copy built shared from registry image (no node_modules, just artifacts)
+# Place it as sibling so workspace dependencies resolve correctly
+COPY --from=shared-source /shared ./shared
+
+# Install dependencies for shared (needed for TypeScript compilation)
+RUN cd ./shared && rm -f package-lock.json bun.lock && npm install
+
+# Copy dashboard package.json and install dependencies
+COPY dashboard/package*.json ./dashboard/
+RUN cd ./dashboard && npm install
 
 FROM base AS dev
+WORKDIR /workspace/dashboard
 COPY dashboard/ ./
 EXPOSE 4200
 
 FROM base AS build
+WORKDIR /workspace/dashboard
 COPY dashboard/ ./
 RUN npm run build
 
 FROM nginx:1.27-alpine AS prod
-COPY --from=build /app/dist/dashboard /usr/share/nginx/html
+COPY --from=build /workspace/dashboard/dist/dashboard /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
